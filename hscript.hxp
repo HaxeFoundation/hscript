@@ -1,5 +1,5 @@
 ﻿<haxe selected="0">
-  <output name="Neko" mode="swf9" out="hscript9.swf" class="Test" lib="" cmd="" main="True" debug="False"></output>
+  <output name="Neko" mode="swf9" out="hscript9.swf" class="Test" lib="" cmd="" main="True" debug="True"></output>
   <files path="/">
     <file path="hscript\Expr.hx" />
     <file path="hscript\Interp.hx" />

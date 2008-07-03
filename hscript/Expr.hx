@@ -45,6 +45,10 @@ enum Expr {
 	EFor( v : String, it : Expr, e : Expr );
 	EBreak;
 	EContinue;
+	EFunction( params : Array<String>, e : Expr, ?name : String );
+	EReturn( ?e : Expr );
+	EArray( e : Expr, index : Expr );
+	EArrayDecl( e : Array<Expr> );
 }
 
 enum Error {

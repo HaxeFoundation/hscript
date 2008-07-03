@@ -37,6 +37,8 @@ enum Token {
 	TDot;
 	TComma;
 	TSemicolon;
+	TBkOpen;
+	TBkClose;
 }
 
 class Parser {
@@ -93,7 +95,7 @@ class Parser {
 			tokens.add(tk);
 			a.push(parseFullExpr(s));
 		}
-		return a;
+		return if( a.length == 1 ) a[0] else EBlock(a);
 	}
 
 	function unexpected( tk ) : Dynamic {
@@ -107,6 +109,11 @@ class Parser {
 		if( tk != TSemicolon && tk != TEof )
 			switch( e ) {
 			case EBlock(_): tokens.add(tk);
+			case EFunction(_,e,_):
+				switch(e) {
+				case EBlock(_): tokens.add(tk);
+				default: unexpected(tk);
+				}
 			default: unexpected(tk);
 			}
 		return e;
@@ -118,8 +125,8 @@ class Parser {
 		case TId(id):
 			var e = parseStructure(s,id);
 			if( e == null )
-				return parseExprNext(s,EIdent(id));
-			return e;
+				e = EIdent(id);
+			return parseExprNext(s,e);
 		case TConst(c):
 			return parseExprNext(s,EConst(c));
 		case TPOpen:
@@ -143,6 +150,8 @@ class Parser {
 				if( x == op )
 					return EUnop(op,true,parseExpr(s));
 			return unexpected(tk);
+		case TBkOpen:
+			return parseExprNext(s,EArrayDecl(parseExprList(s,TBkClose)));
 		default:
 			return unexpected(tk);
 		}
@@ -203,6 +212,36 @@ class Parser {
 		case "break": EBreak;
 		case "continue": EContinue;
 		case "else": unexpected(TId(id));
+		case "function":
+			var tk = token(s);
+			var name = null;
+			switch( tk ) {
+			case TId(id): name = id; tk = token(s);
+			default:
+			}
+			if( tk != TPOpen ) unexpected(tk);
+			var args = new Array();
+			tk = token(s);
+			if( tk != TPClose ) {
+				while( true ) {
+					switch( tk ) {
+					case TId(id): args.push(id);
+					default: unexpected(tk);
+					}
+					tk = token(s);
+					switch( tk ) {
+					case TComma:
+					case TPClose: break;
+					default: unexpected(tk);
+					}
+					tk = token(s);
+				}
+			}
+			EFunction(args,parseExpr(s),name);
+		case "return":
+			var tk = token(s);
+			tokens.add(tk);
+			EReturn(if( tk == TSemicolon ) null else parseExpr(s));
 		default: null;
 		}
 	}
@@ -238,25 +277,35 @@ class Parser {
 			}
 			return parseExprNext(s,EField(e1,field));
 		case TPOpen:
-			var args = new Array();
+			return parseExprNext(s,ECall(e1,parseExprList(s,TPClose)));
+		case TBkOpen:
+			var e2 = parseExpr(s);
 			tk = token(s);
-			if( tk != TPClose ) {
-				tokens.add(tk);
-				while( true ) {
-					args.push(parseExpr(s));
-					tk = token(s);
-					switch( tk ) {
-					case TComma:
-					case TPClose: break;
-					default: unexpected(tk);
-					}
-				}
-			}
-			return ECall(e1,args);
+			if( tk != TBkClose ) unexpected(tk);
+			return parseExprNext(s,EArray(e1,e2));
 		default:
 			tokens.add(tk);
 			return e1;
 		}
+	}
+
+	function parseExprList( s : haxe.io.Input, etk ) {
+		var args = new Array();
+		var tk = token(s);
+		if( tk == etk )
+			return args;
+		tokens.add(tk);
+		while( true ) {
+			args.push(parseExpr(s));
+			tk = token(s);
+			switch( tk ) {
+			case TComma:
+			default:
+				if( tk == etk ) break;
+				unexpected(tk);
+			}
+		}
+		return args;
 	}
 
 	function readChar( s : haxe.io.Input ) {
@@ -334,6 +383,8 @@ class Parser {
 			case 46: return TDot;
 			case 123: return TBrOpen;
 			case 125: return TBrClose;
+			case 91: return TBkOpen;
+			case 93: return TBkClose;
 			case 39: return TConst( CString(readString(s,39)) );
 			case 34: return TConst( CString(readString(s,34)) );
 			default:
@@ -387,6 +438,8 @@ class Parser {
 		case TDot: ".";
 		case TComma: ",";
 		case TSemicolon: ";";
+		case TBkOpen: "[";
+		case TBkClose: "]";
 		}
 	}
 

@@ -28,15 +28,18 @@ import hscript.Expr;
 private enum Stop {
 	SBreak;
 	SContinue;
+	SReturn( v : Dynamic );
 }
 
 class Interp {
 
 	public var variables : Hash<Dynamic>;
+	var locals : Hash<{ r : Dynamic }>;
 	var binops : Hash<Expr -> Expr -> Dynamic>;
-	var declared : Array<{ n : String, old : Dynamic, exists : Bool }>;
+	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 
 	public function new() {
+		locals = new Hash();
 		variables = new Hash();
 		variables.set("null",null);
 		variables.set("true",true);
@@ -72,8 +75,16 @@ class Interp {
 	function assign( e1 : Expr, e2 : Expr ) {
 		var v = expr(e2);
 		switch( e1 ) {
-		case EIdent(id): variables.set(id,v);
-		case EField(e,f): v = set(expr(e),f,v);
+		case EIdent(id):
+			var l = locals.get(id);
+			if( l == null )
+				variables.set(id,v)
+			else
+				l.r = v;
+		case EField(e,f):
+			v = set(expr(e),f,v);
+		case EArray(e,index):
+			expr(e)[expr(index)] = v;
 		default: throw Error.EInvalidOp("=");
 		}
 		return v;
@@ -82,12 +93,13 @@ class Interp {
 	function increment( e : Expr, prefix : Bool, delta : Int ) : Dynamic {
 		switch(e) {
 		case EIdent(id):
-			var v : Dynamic = variables.get(id);
+			var l = locals.get(id);
+			var v : Dynamic = (l == null) ? variables.get(id) : l.r;
 			if( prefix ) {
 				v += delta;
-				variables.set(id,v);
+				if( l == null ) variables.set(id,v) else l.r = v;
 			} else
-				variables.set(id,v + delta);
+				if( l == null ) variables.set(id,v + delta) else l.r = v + delta;
 			return v;
 		case EField(e,f):
 			var obj = expr(e);
@@ -98,13 +110,44 @@ class Interp {
 			} else
 				set(obj,f,v + delta);
 			return v;
+		case EArray(e,index):
+			var arr = expr(e);
+			var index = expr(index);
+			var v = arr[index];
+			if( prefix ) {
+				v += delta;
+				arr[index] = v;
+			} else
+				arr[index] = v + delta;
+			return v;
 		default:
 			throw Error.EInvalidOp((delta > 0)?"++":"--");
 		}
 	}
 
-	public function execute( program : Array<Expr> ) {
-		return block(program);
+	public function execute( expr : Expr ) {
+		locals = new Hash();
+		return exprReturn(expr);
+	}
+
+	function exprReturn(e) : Dynamic {
+		try {
+			return expr(e);
+		} catch( e : Stop ) {
+			switch( e ) {
+			case SBreak: throw "Invalid break";
+			case SContinue: throw "Invalid continue";
+			case SReturn(v): return v;
+			}
+		}
+		return null;
+	}
+
+	function duplicate<T>( h : Hash<T> ) {
+		var h2 = new Hash();
+		for( k in h.keys() )
+			h2.set(k,h.get(k));
+		return h2;
 	}
 
 	function block( exprs : Array<Expr> ) {
@@ -114,10 +157,7 @@ class Interp {
 		for( e in exprs )
 			v = expr(e);
 		for( d in declared )
-			if( d.exists )
-				variables.set(d.n,d.old);
-			else
-				variables.remove(d.n);
+			locals.set(d.n,d.old);
 		declared = old;
 		return v;
 	}
@@ -131,13 +171,16 @@ class Interp {
 			case CString(s): return s;
 			}
 		case EIdent(id):
+			var l = locals.get(id);
+			if( l != null )
+				return l.r;
 			var v = variables.get(id);
 			if( v == null && !variables.exists(v) )
 				throw Error.EUnknownVariable(id);
 			return v;
 		case EVar(n,e):
-			declared.unshift({ n : n, old : variables.get(n), exists : variables.exists(n) });
-			variables.set(n,(e == null)?null:expr(e));
+			declared.unshift({ n : n, old : locals.get(n) });
+			locals.set(n,{ r : (e == null)?null:expr(e) });
 			return null;
 		case EParent(e):
 			return expr(e);
@@ -185,6 +228,32 @@ class Interp {
 			throw SBreak;
 		case EContinue:
 			throw SContinue;
+		case EReturn(e):
+			throw SReturn((e == null)?null:expr(e));
+		case EFunction(params,fexpr,name):
+			var capturedLocals = duplicate(locals);
+			var me = this;
+			var f = function(args:Array<Dynamic>) {
+				if( args.length != params.length ) throw "Invalid number of parameters";
+				var old = me.locals;
+				me.locals = me.duplicate(capturedLocals);
+				for( i in 0...params.length )
+					me.locals.set(params[i],{ r : args[i] });
+				var r = me.exprReturn(fexpr);
+				me.locals = old;
+				return r;
+			};
+			var f = Reflect.makeVarArgs(f);
+			if( name != null )
+				variables.set(name,f);
+			return f;
+		case EArrayDecl(arr):
+			var a = new Array();
+			for( e in arr )
+				a.push(expr(e));
+			return a;
+		case EArray(e,index):
+			return expr(e)[expr(index)];
 		}
 		return null;
 	}
@@ -194,28 +263,33 @@ class Interp {
 			try {
 				block([e]);
 			} catch( err : Stop ) {
-				if( err == SBreak ) break;
+				switch(err) {
+				case SContinue:
+				case SBreak: break;
+				case SReturn(_): throw err;
+				}
 			}
 		}
 	}
 
 	function forLoop(v,it,e) {
-		var old = if( variables.exists(v) ) { v : variables.get(v) } else null;
+		var old = locals.get(v);
 		var it : Dynamic = expr(it);
 		if( it.iterator != null ) it = it.iterator();
 		if( it.hasNext == null || it.next == null ) throw Error.EInvalidIterator(v);
 		while( it.hasNext() ) {
-			variables.set(v,it.next());
+			locals.set(v,{ r : it.next() });
 			try {
 				block([e]);
 			} catch( err : Stop ) {
-				if( err == SBreak ) break;
+				switch( err ) {
+				case SContinue:
+				case SBreak: break;
+				case SReturn(_): throw err;
+				}
 			}
 		}
-		if( old == null )
-			variables.remove(v)
-		else
-			variables.set(v,old.v);
+		locals.set(v,old);
 	}
 
 	function get( o : Dynamic, f : String ) {
