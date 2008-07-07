@@ -78,6 +78,7 @@ class Parser {
 	}
 
 	public function parseString( s : String ) {
+		line = 1;
 		return parse( new haxe.io.StringInput(s) );
 	}
 
@@ -324,10 +325,12 @@ class Parser {
 		var c;
 		var b = new StringBuf();
 		var esc = false;
+		var old = line;
 		while( true ) {
 			try {
 				c = s.readByte();
 			} catch( e : Dynamic ) {
+				line = old;
 				throw Error.EUnterminatedString;
 			}
 			if( esc ) {
@@ -345,8 +348,10 @@ class Parser {
 				esc = true;
 			else if( c == until )
 				break;
-			else
+			else {
+				if( c == 10 ) line++;
 				b.addChar(c);
+			}
 		}
 		return b.toString();
 	}
@@ -403,6 +408,8 @@ class Parser {
 					while( true ) {
 						char = readChar(s);
 						if( !ops[char] ) {
+							if( op.charCodeAt(0) == 47 )
+								return tokenComment(s,op,char);
 							this.char = char;
 							return TOp(op);
 						}
@@ -425,6 +432,38 @@ class Parser {
 			char = readChar(s);
 		}
 		return null;
+	}
+
+	function tokenComment( s : haxe.io.Input, op : String, char : Int ) {
+		var c = op.charCodeAt(1);
+		if( c == 47 ) { // comment
+			try {
+				while( char != 10 )
+					char = s.readByte();
+				this.char = char;
+			} catch( e : Dynamic ) {
+			}
+			return token(s);
+		}
+		if( c == 42 ) { /* comment */
+			var old = line;
+			try {
+				while( true ) {
+					while( char != 42 ) {
+						if( char == 10 ) line++;
+						char = s.readByte();
+					}
+					char = s.readByte();
+					if( char == 47 )
+						break;
+				}
+			} catch( e : Dynamic ) {
+				line = old;
+				throw Error.EUnterminatedComment;
+			}
+			return token(s);
+		}
+		return TOp(op);
 	}
 
 	function constString( c ) {

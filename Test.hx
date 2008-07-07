@@ -3,6 +3,7 @@ class Test {
 	static function main() {
 		var script = "
 			var sum = 0;
+			// blablabla
 			for( a in angles )
 				sum += Math.cos(a);
 			sum;
@@ -33,6 +34,7 @@ class Test {
 			var angles = [0,1,2,3];
 			var i = 0;
 			var sum = 0;
+			/* comment */
 			while( i < angles.length )
 				sum += Math.cos(angles[i++]);
 			sum;
