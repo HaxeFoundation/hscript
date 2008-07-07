@@ -1,5 +1,5 @@
 <project name="hscript" url="http://haxe.org/com/libs/hscript" license="GPL">
     <user name="ncannasse"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.1">Added functions, return, arrays</version>
+    <version name="1.2">Added += and ?:</version>
 </project>

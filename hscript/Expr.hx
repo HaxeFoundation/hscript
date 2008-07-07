@@ -58,4 +58,5 @@ enum Error {
 	EUnknownVariable( v : String );
 	EInvalidIterator( v : String );
 	EInvalidOp( op : String );
+	EInvalidAccess( f : String );
 }

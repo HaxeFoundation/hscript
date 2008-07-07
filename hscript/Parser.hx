@@ -39,6 +39,8 @@ enum Token {
 	TSemicolon;
 	TBkOpen;
 	TBkClose;
+	TQuestion;
+	TDoubleDot;
 }
 
 class Parser {
@@ -283,6 +285,12 @@ class Parser {
 			tk = token(s);
 			if( tk != TBkClose ) unexpected(tk);
 			return parseExprNext(s,EArray(e1,e2));
+		case TQuestion:
+			var e2 = parseExpr(s);
+			tk = token(s);
+			if( tk != TDoubleDot ) unexpected(tk);
+			var e3 = parseExpr(s);
+			return EIf(e1,e2,e3);
 		default:
 			tokens.add(tk);
 			return e1;
@@ -387,6 +395,8 @@ class Parser {
 			case 93: return TBkClose;
 			case 39: return TConst( CString(readString(s,39)) );
 			case 34: return TConst( CString(readString(s,34)) );
+			case 63: return TQuestion;
+			case 58: return TDoubleDot;
 			default:
 				if( ops[char] ) {
 					var op = Std.chr(char);
@@ -440,6 +450,8 @@ class Parser {
 		case TSemicolon: ";";
 		case TBkOpen: "[";
 		case TBkClose: "]";
+		case TQuestion: "?";
+		case TDoubleDot: ":";
 		}
 	}
 

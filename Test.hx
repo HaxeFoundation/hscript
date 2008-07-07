@@ -4,7 +4,7 @@ class Test {
 		var script = "
 			var sum = 0;
 			for( a in angles )
-				sum = sum + Math.cos(a);
+				sum += Math.cos(a);
 			sum;
 		";
 		var p = new hscript.Parser();
@@ -20,7 +20,7 @@ class Test {
 				return Math.cos(a);
 			}
 			function bar(x) {
-				sum = sum + foo(x);
+				sum += foo(x);
 			}
 			for( x in angles )
 				bar(x);
@@ -34,7 +34,7 @@ class Test {
 			var i = 0;
 			var sum = 0;
 			while( i < angles.length )
-				sum = sum + Math.cos(angles[i++]);
+				sum += Math.cos(angles[i++]);
 			sum;
 		";
 		var program = p.parseString(script);

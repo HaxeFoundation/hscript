@@ -70,6 +70,17 @@ class Interp {
 		binops.set("||",function(e1,e2) return me.expr(e1) == true || me.expr(e2) == true);
 		binops.set("&&",function(e1,e2) return me.expr(e1) == true && me.expr(e2) == true);
 		binops.set("=",assign);
+		assignOp("+=",function(v1:Dynamic,v2:Dynamic) return v1 + v2);
+		assignOp("-=",function(v1:Float,v2:Float) return v1 - v2);
+		assignOp("*=",function(v1:Float,v2:Float) return v1 * v2);
+		assignOp("/=",function(v1:Float,v2:Float) return v1 / v2);
+		assignOp("%=",function(v1:Float,v2:Float) return v1 % v2);
+		assignOp("&=",function(v1,v2) return v1 & v2);
+		assignOp("|=",function(v1,v2) return v1 | v2);
+		assignOp("^=",function(v1,v2) return v1 ^ v2);
+		assignOp("<<=",function(v1,v2) return v1 << v2);
+		assignOp(">>=",function(v1,v2) return v1 >> v2);
+		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
 	}
 
 	function assign( e1 : Expr, e2 : Expr ) {
@@ -86,6 +97,36 @@ class Interp {
 		case EArray(e,index):
 			expr(e)[expr(index)] = v;
 		default: throw Error.EInvalidOp("=");
+		}
+		return v;
+	}
+
+	function assignOp( op, fop ) {
+		var me = this;
+		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
+	}
+
+	function evalAssignOp(op,fop,e1,e2) : Dynamic {
+		var v;
+		switch( e1 ) {
+		case EIdent(id):
+			var l = locals.get(id);
+			v = fop(expr(e1),expr(e2));
+			if( l == null )
+				variables.set(id,v)
+			else
+				l.r = v;
+		case EField(e,f):
+			var obj = expr(e);
+			v = fop(get(obj,f),expr(e2));
+			v = set(obj,f,v);
+		case EArray(e,index):
+			var arr = expr(e);
+			var index = expr(index);
+			v = fop(arr[index],expr(e2));
+			arr[index] = v;
+		default:
+			throw Error.EInvalidOp(op);
 		}
 		return v;
 	}
@@ -212,6 +253,7 @@ class Interp {
 			switch(e) {
 			case EField(e,f):
 				var obj = expr(e);
+				if( obj == null ) throw Error.EInvalidAccess(f);
 				return call(obj,Reflect.field(obj,f),args);
 			default:
 				return call(null,expr(e),args);
@@ -293,10 +335,12 @@ class Interp {
 	}
 
 	function get( o : Dynamic, f : String ) {
+		if( o == null ) throw Error.EInvalidAccess(f);
 		return Reflect.field(o,f);
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) {
+		if( o == null ) throw Error.EInvalidAccess(f);
 		Reflect.setField(o,f,v);
 		return v;
 	}
