@@ -106,19 +106,30 @@ class Parser {
 		return null;
 	}
 
+	function isBlock(e) {
+		return switch( e ) {
+		case EBlock(_): true;
+		case EFunction(_,e,_): isBlock(e);
+		case EVar(_,e): e != null && isBlock(e);
+		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);
+		case EBinop(_,_,e): isBlock(e);
+		case EUnop(_,prefix,e): !prefix && isBlock(e);
+		case EWhile(_,e): isBlock(e);
+		case EFor(_,_,e): isBlock(e);
+		case EReturn(e): e != null && isBlock(e);
+		default: false;
+		}
+	}
+
 	function parseFullExpr(s) {
 		var e = parseExpr(s);
 		var tk = token(s);
-		if( tk != TSemicolon && tk != TEof )
-			switch( e ) {
-			case EBlock(_): tokens.add(tk);
-			case EFunction(_,e,_):
-				switch(e) {
-				case EBlock(_): tokens.add(tk);
-				default: unexpected(tk);
-				}
-			default: unexpected(tk);
-			}
+		if( tk != TSemicolon && tk != TEof ) {
+			if( isBlock(e) )
+				tokens.add(tk);
+			else
+				unexpected(tk);
+		}
 		return e;
 	}
 
