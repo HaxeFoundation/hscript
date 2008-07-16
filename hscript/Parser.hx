@@ -192,13 +192,13 @@ class Parser {
 			EIf(cond,e1,e2);
 		case "var":
 			var tk = token(s);
-			var ident;
+			var ident = null;
 			switch(tk) {
 			case TId(id): ident = id;
 			default: unexpected(tk);
 			}
 			tk = token(s);
-			var e;
+			var e = null;
 			if( Type.enumEq(tk,TOp("=")) )
 				e = parseExpr(s);
 			else
@@ -212,7 +212,7 @@ class Parser {
 			var tk = token(s);
 			if( tk != TPOpen ) unexpected(tk);
 			tk = token(s);
-			var vname;
+			var vname = null;
 			switch( tk ) {
 			case TId(id): vname = id;
 			default: unexpected(tk);
@@ -284,7 +284,7 @@ class Parser {
 			return EBinop(op,e1,e2);
 		case TDot:
 			tk = token(s);
-			var field;
+			var field = null;
 			switch(tk) {
 			case TId(id): field = id;
 			default: unexpected(tk);
@@ -415,7 +415,7 @@ class Parser {
 			case 58: return TDoubleDot;
 			default:
 				if( ops[char] ) {
-					var op = Std.chr(char);
+					var op = String.fromCharCode(char);
 					while( true ) {
 						char = readChar(s);
 						if( !ops[char] ) {
@@ -424,18 +424,18 @@ class Parser {
 							this.char = char;
 							return TOp(op);
 						}
-						op += Std.chr(char);
+						op += String.fromCharCode(char);
 					}
 				}
 				if( idents[char] ) {
-					var id = Std.chr(char);
+					var id = String.fromCharCode(char);
 					while( true ) {
 						char = readChar(s);
 						if( !idents[char] ) {
 							this.char = char;
 							return TId(id);
 						}
-						id += Std.chr(char);
+						id += String.fromCharCode(char);
 					}
 				}
 				throw Error.EInvalidChar(char);
