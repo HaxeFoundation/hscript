@@ -83,7 +83,7 @@ class Interp {
 		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
 	}
 
-	function assign( e1 : Expr, e2 : Expr ) {
+	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
 		switch( e1 ) {
 		case EIdent(id):
@@ -166,7 +166,7 @@ class Interp {
 		}
 	}
 
-	public function execute( expr : Expr ) {
+	public function execute( expr : Expr ) : Dynamic {
 		locals = new Hash();
 		return exprReturn(expr);
 	}
@@ -191,7 +191,7 @@ class Interp {
 		return h2;
 	}
 
-	function block( exprs : Array<Expr> ) {
+	function block( exprs : Array<Expr> ) : Dynamic {
 		var old = declared;
 		declared = new Array();
 		var v = null;
@@ -334,18 +334,18 @@ class Interp {
 		locals.set(v,old);
 	}
 
-	function get( o : Dynamic, f : String ) {
+	function get( o : Dynamic, f : String ) : Dynamic {
 		if( o == null ) throw Error.EInvalidAccess(f);
 		return Reflect.field(o,f);
 	}
 
-	function set( o : Dynamic, f : String, v : Dynamic ) {
+	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) throw Error.EInvalidAccess(f);
 		Reflect.setField(o,f,v);
 		return v;
 	}
 
-	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) {
+	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
 		return Reflect.callMethod(o,f,args);
 	}
 
