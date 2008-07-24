@@ -101,7 +101,7 @@ class Interp {
 		return v;
 	}
 
-	function assignOp( op, fop ) {
+	function assignOp( op, fop : Dynamic -> Dynamic -> Dynamic ) {
 		var me = this;
 		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
 	}
