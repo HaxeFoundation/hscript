@@ -449,7 +449,7 @@ class Parser {
 		var c = op.charCodeAt(1);
 		if( c == 47 ) { // comment
 			try {
-				while( char != 10 )
+				while( char != 10 && char != 13 )
 					char = s.readByte();
 				this.char = char;
 			} catch( e : Dynamic ) {
