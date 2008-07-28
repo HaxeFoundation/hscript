@@ -1,6 +1,5 @@
 # Neko
--swf hscript9.swf
--swf-version 9
+-swf9 hscript9.swf
 -main Test
 -debug
 
