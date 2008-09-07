@@ -283,7 +283,13 @@ class Interp {
 				me.locals = me.duplicate(capturedLocals);
 				for( i in 0...params.length )
 					me.locals.set(params[i],{ r : args[i] });
-				var r = me.exprReturn(fexpr);
+				var r;
+				try {
+					r = me.exprReturn(fexpr);
+				} catch( e : Dynamic ) {
+					me.locals = old;
+					throw e;
+				}
 				me.locals = old;
 				return r;
 			};
