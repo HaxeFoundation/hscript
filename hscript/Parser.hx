@@ -64,6 +64,7 @@ class Parser {
 		opChars = "+*/-=!><&|^%";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 		opPriority = [
+			"...",
 			"=",
 			"||","&&",
 			"==","!=",">","<",">=","<=",
@@ -162,12 +163,35 @@ class Parser {
 			var found;
 			for( x in unopsPrefix )
 				if( x == op )
-					return EUnop(op,true,parseExpr(s));
+					return makeUnop(op,parseExpr(s));
 			return unexpected(tk);
 		case TBkOpen:
 			return parseExprNext(s,EArrayDecl(parseExprList(s,TBkClose)));
 		default:
 			return unexpected(tk);
+		}
+	}
+
+	function priority(op) {
+		for( i in 0...opPriority.length )
+			if( opPriority[i] == op )
+				return i;
+		return -1;
+	}
+
+	function makeUnop( op, e ) {
+		return switch( e ) {
+		case EBinop(bop,e1,e2): EBinop(bop,makeUnop(op,e1),e2);
+		default: EUnop(op,true,e);
+		}
+	}
+
+	function makeBinop( op, e1, e2 ) {
+		return switch( e2 ) {
+		case EBinop(op2,e2,e3):
+			if( priority(op) > priority(op2) )
+				return EBinop(op2,makeBinop(op,e1,e2),e3);
+		default: EBinop(op,e1,e2);
 		}
 	}
 
@@ -256,15 +280,52 @@ class Parser {
 			var tk = token(s);
 			tokens.add(tk);
 			EReturn(if( tk == TSemicolon ) null else parseExpr(s));
-		default: null;
+		case "new":
+			var a = new Array();
+			var tk = token(s);
+			switch( tk ) {
+			case TId(id): a.push(id);
+			default: unexpected(tk);
+			}
+			while( true ) {
+				tk = token(s);
+				switch( tk ) {
+				case TDot:
+					tk = token(s);
+					switch(tk) {
+					case TId(id): a.push(id);
+					default: unexpected(tk);
+					}
+				case TPOpen:
+					break;
+				default:
+					unexpected(tk);
+				}
+			}
+			ENew(a.join("."),parseExprList(s,TPClose));
+		case "throw":
+			EThrow( parseExpr(s) );
+		case "try":
+			var e = parseExpr(s);
+			var tk = token(s);
+			if( !Type.enumEq(tk,TId("catch")) ) unexpected(tk);
+			tk = token(s);
+			if( tk != TPOpen ) unexpected(tk);
+			tk = token(s);
+			var vname = switch( tk ) {
+			case TId(id): id;
+			default: unexpected(tk);
+			}
+			tk = token(s);
+			if( tk != TDoubleDot ) unexpected(tk);
+			tk = token(s);
+			if( !Type.enumEq(tk,TId("Dynamic")) ) unexpected(tk);
+			tk = token(s);
+			if( tk != TPClose ) unexpected(tk);
+			ETry(e,vname,parseExpr(s));
+		default:
+			null;
 		}
-	}
-
-	function priority(op) {
-		for( i in 0...opPriority.length )
-			if( opPriority[i] == op )
-				return i;
-		return -1;
 	}
 
 	function parseExprNext( s : haxe.io.Input, e1 : Expr ) {
@@ -274,14 +335,7 @@ class Parser {
 			for( x in unopsSuffix )
 				if( x == op )
 					return EUnop(op,false,e1);
-			var e2 = parseExpr(s);
-			switch( e2 ) {
-			case EBinop(op2,e2,e3):
-				if( priority(op) > priority(op2) )
-					return EBinop(op2,EBinop(op,e1,e2),e3);
-			default:
-			}
-			return EBinop(op,e1,e2);
+			return makeBinop(op,e1,parseExpr(s));
 		case TDot:
 			tk = token(s);
 			var field = null;
@@ -392,9 +446,33 @@ class Parser {
 					case 48,49,50,51,52,53,54,55,56,57:
 						n = n * 10 + (char - 48);
 					case 46:
-						if( exp > 0 )
+						if( exp > 0 ) {
+							// in case of '...'
+							if( exp == 10 && readChar(s) == 46 ) {
+								tokens.add(TOp("..."));
+								return TConst( CInt(n) );
+							}
 							throw Error.EInvalidChar(char);
+						}
 						exp = 1;
+					case 120: // x
+						if( n > 0 || exp > 0 )
+							throw Error.EInvalidChar(char);
+						// read hexa
+						while( true ) {
+							char = readChar(s);
+							switch( char ) {
+							case 48,49,50,51,52,53,54,55,56,57: // 0-9
+								n = (n << 4) + (char - 48);
+							case 65,66,67,68,69,70: // A-F
+								n = (n << 4) + (char - 55);
+							case 97,98,99,100,101,102: // a-f
+								n = (n << 4) + (char - 87);
+							default:
+								this.char = char;
+								return TConst( CInt(n) );
+							}
+						}
 					default:
 						this.char = char;
 						return TConst( (exp > 0) ? CFloat(n * 10 / exp) : CInt(n) );
@@ -404,7 +482,16 @@ class Parser {
 			case 40: return TPOpen;
 			case 41: return TPClose;
 			case 44: return TComma;
-			case 46: return TDot;
+			case 46:
+				char = readChar(s);
+				if( char != 46 ) {
+					this.char = char;
+					return TDot;
+				}
+				char = readChar(s);
+				if( char != 46 )
+					throw Error.EInvalidChar(char);
+				return TOp("...");
 			case 123: return TBrOpen;
 			case 125: return TBrClose;
 			case 91: return TBkOpen;

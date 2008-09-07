@@ -40,6 +40,7 @@ class Interp {
 
 	public function new() {
 		locals = new Hash();
+		declared = new Array();
 		variables = new Hash();
 		variables.set("null",null);
 		variables.set("true",true);
@@ -70,6 +71,7 @@ class Interp {
 		binops.set("||",function(e1,e2) return me.expr(e1) == true || me.expr(e2) == true);
 		binops.set("&&",function(e1,e2) return me.expr(e1) == true && me.expr(e2) == true);
 		binops.set("=",assign);
+		binops.set("...",function(e1,e2) return new IntIter(me.expr(e1),me.expr(e2)));
 		assignOp("+=",function(v1:Dynamic,v2:Dynamic) return v1 + v2);
 		assignOp("-=",function(v1:Float,v2:Float) return v1 - v2);
 		assignOp("*=",function(v1:Float,v2:Float) return v1 * v2);
@@ -191,16 +193,11 @@ class Interp {
 		return h2;
 	}
 
-	function block( exprs : Array<Expr> ) : Dynamic {
-		var old = declared;
-		declared = new Array();
-		var v = null;
-		for( e in exprs )
-			v = expr(e);
-		for( d in declared )
+	function restore( old : Int ) {
+		while( declared.length > old ) {
+			var d = declared.pop();
 			locals.set(d.n,d.old);
-		declared = old;
-		return v;
+		}
 	}
 
 	public function expr( e : Expr ) : Dynamic {
@@ -220,13 +217,18 @@ class Interp {
 				throw Error.EUnknownVariable(id);
 			return v;
 		case EVar(n,e):
-			declared.unshift({ n : n, old : locals.get(n) });
+			declared.push({ n : n, old : locals.get(n) });
 			locals.set(n,{ r : (e == null)?null:expr(e) });
 			return null;
 		case EParent(e):
 			return expr(e);
 		case EBlock(exprs):
-			return block(exprs);
+			var old = declared.length;
+			var v = null;
+			for( e in exprs )
+				v = expr(e);
+			restore(old);
+			return v;
 		case EField(e,f):
 			return get(expr(e),f);
 		case EBinop(op,e1,e2):
@@ -296,14 +298,40 @@ class Interp {
 			return a;
 		case EArray(e,index):
 			return expr(e)[expr(index)];
+		case ENew(cl,params):
+			var a = new Array();
+			for( e in params )
+				a.push(expr(e));
+			return cnew(cl,a);
+		case EThrow(e):
+			throw expr(e);
+		case ETry(e,n,ecatch):
+			var old = declared.length;
+			try {
+				var v : Dynamic = expr(e);
+				restore(old);
+				return v;
+			} catch( err : Stop ) {
+				throw err;
+			} catch( err : Dynamic ) {
+				// restore vars
+				restore(old);
+				// declare 'v'
+				declared.push({ n : n, old : locals.get(n) });
+				locals.set(n,{ r : err });
+				var v : Dynamic = expr(ecatch);
+				restore(old);
+				return v;
+			}
 		}
 		return null;
 	}
 
 	function whileLoop(econd,e) {
+		var old = declared.length;
 		while( expr(econd) == true ) {
 			try {
-				block([e]);
+				expr(e);
 			} catch( err : Stop ) {
 				switch(err) {
 				case SContinue:
@@ -312,17 +340,23 @@ class Interp {
 				}
 			}
 		}
+		restore(old);
 	}
 
-	function forLoop(v,it,e) {
-		var old = locals.get(v);
-		var it : Dynamic = expr(it);
-		if( it.iterator != null ) it = it.iterator();
-		if( it.hasNext == null || it.next == null ) throw Error.EInvalidIterator(v);
+	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
+		try v = v.iterator() catch( e : Dynamic ) {};
+		if( v.hasNext == null || v.next == null ) throw Error.EInvalidIterator(v);
+		return v;
+	}
+
+	function forLoop(n,it,e) {
+		var old = declared.length;
+		declared.push({ n : n, old : locals.get(n) });
+		var it = makeIterator(expr(it));
 		while( it.hasNext() ) {
-			locals.set(v,{ r : it.next() });
+			locals.set(n,{ r : it.next() });
 			try {
-				block([e]);
+				expr(e);
 			} catch( err : Stop ) {
 				switch( err ) {
 				case SContinue:
@@ -331,7 +365,7 @@ class Interp {
 				}
 			}
 		}
-		locals.set(v,old);
+		restore(old);
 	}
 
 	function get( o : Dynamic, f : String ) : Dynamic {
@@ -347,6 +381,10 @@ class Interp {
 
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
 		return Reflect.callMethod(o,f,args);
+	}
+
+	function cnew( cl : String, args : Array<Dynamic> ) : Dynamic {
+		return Type.createInstance(Type.resolveClass(cl),args);
 	}
 
 }

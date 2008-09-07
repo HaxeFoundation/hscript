@@ -1,5 +1,5 @@
 <project name="hscript" url="http://haxe.org/com/libs/hscript" license="GPL">
     <user name="ncannasse"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.3.1">Fixed bugs in flash9</version>
+    <version name="1.4">Added new, throw, try/catch, hex numbers and ... operator support</version>
 </project>
