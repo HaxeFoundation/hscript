@@ -190,7 +190,9 @@ class Parser {
 		return switch( e2 ) {
 		case EBinop(op2,e2,e3):
 			if( priority(op) > priority(op2) )
-				return EBinop(op2,makeBinop(op,e1,e2),e3);
+				EBinop(op2,makeBinop(op,e1,e2),e3);
+			else
+				EBinop(op,e1,e2);
 		default: EBinop(op,e1,e2);
 		}
 	}

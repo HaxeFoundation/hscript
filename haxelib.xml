@@ -1,5 +1,5 @@
 <project name="hscript" url="http://haxe.org/com/libs/hscript" license="GPL">
     <user name="ncannasse"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.4.1">Fixed bug in interpreter when catching exception in function</version>
+    <version name="1.4.2">Fixed bug in interpreter when parsing binops</version>
 </project>
