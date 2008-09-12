@@ -17,6 +17,7 @@ class Test {
 		test("-123",-123);
 		test("- 123",-123);
 		test("1.546",1.546);
+		test(".545",.545);
 		test("'bla'","bla");
 		test("null",null);
 		test("true",true);
@@ -45,6 +46,7 @@ class Test {
 		test("var a = 1; a++; a",2);
 		test("var a = 1; ++a",2);
 		test("var a = 1; a *= 3",3);
+		test("a = b = 3; a + b",6);
 		test("add(1,2)",3,{ add : function(x,y) return x + y });
 		test("a.push(5); a.pop() + a.pop()",8,{ a : [3] });
 		test("if( true ) 1 else 2",1);

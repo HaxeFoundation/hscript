@@ -186,14 +186,14 @@ class Parser {
 		}
 	}
 
-	function makeBinop( op, e1, e2 ) {
-		return switch( e2 ) {
+	function makeBinop( op, e1, e ) {
+		return switch( e ) {
 		case EBinop(op2,e2,e3):
 			if( priority(op) > priority(op2) )
 				EBinop(op2,makeBinop(op,e1,e2),e3);
 			else
-				EBinop(op,e1,e2);
-		default: EBinop(op,e1,e2);
+				EBinop(op,e1,e);
+		default: EBinop(op,e1,e);
 		}
 	}
 
@@ -486,14 +486,30 @@ class Parser {
 			case 44: return TComma;
 			case 46:
 				char = readChar(s);
-				if( char != 46 ) {
+				switch( char ) {
+				case 48,49,50,51,52,53,54,55,56,57:
+					var n = char - 48;
+					var exp = 1;
+					while( true ) {
+						char = readChar(s);
+						exp *= 10;
+						switch( char ) {
+						case 48,49,50,51,52,53,54,55,56,57:
+							n = n * 10 + (char - 48);
+						default:
+							this.char = char;
+							return TConst( CFloat(n/exp) );
+						}
+					}
+				case 46:
+					char = readChar(s);
+					if( char != 46 )
+						throw Error.EInvalidChar(char);
+					return TOp("...");
+				default:
 					this.char = char;
 					return TDot;
 				}
-				char = readChar(s);
-				if( char != 46 )
-					throw Error.EInvalidChar(char);
-				return TOp("...");
 			case 123: return TBrOpen;
 			case 125: return TBrClose;
 			case 91: return TBkOpen;
