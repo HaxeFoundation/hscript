@@ -45,6 +45,7 @@ class Interp {
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
+		variables.set("trace",function(e) haxe.Log.trace(Std.string(e),cast { fileName : "hscript", lineNumber : 0 }));
 		initOps();
 	}
 
@@ -213,7 +214,7 @@ class Interp {
 			if( l != null )
 				return l.r;
 			var v = variables.get(id);
-			if( v == null && !variables.exists(v) )
+			if( v == null && !variables.exists(id) )
 				throw Error.EUnknownVariable(id);
 			return v;
 		case EVar(n,e):
@@ -283,12 +284,16 @@ class Interp {
 				me.locals = me.duplicate(capturedLocals);
 				for( i in 0...params.length )
 					me.locals.set(params[i],{ r : args[i] });
-				var r;
+				var r = null;
 				try {
 					r = me.exprReturn(fexpr);
 				} catch( e : Dynamic ) {
 					me.locals = old;
+					#if neko
+					neko.Lib.rethrow(e);
+					#else
 					throw e;
+					#end
 				}
 				me.locals = old;
 				return r;
@@ -350,7 +355,11 @@ class Interp {
 	}
 
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
+		#if (flash && !flash9)
+		if( v.iterator != null ) v = v.iterator();
+		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
+		#end
 		if( v.hasNext == null || v.next == null ) throw Error.EInvalidIterator(v);
 		return v;
 	}

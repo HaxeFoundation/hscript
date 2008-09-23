@@ -36,6 +36,8 @@ class Test {
 		test("3 * (2 + 5)",21);
 		test("3 * 2 // + 5 \n + 6",12);
 		test("3 /* 2\n */ + 5",8);
+		test("[55,66,77][1]",66);
+		test("var a = [55]; a[0] *= 2; a[0]",110);
 		test("x",55,{ x : 55 });
 		test("var y = 33; y",33);
 		test("{ 1; 2; 3; }",3);
@@ -52,6 +54,7 @@ class Test {
 		test("if( true ) 1 else 2",1);
 		test("if( false ) 1 else 2",2);
 		test("var t = 0; for( x in [1,2,3] ) t += x; t",6);
+		test("var a = new Array(); for( x in 0...5 ) a[x] = x; a.join('-')","0-1-2-3-4");
 		test("(function(a,b) return a + b)(4,5)",9);
 		test("var y = 0; var add = function(a) y += a; add(5); add(3); y", 8);
 		test("var a = [1,[2,[3,[4,null]]]]; var t = 0; while( a != null ) { t += a[0]; a = a[1]; }; t",10);
@@ -59,6 +62,7 @@ class Test {
 		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t",45,{ IntIter : IntIter });
 		test("var x = 1; try { var x = 66; throw 789; } catch( e : Dynamic ) e + x",790);
 		test("var x = 1; var f = function(x) throw x; try f(55) catch( e : Dynamic ) e + x",56);
+		trace("Done");
 	}
 
 }
