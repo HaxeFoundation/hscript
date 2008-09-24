@@ -3,6 +3,8 @@ class Test {
 	static function test(x,v:Dynamic,?vars : Dynamic) {
 		var p = new hscript.Parser();
 		var program = p.parseString(x);
+		var bytes = hscript.Bytes.encode(program);
+		program = hscript.Bytes.decode(bytes);
 		var interp = new hscript.Interp();
 		if( vars != null )
 			for( v in Reflect.fields(vars) )
