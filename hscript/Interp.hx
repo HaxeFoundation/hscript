@@ -246,6 +246,12 @@ class Interp {
 				return increment(e,prefix,1);
 			case "--":
 				return increment(e,prefix,-1);
+			case "~":
+				#if neko
+				return haxe.Int32.complement(expr(e));
+				#else
+				return ~expr(e);
+				#end
 			default:
 				throw Error.EInvalidOp(op);
 			}

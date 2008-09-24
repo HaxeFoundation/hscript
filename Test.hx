@@ -30,6 +30,7 @@ class Test {
 		test("0 < 0",false);
 		test("-1 <= -1",true);
 		test("1 + 2",3);
+		test("~545",-546);
 		test("'abc' + 55","abc55");
 		test("'abc' + 'de'","abcde");
 		test("-1 + 2",1);

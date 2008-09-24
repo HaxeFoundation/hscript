@@ -61,7 +61,7 @@ class Parser {
 
 	public function new() {
 		line = 1;
-		opChars = "+*/-=!><&|^%";
+		opChars = "+*/-=!><&|^%~";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 		opPriority = [
 			"...",
@@ -74,7 +74,7 @@ class Parser {
 			"*","/",
 			"%"
 		];
-		unopsPrefix = ["!","++","--","-"];
+		unopsPrefix = ["!","++","--","-","~"];
 		unopsSuffix = ["++","--"];
 	}
 
