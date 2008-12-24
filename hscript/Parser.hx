@@ -335,8 +335,13 @@ class Parser {
 		switch( tk ) {
 		case TOp(op):
 			for( x in unopsSuffix )
-				if( x == op )
-					return EUnop(op,false,e1);
+				if( x == op ) {
+					if( isBlock(e1) || switch(e1) { case EParent(_): true; default: false; } ) {
+						tokens.add(tk);
+						return e1;
+					}
+					return parseExprNext(s,EUnop(op,false,e1));
+				}
 			return makeBinop(op,e1,parseExpr(s));
 		case TDot:
 			tk = token(s);
@@ -579,6 +584,7 @@ class Parser {
 			}
 			return token(s);
 		}
+		this.char = char;
 		return TOp(op);
 	}
 

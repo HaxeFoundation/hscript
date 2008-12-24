@@ -65,6 +65,9 @@ class Test {
 		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t",45,{ IntIter : IntIter });
 		test("var x = 1; try { var x = 66; throw 789; } catch( e : Dynamic ) e + x",790);
 		test("var x = 1; var f = function(x) throw x; try f(55) catch( e : Dynamic ) e + x",56);
+		test("var i=2; if( true ) --i; i",1);
+		test("var i=0; if( i++ > 0 ) i=3; i",1);
+		test("var a = 5/2; a",2.5);
 		trace("Done");
 	}
 
