@@ -16,6 +16,8 @@ class Test {
 	static function main() {
 		test("0",0);
 		test("0xFF",255);
+		test("n(0xBFFFFFFF)",0xBFFFFFFF,{ n : haxe.Int32.toNativeInt });
+		test("n(0x7FFFFFFF)",0x7FFFFFFF,{ n : haxe.Int32.toNativeInt });
 		test("-123",-123);
 		test("- 123",-123);
 		test("1.546",1.546);

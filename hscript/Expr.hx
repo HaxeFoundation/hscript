@@ -28,6 +28,7 @@ enum Const {
 	CInt( v : Int );
 	CFloat( f : Float );
 	CString( s : String );
+	CInt32( v : haxe.Int32 );
 }
 
 enum Expr {
