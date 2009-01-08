@@ -1,5 +1,5 @@
 <project name="hscript" url="http://haxe.org/com/libs/hscript" license="GPL">
     <user name="ncannasse"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.4.5">Added ~, added hscript.Bytes</version>
+    <version name="1.4.6">Added Int32 hexadecimal support</version>
 </project>
