@@ -154,6 +154,8 @@ class Parser {
 				default:
 					unexpected(tk);
 				}
+			case TBrClose:
+				break;
 			default:
 				unexpected(tk);
 			}
