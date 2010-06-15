@@ -205,6 +205,12 @@ class Bytes {
 			doEncode(e);
 			doEncodeString(v);
 			doEncode(ecatch);
+		case EObject(fl):
+			bout.addByte(fl.length);
+			for( f in fl ) {
+				doEncodeString(f.name);
+				doEncode(f.e);
+			}
 		}
 	}
 
@@ -285,6 +291,14 @@ class Bytes {
 			var e = doDecode();
 			var v = doDecodeString();
 			ETry(e,v,doDecode());
+		case 21:
+			var fl = new Array();
+			for( i in 0...bin.get(pin++) ) {
+				var name = doDecodeString();
+				var e = doDecode();
+				fl.push({ name : name, e : e });
+			}
+			EObject(fl);
 		case 255:
 			null;
 		default:

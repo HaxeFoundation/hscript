@@ -53,6 +53,7 @@ enum Expr {
 	ENew( cl : String, params : Array<Expr> );
 	EThrow( e : Expr );
 	ETry( e : Expr, v : String, ecatch : Expr );
+	EObject( fl : Array<{ name : String, e : Expr }> );
 }
 
 enum Error {

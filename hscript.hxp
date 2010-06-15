@@ -1,5 +1,5 @@
 ﻿<haxe selected="0">
-  <output name="HScript" mode="neko" out="hscript.n" class="Test" lib="" cmd="" main="True" debug="True"></output>
+  <output name="HScript" mode="swf9" out="hscript.swf" class="Test" lib="" cmd="" main="True" debug="True"></output>
   <files path="/">
     <file path="hscript\Bytes.hx" />
     <file path="hscript\Expr.hx" />

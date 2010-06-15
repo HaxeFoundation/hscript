@@ -54,6 +54,7 @@ class Parser {
 	public var unopsSuffix : Array<String>;
 
 	// implementation
+	var input : haxe.io.Input;
 	var char : Null<Int>;
 	var ops : Array<Bool>;
 	var idents : Array<Bool>;
@@ -85,6 +86,7 @@ class Parser {
 
 	public function parse( s : haxe.io.Input ) {
 		char = null;
+		input = s;
 		ops = new Array();
 		idents = new Array();
 		tokens = new haxe.FastList<Token>();
@@ -94,10 +96,10 @@ class Parser {
 			idents[identChars.charCodeAt(i)] = true;
 		var a = new Array();
 		while( true ) {
-			var tk = token(s);
+			var tk = token();
 			if( tk == TEof ) break;
 			tokens.add(tk);
-			a.push(parseFullExpr(s));
+			a.push(parseFullExpr());
 		}
 		return if( a.length == 1 ) a[0] else EBlock(a);
 	}
@@ -122,9 +124,9 @@ class Parser {
 		}
 	}
 
-	function parseFullExpr(s) {
-		var e = parseExpr(s);
-		var tk = token(s);
+	function parseFullExpr() {
+		var e = parseExpr();
+		var tk = token();
 		if( tk != TSemicolon && tk != TEof ) {
 			if( isBlock(e) )
 				tokens.add(tk);
@@ -134,39 +136,80 @@ class Parser {
 		return e;
 	}
 
-	function parseExpr( s : haxe.io.Input ) {
-		var tk = token(s);
+	function parseObject() {
+		// parse object
+		var fl = new Array();
+		while( true ) {
+			var tk = token();
+			switch( tk ) {
+			case TId(id):
+				tk = token();
+				if( tk != TDoubleDot ) unexpected(tk);
+				fl.push({ name : id, e : parseExpr() });
+				tk = token();
+				switch( tk ) {
+				case TBrClose:
+					break;
+				case TComma:
+				default:
+					unexpected(tk);
+				}
+			default:
+				unexpected(tk);
+			}
+		}
+		return parseExprNext(EObject(fl));
+	}
+
+	function parseExpr() {
+		var tk = token();
 		switch( tk ) {
 		case TId(id):
-			var e = parseStructure(s,id);
+			var e = parseStructure(id);
 			if( e == null )
 				e = EIdent(id);
-			return parseExprNext(s,e);
+			return parseExprNext(e);
 		case TConst(c):
-			return parseExprNext(s,EConst(c));
+			return parseExprNext(EConst(c));
 		case TPOpen:
-			var e = parseExpr(s);
-			tk = token(s);
+			var e = parseExpr();
+			tk = token();
 			if( tk != TPClose ) unexpected(tk);
-			return parseExprNext(s,EParent(e));
+			return parseExprNext(EParent(e));
 		case TBrOpen:
+			tk = token();
+			switch( tk ) {
+			case TBrClose:
+				return parseExprNext(EObject([]));
+			case TId(id):
+				var tk2 = token();
+				tokens.add(tk2);
+				tokens.add(tk);
+				switch( tk2 ) {
+				case TDoubleDot:
+					return parseExprNext(parseObject());
+				default:
+				}
+			default:
+				tokens.add(tk);
+			}
 			var a = new Array();
 			while( true ) {
-				tk = token(s);
+				a.push(parseFullExpr());
+				tk = token();
 				if( tk == TBrClose )
 					break;
 				tokens.add(tk);
-				a.push(parseFullExpr(s));
 			}
 			return EBlock(a);
 		case TOp(op):
 			var found;
 			for( x in unopsPrefix )
 				if( x == op )
-					return makeUnop(op,parseExpr(s));
+					return makeUnop(op,parseExpr());
 			return unexpected(tk);
 		case TBkOpen:
-			return parseExprNext(s,EArrayDecl(parseExprList(s,TBkClose)));
+			return parseExprNext(EArrayDecl(parseExprList(TBkClose)));
 		default:
 			return unexpected(tk);
 		}
@@ -197,103 +240,103 @@ class Parser {
 		}
 	}
 
-	function parseStructure( s, id ) {
+	function parseStructure(id) {
 		return switch( id ) {
 		case "if":
-			var cond = parseExpr(s);
-			var e1 = parseExpr(s);
+			var cond = parseExpr();
+			var e1 = parseExpr();
 			var e2 = null;
 			var semic = false;
-			var tk = token(s);
+			var tk = token();
 			if( tk == TSemicolon ) {
 				semic = true;
-				tk = token(s);
+				tk = token();
 			}
 			if( Type.enumEq(tk,TId("else")) )
-				e2 = parseExpr(s);
+				e2 = parseExpr();
 			else {
 				tokens.add(tk);
 				if( semic ) tokens.add(TSemicolon);
 			}
 			EIf(cond,e1,e2);
 		case "var":
-			var tk = token(s);
+			var tk = token();
 			var ident = null;
 			switch(tk) {
 			case TId(id): ident = id;
 			default: unexpected(tk);
 			}
-			tk = token(s);
+			tk = token();
 			var e = null;
 			if( Type.enumEq(tk,TOp("=")) )
-				e = parseExpr(s);
+				e = parseExpr();
 			else
 				tokens.add(tk);
 			EVar(ident,e);
 		case "while":
-			var econd = parseExpr(s);
-			var e = parseExpr(s);
+			var econd = parseExpr();
+			var e = parseExpr();
 			EWhile(econd,e);
 		case "for":
-			var tk = token(s);
+			var tk = token();
 			if( tk != TPOpen ) unexpected(tk);
-			tk = token(s);
+			tk = token();
 			var vname = null;
 			switch( tk ) {
 			case TId(id): vname = id;
 			default: unexpected(tk);
 			}
-			tk = token(s);
+			tk = token();
 			if( !Type.enumEq(tk,TId("in")) ) unexpected(tk);
-			var eiter = parseExpr(s);
-			tk = token(s);
+			var eiter = parseExpr();
+			tk = token();
 			if( tk != TPClose ) unexpected(tk);
-			EFor(vname,eiter,parseExpr(s));
+			EFor(vname,eiter,parseExpr());
 		case "break": EBreak;
 		case "continue": EContinue;
 		case "else": unexpected(TId(id));
 		case "function":
-			var tk = token(s);
+			var tk = token();
 			var name = null;
 			switch( tk ) {
-			case TId(id): name = id; tk = token(s);
+			case TId(id): name = id; tk = token();
 			default:
 			}
 			if( tk != TPOpen ) unexpected(tk);
 			var args = new Array();
-			tk = token(s);
+			tk = token();
 			if( tk != TPClose ) {
 				while( true ) {
 					switch( tk ) {
 					case TId(id): args.push(id);
 					default: unexpected(tk);
 					}
-					tk = token(s);
+					tk = token();
 					switch( tk ) {
 					case TComma:
 					case TPClose: break;
 					default: unexpected(tk);
 					}
-					tk = token(s);
+					tk = token();
 				}
 			}
-			EFunction(args,parseExpr(s),name);
+			EFunction(args,parseExpr(),name);
 		case "return":
-			var tk = token(s);
+			var tk = token();
 			tokens.add(tk);
-			EReturn(if( tk == TSemicolon ) null else parseExpr(s));
+			EReturn(if( tk == TSemicolon ) null else parseExpr());
 		case "new":
 			var a = new Array();
-			var tk = token(s);
+			var tk = token();
 			switch( tk ) {
 			case TId(id): a.push(id);
 			default: unexpected(tk);
 			}
 			while( true ) {
-				tk = token(s);
+				tk = token();
 				switch( tk ) {
 				case TDot:
-					tk = token(s);
+					tk = token();
 					switch(tk) {
 					case TId(id): a.push(id);
 					default: unexpected(tk);
@@ -304,34 +347,34 @@ class Parser {
 					unexpected(tk);
 				}
 			}
-			ENew(a.join("."),parseExprList(s,TPClose));
+			ENew(a.join("."),parseExprList(TPClose));
 		case "throw":
-			EThrow( parseExpr(s) );
+			EThrow( parseExpr() );
 		case "try":
-			var e = parseExpr(s);
-			var tk = token(s);
+			var e = parseExpr();
+			var tk = token();
 			if( !Type.enumEq(tk,TId("catch")) ) unexpected(tk);
-			tk = token(s);
+			tk = token();
 			if( tk != TPOpen ) unexpected(tk);
-			tk = token(s);
+			tk = token();
 			var vname = switch( tk ) {
 			case TId(id): id;
 			default: unexpected(tk);
 			}
-			tk = token(s);
+			tk = token();
 			if( tk != TDoubleDot ) unexpected(tk);
-			tk = token(s);
+			tk = token();
 			if( !Type.enumEq(tk,TId("Dynamic")) ) unexpected(tk);
-			tk = token(s);
+			tk = token();
 			if( tk != TPClose ) unexpected(tk);
-			ETry(e,vname,parseExpr(s));
+			ETry(e,vname,parseExpr());
 		default:
 			null;
 		}
 	}
 
-	function parseExprNext( s : haxe.io.Input, e1 : Expr ) {
-		var tk = token(s);
+	function parseExprNext( e1 : Expr ) {
+		var tk = token();
 		switch( tk ) {
 		case TOp(op):
 			for( x in unopsSuffix )
@@ -340,29 +383,29 @@ class Parser {
 						tokens.add(tk);
 						return e1;
 					}
-					return parseExprNext(s,EUnop(op,false,e1));
+					return parseExprNext(EUnop(op,false,e1));
 				}
-			return makeBinop(op,e1,parseExpr(s));
+			return makeBinop(op,e1,parseExpr());
 		case TDot:
-			tk = token(s);
+			tk = token();
 			var field = null;
 			switch(tk) {
 			case TId(id): field = id;
 			default: unexpected(tk);
 			}
-			return parseExprNext(s,EField(e1,field));
+			return parseExprNext(EField(e1,field));
 		case TPOpen:
-			return parseExprNext(s,ECall(e1,parseExprList(s,TPClose)));
+			return parseExprNext(ECall(e1,parseExprList(TPClose)));
 		case TBkOpen:
-			var e2 = parseExpr(s);
-			tk = token(s);
+			var e2 = parseExpr();
+			tk = token();
 			if( tk != TBkClose ) unexpected(tk);
-			return parseExprNext(s,EArray(e1,e2));
+			return parseExprNext(EArray(e1,e2));
 		case TQuestion:
-			var e2 = parseExpr(s);
-			tk = token(s);
+			var e2 = parseExpr();
+			tk = token();
 			if( tk != TDoubleDot ) unexpected(tk);
-			var e3 = parseExpr(s);
+			var e3 = parseExpr();
 			return EIf(e1,e2,e3);
 		default:
 			tokens.add(tk);
@@ -370,15 +413,15 @@ class Parser {
 		}
 	}
 
-	function parseExprList( s : haxe.io.Input, etk ) {
+	function parseExprList( etk ) {
 		var args = new Array();
-		var tk = token(s);
+		var tk = token();
 		if( tk == etk )
 			return args;
 		tokens.add(tk);
 		while( true ) {
-			args.push(parseExpr(s));
-			tk = token(s);
+			args.push(parseExpr());
+			tk = token();
 			switch( tk ) {
 			case TComma:
 			default:
@@ -389,15 +432,16 @@ class Parser {
 		return args;
 	}
 
-	function readChar( s : haxe.io.Input ) {
-		return try s.readByte() catch( e : Dynamic ) 0;
+	function readChar() {
+		return try input.readByte() catch( e : Dynamic ) 0;
 	}
 
-	function readString( s : haxe.io.Input, until ) {
+	function readString( until ) {
 		var c;
 		var b = new StringBuf();
 		var esc = false;
 		var old = line;
+		var s = input;
 		while( true ) {
 			try {
 				c = s.readByte();
@@ -428,12 +472,12 @@ class Parser {
 		return b.toString();
 	}
 
-	function token( s : haxe.io.Input ) {
+	function token() {
 		if( !tokens.isEmpty() )
 			return tokens.pop();
 		var char;
 		if( this.char == null )
-			char = readChar(s);
+			char = readChar();
 		else {
 			char = this.char;
 			this.char = null;
@@ -447,7 +491,7 @@ class Parser {
 				var n = char - 48;
 				var exp = 0;
 				while( true ) {
-					char = readChar(s);
+					char = readChar();
 					exp *= 10;
 					switch( char ) {
 					case 48,49,50,51,52,53,54,55,56,57:
@@ -455,7 +499,7 @@ class Parser {
 					case 46:
 						if( exp > 0 ) {
 							// in case of '...'
-							if( exp == 10 && readChar(s) == 46 ) {
+							if( exp == 10 && readChar() == 46 ) {
 								tokens.add(TOp("..."));
 								return TConst( CInt(n) );
 							}
@@ -468,7 +512,7 @@ class Parser {
 						// read hexa
 						var n = haxe.Int32.ofInt(0);
 						while( true ) {
-							char = readChar(s);
+							char = readChar();
 							switch( char ) {
 							case 48,49,50,51,52,53,54,55,56,57: // 0-9
 								n = haxe.Int32.add(haxe.Int32.shl(n,4), cast (char - 48));
@@ -495,13 +539,13 @@ class Parser {
 			case 41: return TPClose;
 			case 44: return TComma;
 			case 46:
-				char = readChar(s);
+				char = readChar();
 				switch( char ) {
 				case 48,49,50,51,52,53,54,55,56,57:
 					var n = char - 48;
 					var exp = 1;
 					while( true ) {
-						char = readChar(s);
+						char = readChar();
 						exp *= 10;
 						switch( char ) {
 						case 48,49,50,51,52,53,54,55,56,57:
@@ -512,7 +556,7 @@ class Parser {
 						}
 					}
 				case 46:
-					char = readChar(s);
+					char = readChar();
 					if( char != 46 )
 						throw Error.EInvalidChar(char);
 					return TOp("...");
@@ -524,18 +568,18 @@ class Parser {
 			case 125: return TBrClose;
 			case 91: return TBkOpen;
 			case 93: return TBkClose;
-			case 39: return TConst( CString(readString(s,39)) );
-			case 34: return TConst( CString(readString(s,34)) );
+			case 39: return TConst( CString(readString(39)) );
+			case 34: return TConst( CString(readString(34)) );
 			case 63: return TQuestion;
 			case 58: return TDoubleDot;
 			default:
 				if( ops[char] ) {
 					var op = String.fromCharCode(char);
 					while( true ) {
-						char = readChar(s);
+						char = readChar();
 						if( !ops[char] ) {
 							if( op.charCodeAt(0) == 47 )
-								return tokenComment(s,op,char);
+								return tokenComment(op,char);
 							this.char = char;
 							return TOp(op);
 						}
@@ -545,7 +589,7 @@ class Parser {
 				if( idents[char] ) {
 					var id = String.fromCharCode(char);
 					while( true ) {
-						char = readChar(s);
+						char = readChar();
 						if( !idents[char] ) {
 							this.char = char;
 							return TId(id);
@@ -555,13 +599,14 @@ class Parser {
 				}
 				throw Error.EInvalidChar(char);
 			}
-			char = readChar(s);
+			char = readChar();
 		}
 		return null;
 	}
 
-	function tokenComment( s : haxe.io.Input, op : String, char : Int ) {
+	function tokenComment( op : String, char : Int ) {
 		var c = op.charCodeAt(1);
+		var s = input;
 		if( c == 47 ) { // comment
 			try {
 				while( char != 10 && char != 13 )
@@ -569,7 +614,7 @@ class Parser {
 				this.char = char;
 			} catch( e : Dynamic ) {
 			}
-			return token(s);
+			return token();
 		}
 		if( c == 42 ) { /* comment */
 			var old = line;
@@ -587,7 +632,7 @@ class Parser {
 				line = old;
 				throw Error.EUnterminatedComment;
 			}
-			return token(s);
+			return token();
 		}
 		this.char = char;
 		return TOp(op);

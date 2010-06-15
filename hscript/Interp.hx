@@ -341,6 +341,11 @@ class Interp {
 				restore(old);
 				return v;
 			}
+		case EObject(fl):
+			var o = {};
+			for( f in fl )
+				set(o,f.name,expr(f.e));
+			return o;
 		}
 		return null;
 	}
