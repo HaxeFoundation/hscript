@@ -211,7 +211,16 @@ class Parser {
 					return makeUnop(op,parseExpr());
 			return unexpected(tk);
 		case TBkOpen:
-			return parseExprNext(EArrayDecl(parseExprList(TBkClose)));
+			var a = new Array();
+			tk = token();
+			while( tk != TBkClose ) {
+				tokens.add(tk);
+				a.push(parseExpr());
+				tk = token();
+				if( tk == TComma )
+					tk = token();
+			}
+			return parseExprNext(EArrayDecl(a));
 		default:
 			return unexpected(tk);
 		}
