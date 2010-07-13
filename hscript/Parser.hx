@@ -449,7 +449,7 @@ class Parser {
 
 	function readString( until ) {
 		var c;
-		var b = new StringBuf();
+		var b = new haxe.io.BytesOutput();
 		var esc = false;
 		var old = line;
 		var s = input;
@@ -463,12 +463,12 @@ class Parser {
 			if( esc ) {
 				esc = false;
 				switch( c ) {
-				case 110: b.addChar(10); // \n
-				case 114: b.addChar(13); // \r
-				case 116: b.addChar(9); // \t
-				case 39: b.addChar(39); // \'
-				case 34: b.addChar(34); // \"
-				case 92: b.addChar(92); // \\
+				case 110: b.writeByte(10); // \n
+				case 114: b.writeByte(13); // \r
+				case 116: b.writeByte(9); // \t
+				case 39: b.writeByte(39); // \'
+				case 34: b.writeByte(34); // \"
+				case 92: b.writeByte(92); // \\
 				default: throw Error.EInvalidChar(c);
 				}
 			} else if( c == 92 )
@@ -477,10 +477,10 @@ class Parser {
 				break;
 			else {
 				if( c == 10 ) line++;
-				b.addChar(c);
+				b.writeByte(c);
 			}
 		}
-		return b.toString();
+		return b.getBytes().toString();
 	}
 
 	function token() {
