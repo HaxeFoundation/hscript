@@ -2,5 +2,5 @@
     <user name="ncannasse"/>
     <tag v="cross"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.5">Added anonymous object support</version>
+    <version name="1.5.1">UTF8 string support + minor syntax fixes</version>
 </project>
