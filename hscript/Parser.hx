@@ -53,6 +53,11 @@ class Parser {
 	public var unopsPrefix : Array<String>;
 	public var unopsSuffix : Array<String>;
 
+	/**
+		activate JSON compatiblity
+	**/
+	public var allowJSON : Bool;
+
 	// implementation
 	var input : haxe.io.Input;
 	var char : Null<Int>;
@@ -141,21 +146,28 @@ class Parser {
 		var fl = new Array();
 		while( true ) {
 			var tk = token();
-			switch( tk ) {
-			case TId(id):
-				tk = token();
-				if( tk != TDoubleDot ) unexpected(tk);
-				fl.push({ name : id, e : parseExpr() });
-				tk = token();
-				switch( tk ) {
-				case TBrClose:
-					break;
-				case TComma:
-				default:
+			var id = switch( tk ) {
+			case TId(id): id;
+			case TConst(c):
+				if( !allowJSON )
 					unexpected(tk);
+				switch( c ) {
+				case CString(s): s;
+				default: unexpected(tk);
 				}
 			case TBrClose:
 				break;
+			default:
+				unexpected(tk);
+			}
+			tk = token();
+			if( tk != TDoubleDot ) unexpected(tk);
+			fl.push({ name : id, e : parseExpr() });
+			tk = token();
+			switch( tk ) {
+			case TBrClose:
+				break;
+			case TComma:
 			default:
 				unexpected(tk);
 			}
@@ -192,6 +204,23 @@ class Parser {
 					return parseExprNext(parseObject());
 				default:
 				}
+			case TConst(c):
+				if( allowJSON ) {
+					switch( c ) {
+					case CString(_):
+						var tk2 = token();
+						tokens.add(tk2);
+						tokens.add(tk);
+						switch( tk2 ) {
+						case TDoubleDot:
+							return parseExprNext(parseObject());
+						default:
+						}
+					default:
+						tokens.add(tk);
+					}
+				} else
+					tokens.add(tk);
 			default:
 				tokens.add(tk);
 			}
@@ -463,12 +492,46 @@ class Parser {
 			if( esc ) {
 				esc = false;
 				switch( c ) {
-				case 110: b.writeByte(10); // \n
-				case 114: b.writeByte(13); // \r
-				case 116: b.writeByte(9); // \t
-				case 39: b.writeByte(39); // \'
-				case 34: b.writeByte(34); // \"
-				case 92: b.writeByte(92); // \\
+				case 'n'.code: b.writeByte(10);
+				case 'r'.code: b.writeByte(13);
+				case 't'.code: b.writeByte(9);
+				case "'".code, '"'.code, '\\'.code: b.writeByte(c);
+				case '/'.code: if( allowJSON ) b.writeByte(c) else throw Error.EInvalidChar(c);
+				case "u".code:
+					if( !allowJSON ) throw Error.EInvalidChar(c);
+					var code;
+					try {
+						code = s.readString(4);
+					} catch( e : Dynamic ) {
+						line = old;
+						throw Error.EUnterminatedString;
+					}
+					var k = 0;
+					for( i in 0...4 ) {
+						k <<= 4;
+						var char = code.charCodeAt(i);
+						switch( char ) {
+						case 48,49,50,51,52,53,54,55,56,57: // 0-9
+							k += char - 48;
+						case 65,66,67,68,69,70: // A-F
+							k += char - 55;
+						case 97,98,99,100,101,102: // a-f
+							k += char - 87;
+						default:
+							throw Error.EInvalidChar(char);
+						}
+					}
+					// encode k in UTF8
+					if( k <= 0x7F )
+						b.writeByte(k);
+					else if( k <= 0x7FF ) {
+						b.writeByte( 0xC0 | (k >> 6));
+						b.writeByte( 0x80 | (k & 63));
+					} else {
+						b.writeByte( 0xE0 | (k >> 12) );
+						b.writeByte( 0x80 | ((k >> 6) & 63) );
+						b.writeByte( 0x80 | (k & 63) );
+					}
 				default: throw Error.EInvalidChar(c);
 				}
 			} else if( c == 92 )
@@ -499,7 +562,7 @@ class Parser {
 			case 32,9,13: // space, tab, CR
 			case 10: line++; // LF
 			case 48,49,50,51,52,53,54,55,56,57: // 0...9
-				var n = char - 48;
+				var n = (char - 48) * 1.0;
 				var exp = 0;
 				while( true ) {
 					char = readChar();
@@ -512,7 +575,8 @@ class Parser {
 							// in case of '...'
 							if( exp == 10 && readChar() == 46 ) {
 								tokens.add(TOp("..."));
-								return TConst( CInt(n) );
+								var i = Std.int(n);
+								return TConst( (i == n) ? CInt(i) : CFloat(n) );
 							}
 							throw Error.EInvalidChar(char);
 						}
@@ -542,7 +606,8 @@ class Parser {
 						}
 					default:
 						this.char = char;
-						return TConst( (exp > 0) ? CFloat(n * 10 / exp) : CInt(n) );
+						var i = Std.int(n);
+						return TConst( (exp > 0) ? CFloat(n * 10 / exp) : ((i == n) ? CInt(i) : CFloat(n)) );
 					}
 				}
 			case 59: return TSemicolon;
