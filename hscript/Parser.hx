@@ -146,13 +146,14 @@ class Parser {
 		var fl = new Array();
 		while( true ) {
 			var tk = token();
-			var id = switch( tk ) {
-			case TId(id): id;
+			var id = null;
+			switch( tk ) {
+			case TId(i): id = i;
 			case TConst(c):
 				if( !allowJSON )
 					unexpected(tk);
 				switch( c ) {
-				case CString(s): s;
+				case CString(s): id = s;
 				default: unexpected(tk);
 				}
 			case TBrClose:
