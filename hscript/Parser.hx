@@ -116,7 +116,7 @@ class Parser {
 
 	function isBlock(e) {
 		return switch( e ) {
-		case EBlock(_): true;
+		case EBlock(_), EObject(_): true;
 		case EFunction(_,e,_): isBlock(e);
 		case EVar(_,e): e != null && isBlock(e);
 		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);

@@ -71,7 +71,8 @@ class Test {
 		test("var i=0; if( i++ > 0 ) i=3; i",1);
 		test("var a = 5/2; a",2.5);
 		test("{ x = 3; x; }", 3);
-		test("{ x : 3, y : {} }.x",3);
+		test("{ x : 3, y : {} }.x", 3);
+		test("function bug(){ \n }\nbug().x", null);
 		trace("Done");
 	}
 

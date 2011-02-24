@@ -1,5 +1,5 @@
-# HScript
--swf9 hscript.swf
+-swf hscript.swf
+-swf-version 9
+-swf-header 800:600:30:FFFFFF
+--flash-strict
 -main Test
--debug
-
