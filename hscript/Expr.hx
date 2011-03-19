@@ -34,7 +34,7 @@ enum Const {
 enum Expr {
 	EConst( c : Const );
 	EIdent( v : String );
-	EVar( n : String, ?e : Expr );
+	EVar( n : String, ?t : CType, ?e : Expr );
 	EParent( e : Expr );
 	EBlock( e : Array<Expr> );
 	EField( e : Expr, f : String );
@@ -46,14 +46,21 @@ enum Expr {
 	EFor( v : String, it : Expr, e : Expr );
 	EBreak;
 	EContinue;
-	EFunction( params : Array<String>, e : Expr, ?name : String );
+	EFunction( args : Array<{ name : String, t : Null<CType> }>, e : Expr, ?name : String, ?ret : CType );
 	EReturn( ?e : Expr );
 	EArray( e : Expr, index : Expr );
 	EArrayDecl( e : Array<Expr> );
 	ENew( cl : String, params : Array<Expr> );
 	EThrow( e : Expr );
-	ETry( e : Expr, v : String, ecatch : Expr );
+	ETry( e : Expr, v : String, t : Null<CType>, ecatch : Expr );
 	EObject( fl : Array<{ name : String, e : Expr }> );
+}
+
+enum CType {
+	CTPath( path : Array<String>, ?params : Array<CType> );
+	CTFun( args : Array<CType>, ret : CType );
+	CTAnon( fields : Array<{ name : String, t : CType }> );
+	CTParent( t : CType );
 }
 
 enum Error {

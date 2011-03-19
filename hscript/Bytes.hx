@@ -132,7 +132,7 @@ class Bytes {
 			doEncodeConst(c);
 		case EIdent(v):
 			doEncodeString(v);
-		case EVar(n,e):
+		case EVar(n,_,e):
 			doEncodeString(n);
 			if( e == null )
 				bout.addByte(255);
@@ -175,10 +175,10 @@ class Bytes {
 			doEncode(it);
 			doEncode(e);
 		case EBreak, EContinue:
-		case EFunction(params,e,name):
+		case EFunction(params,e,name,_):
 			bout.addByte(params.length);
 			for( p in params )
-				doEncodeString(p);
+				doEncodeString(p.name);
 			doEncode(e);
 			doEncodeString(name == null?"":name);
 		case EReturn(e):
@@ -201,7 +201,7 @@ class Bytes {
 				doEncode(e);
 		case EThrow(e):
 			doEncode(e);
-		case ETry(e,v,ecatch):
+		case ETry(e,v,_,ecatch):
 			doEncode(e);
 			doEncodeString(v);
 			doEncode(ecatch);
@@ -214,7 +214,7 @@ class Bytes {
 		}
 	}
 
-	function doDecode() {
+	function doDecode() : Expr {
 		return switch( bin.get(pin++) ) {
 		case 0:
 			EConst( doDecodeConst() );
@@ -265,7 +265,7 @@ class Bytes {
 		case 14:
 			var params = new Array();
 			for( i in 0...bin.get(pin++) )
-				params.push(doDecodeString());
+				params.push({ name : doDecodeString(), t : null });
 			var e = doDecode();
 			var name = doDecodeString();
 			EFunction(params,e,(name == "") ? null: name);
@@ -290,7 +290,7 @@ class Bytes {
 		case 20:
 			var e = doDecode();
 			var v = doDecodeString();
-			ETry(e,v,doDecode());
+			ETry(e,v,null,doDecode());
 		case 21:
 			var fl = new Array();
 			for( i in 0...bin.get(pin++) ) {

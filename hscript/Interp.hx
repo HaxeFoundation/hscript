@@ -218,7 +218,7 @@ class Interp {
 			if( v == null && !variables.exists(id) )
 				throw Error.EUnknownVariable(id);
 			return v;
-		case EVar(n,e):
+		case EVar(n,_,e):
 			declared.push({ n : n, old : locals.get(n) });
 			locals.set(n,{ r : (e == null)?null:expr(e) });
 			return null;
@@ -282,7 +282,7 @@ class Interp {
 			throw SContinue;
 		case EReturn(e):
 			throw SReturn((e == null)?null:expr(e));
-		case EFunction(params,fexpr,name):
+		case EFunction(params,fexpr,name,_):
 			var capturedLocals = duplicate(locals);
 			var me = this;
 			var f = function(args:Array<Dynamic>) {
@@ -290,7 +290,7 @@ class Interp {
 				var old = me.locals;
 				me.locals = me.duplicate(capturedLocals);
 				for( i in 0...params.length )
-					me.locals.set(params[i],{ r : args[i] });
+					me.locals.set(params[i].name,{ r : args[i] });
 				var r = null;
 				try {
 					r = me.exprReturn(fexpr);
@@ -323,7 +323,7 @@ class Interp {
 			return cnew(cl,a);
 		case EThrow(e):
 			throw expr(e);
-		case ETry(e,n,ecatch):
+		case ETry(e,n,_,ecatch):
 			var old = declared.length;
 			try {
 				var v : Dynamic = expr(e);

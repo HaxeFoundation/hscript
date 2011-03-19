@@ -37,7 +37,14 @@
   </library>
   <!-- Paths to exclude from the Project Explorer tree -->
   <hiddenPaths>
-    <!-- example: <hidden path="..." /> -->
+    <hidden path="haxelib.xml" />
+    <hidden path="hscript.hxml" />
+    <hidden path="hscript.js" />
+    <hidden path="hscript.n" />
+    <hidden path="hscript.swf" />
+    <hidden path="hscript9.swf" />
+    <hidden path="release.bat" />
+    <hidden path="release.zip" />
   </hiddenPaths>
   <!-- Executed before build -->
   <preBuildCommand />

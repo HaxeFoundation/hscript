@@ -57,6 +57,11 @@ class Parser {
 		activate JSON compatiblity
 	**/
 	public var allowJSON : Bool;
+	
+	/**
+		allow types declarations
+	**/
+	public var allowTypes : Bool;
 
 	// implementation
 	var input : haxe.io.Input;
@@ -103,7 +108,7 @@ class Parser {
 		while( true ) {
 			var tk = token();
 			if( tk == TEof ) break;
-			tokens.add(tk);
+			push(tk);
 			a.push(parseFullExpr());
 		}
 		return if( a.length == 1 ) a[0] else EBlock(a);
@@ -113,12 +118,21 @@ class Parser {
 		throw Error.EUnexpected(tokenString(tk));
 		return null;
 	}
+	
+	inline function push(tk) {
+		tokens.add(tk);
+	}
+	
+	inline function ensure(tk) {
+		var t = token();
+		if( t != tk ) unexpected(t);
+	}
 
 	function isBlock(e) {
 		return switch( e ) {
 		case EBlock(_), EObject(_): true;
-		case EFunction(_,e,_): isBlock(e);
-		case EVar(_,e): e != null && isBlock(e);
+		case EFunction(_,e,_,_): isBlock(e);
+		case EVar(_,_,e): e != null && isBlock(e);
 		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);
 		case EBinop(_,_,e): isBlock(e);
 		case EUnop(_,prefix,e): !prefix && isBlock(e);
@@ -134,7 +148,7 @@ class Parser {
 		var tk = token();
 		if( tk != TSemicolon && tk != TEof ) {
 			if( isBlock(e) )
-				tokens.add(tk);
+				push(tk);
 			else
 				unexpected(tk);
 		}
@@ -161,8 +175,7 @@ class Parser {
 			default:
 				unexpected(tk);
 			}
-			tk = token();
-			if( tk != TDoubleDot ) unexpected(tk);
+			ensure(TDoubleDot);
 			fl.push({ name : id, e : parseExpr() });
 			tk = token();
 			switch( tk ) {
@@ -188,8 +201,7 @@ class Parser {
 			return parseExprNext(EConst(c));
 		case TPOpen:
 			var e = parseExpr();
-			tk = token();
-			if( tk != TPClose ) unexpected(tk);
+			ensure(TPClose);
 			return parseExprNext(EParent(e));
 		case TBrOpen:
 			tk = token();
@@ -198,8 +210,8 @@ class Parser {
 				return parseExprNext(EObject([]));
 			case TId(id):
 				var tk2 = token();
-				tokens.add(tk2);
-				tokens.add(tk);
+				push(tk2);
+				push(tk);
 				switch( tk2 ) {
 				case TDoubleDot:
 					return parseExprNext(parseObject());
@@ -210,20 +222,20 @@ class Parser {
 					switch( c ) {
 					case CString(_):
 						var tk2 = token();
-						tokens.add(tk2);
-						tokens.add(tk);
+						push(tk2);
+						push(tk);
 						switch( tk2 ) {
 						case TDoubleDot:
 							return parseExprNext(parseObject());
 						default:
 						}
 					default:
-						tokens.add(tk);
+						push(tk);
 					}
 				} else
-					tokens.add(tk);
+					push(tk);
 			default:
-				tokens.add(tk);
+				push(tk);
 			}
 			var a = new Array();
 			while( true ) {
@@ -231,7 +243,7 @@ class Parser {
 				tk = token();
 				if( tk == TBrClose )
 					break;
-				tokens.add(tk);
+				push(tk);
 			}
 			return EBlock(a);
 		case TOp(op):
@@ -244,7 +256,7 @@ class Parser {
 			var a = new Array();
 			tk = token();
 			while( tk != TBkClose ) {
-				tokens.add(tk);
+				push(tk);
 				a.push(parseExpr());
 				tk = token();
 				if( tk == TComma )
@@ -296,8 +308,8 @@ class Parser {
 			if( Type.enumEq(tk,TId("else")) )
 				e2 = parseExpr();
 			else {
-				tokens.add(tk);
-				if( semic ) tokens.add(TSemicolon);
+				push(tk);
+				if( semic ) push(TSemicolon);
 			}
 			EIf(cond,e1,e2);
 		case "var":
@@ -308,20 +320,24 @@ class Parser {
 			default: unexpected(tk);
 			}
 			tk = token();
+			var t = null;
+			if( tk == TDoubleDot && allowTypes ) {
+				t = parseType();
+				tk = token();
+			}
 			var e = null;
 			if( Type.enumEq(tk,TOp("=")) )
 				e = parseExpr();
 			else
-				tokens.add(tk);
-			EVar(ident,e);
+				push(tk);
+			EVar(ident,t,e);
 		case "while":
 			var econd = parseExpr();
 			var e = parseExpr();
 			EWhile(econd,e);
 		case "for":
+			ensure(TPOpen);
 			var tk = token();
-			if( tk != TPOpen ) unexpected(tk);
-			tk = token();
 			var vname = null;
 			switch( tk ) {
 			case TId(id): vname = id;
@@ -330,8 +346,7 @@ class Parser {
 			tk = token();
 			if( !Type.enumEq(tk,TId("in")) ) unexpected(tk);
 			var eiter = parseExpr();
-			tk = token();
-			if( tk != TPClose ) unexpected(tk);
+			ensure(TPClose);
 			EFor(vname,eiter,parseExpr());
 		case "break": EBreak;
 		case "continue": EContinue;
@@ -340,19 +355,26 @@ class Parser {
 			var tk = token();
 			var name = null;
 			switch( tk ) {
-			case TId(id): name = id; tk = token();
-			default:
+			case TId(id): name = id;
+			default: push(tk);
 			}
-			if( tk != TPOpen ) unexpected(tk);
+			ensure(TPOpen);
 			var args = new Array();
 			tk = token();
 			if( tk != TPClose ) {
 				while( true ) {
+					var name = null;
 					switch( tk ) {
-					case TId(id): args.push(id);
+					case TId(id): name = id;
 					default: unexpected(tk);
 					}
 					tk = token();
+					var t = null;
+					if( tk == TDoubleDot && allowTypes ) {
+						t = parseType();
+						tk = token();
+					}
+					args.push({ name : name, t : t });
 					switch( tk ) {
 					case TComma:
 					case TPClose: break;
@@ -361,10 +383,18 @@ class Parser {
 					tk = token();
 				}
 			}
-			EFunction(args,parseExpr(),name);
+			var ret = null;
+			if( allowTypes ) {
+				tk = token();
+				if( tk != TDoubleDot )
+					push(tk);
+				else
+					ret = parseType();
+			}
+			EFunction(args, parseExpr(), name, ret);
 		case "return":
 			var tk = token();
-			tokens.add(tk);
+			push(tk);
 			EReturn(if( tk == TSemicolon ) null else parseExpr());
 		case "new":
 			var a = new Array();
@@ -394,21 +424,23 @@ class Parser {
 		case "try":
 			var e = parseExpr();
 			var tk = token();
-			if( !Type.enumEq(tk,TId("catch")) ) unexpected(tk);
-			tk = token();
-			if( tk != TPOpen ) unexpected(tk);
+			if( !Type.enumEq(tk, TId("catch")) ) unexpected(tk);
+			ensure(TPOpen);
 			tk = token();
 			var vname = switch( tk ) {
 			case TId(id): id;
 			default: unexpected(tk);
 			}
-			tk = token();
-			if( tk != TDoubleDot ) unexpected(tk);
-			tk = token();
-			if( !Type.enumEq(tk,TId("Dynamic")) ) unexpected(tk);
-			tk = token();
-			if( tk != TPClose ) unexpected(tk);
-			ETry(e,vname,parseExpr());
+			ensure(TDoubleDot);
+			var t = null;
+			if( allowTypes )
+				t = parseType();
+			else {
+				tk = token();
+				if( !Type.enumEq(tk, TId("Dynamic")) ) unexpected(tk);
+			}
+			ensure(TPClose);
+			ETry(e,vname,t,parseExpr());
 		default:
 			null;
 		}
@@ -421,7 +453,7 @@ class Parser {
 			for( x in unopsSuffix )
 				if( x == op ) {
 					if( isBlock(e1) || switch(e1) { case EParent(_): true; default: false; } ) {
-						tokens.add(tk);
+						push(tk);
 						return e1;
 					}
 					return parseExprNext(EUnop(op,false,e1));
@@ -439,21 +471,107 @@ class Parser {
 			return parseExprNext(ECall(e1,parseExprList(TPClose)));
 		case TBkOpen:
 			var e2 = parseExpr();
-			tk = token();
-			if( tk != TBkClose ) unexpected(tk);
+			ensure(TBkClose);
 			return parseExprNext(EArray(e1,e2));
 		case TQuestion:
 			var e2 = parseExpr();
-			tk = token();
-			if( tk != TDoubleDot ) unexpected(tk);
+			ensure(TDoubleDot);
 			var e3 = parseExpr();
 			return EIf(e1,e2,e3);
 		default:
-			tokens.add(tk);
+			push(tk);
 			return e1;
 		}
 	}
 
+	function parseType() : CType {
+		var t = token();
+		switch( t ) {
+		case TId(v):
+			var path = [v];
+			while( true ) {
+				t = token();
+				if( t != TDot )
+					break;
+				t = token();
+				switch( t ) {
+				case TId(v):
+					path.push(v);
+				default:
+					unexpected(t);
+				}
+			}
+			var params = null;
+			switch( t ) {
+			case TOp(op):
+				if( op == "<" ) {
+					params = [];
+					while( true ) {
+						params.push(parseType());
+						t = token();
+						switch( t ) {
+						case TComma: continue;
+						case TOp(op): if( op ==	">" ) break;
+						default:
+						}
+						unexpected(t);
+					}
+				}
+			default:
+				push(t);
+			}
+			return parseTypeNext(CTPath(path, params));
+		case TPOpen:
+			var t = parseType();
+			ensure(TPClose);
+			return parseTypeNext(CTParent(t));
+		case TBrOpen:
+			var fields = [];
+			while( true ) {
+				t = token();
+				switch( t ) {
+				case TBrClose: break;
+				case TId(name):
+					ensure(TDoubleDot);
+					fields.push( { name : name, t : parseType() } );
+					t = token();
+					switch( t ) {
+					case TComma:
+					case TBrClose: break;
+					default: unexpected(t);
+					}
+				default:
+					unexpected(t);
+				}
+			}
+			return parseTypeNext(CTAnon(fields));
+		default:
+			return unexpected(t);
+		}
+	}
+	
+	function parseTypeNext( t : CType ) {
+		var tk = token();
+		switch( tk ) {
+		case TOp(op):
+			if( op != "->" ) {
+				push(tk);
+				return t;
+			}
+		default:
+			push(tk);
+			return t;
+		}
+		var t2 = parseType();
+		switch( t2 ) {
+		case CTFun(args, ret):
+			args.unshift(t);
+			return t2;
+		default:
+			return CTFun([t], t2);
+		}
+	}
+	
 	function parseExprList( etk ) {
 		var args = new Array();
 		var tk = token();
