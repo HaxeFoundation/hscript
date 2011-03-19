@@ -31,7 +31,16 @@ enum Const {
 	CInt32( v : haxe.Int32 );
 }
 
+#if hscriptPos
+typedef Expr = {
+	var e : ExprDef;
+	var pmin : Int;
+	var pmax : Int;
+}
+enum ExprDef {
+#else
 enum Expr {
+#end
 	EConst( c : Const );
 	EIdent( v : String );
 	EVar( n : String, ?t : CType, ?e : Expr );
@@ -63,7 +72,21 @@ enum CType {
 	CTParent( t : CType );
 }
 
+#if hscriptPos
+class Error {
+	public var e : ErrorDef;
+	public var pmin : Int;
+	public var pmax : Int;
+	public function new(e, pmin, pmax) {
+		this.e = e;
+		this.pmin = pmin;
+		this.pmax = pmax;
+	}
+}
+enum ErrorDef {
+#else
 enum Error {
+#end
 	EInvalidChar( c : Int );
 	EUnexpected( s : String );
 	EUnterminatedString;

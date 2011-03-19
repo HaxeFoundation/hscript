@@ -65,10 +65,25 @@ class Parser {
 
 	// implementation
 	var input : haxe.io.Input;
-	var char : Null<Int>;
+	var char : Int;
 	var ops : Array<Bool>;
 	var idents : Array<Bool>;
+
+	
+	// only used for hscriptPos, but needs to be defined
+	var readPos : Int;
+	var tokenMin : Int;
+	var tokenMax : Int;
+
+	
+	#if hscriptPos
+	var oldTokenMin : Int;
+	var oldTokenMax : Int;
+	var tokens : List<{ min : Int, max : Int, t : Token }>;
+	#else
 	var tokens : haxe.FastList<Token>;
+	#end
+	
 
 	public function new() {
 		line = 1;
@@ -86,7 +101,19 @@ class Parser {
 			"%"
 		];
 		unopsPrefix = ["!","++","--","-","~"];
-		unopsSuffix = ["++","--"];
+		unopsSuffix = ["++", "--"];
+	}
+	
+	public inline function error( err, pmin, pmax ) {
+		#if hscriptPos
+		throw new Error(err, pmin, pmax);
+		#else
+		throw err;
+		#end
+	}
+	
+	public function invalidChar(c) {
+		error(EInvalidChar(c), readPos, readPos);
 	}
 
 	public function parseString( s : String ) {
@@ -95,11 +122,18 @@ class Parser {
 	}
 
 	public function parse( s : haxe.io.Input ) {
-		char = null;
+		#if hscriptPos
+		readPos = 0;
+		tokenMin = oldTokenMin = 0;
+		tokenMax = oldTokenMax = 0;
+		tokens = new List();
+		#else
+		tokens = new haxe.FastList<Token>();
+		#end
+		char = -1;
 		input = s;
 		ops = new Array();
 		idents = new Array();
-		tokens = new haxe.FastList<Token>();
 		for( i in 0...opChars.length )
 			ops[opChars.charCodeAt(i)] = true;
 		for( i in 0...identChars.length )
@@ -111,25 +145,65 @@ class Parser {
 			push(tk);
 			a.push(parseFullExpr());
 		}
-		return if( a.length == 1 ) a[0] else EBlock(a);
+		return if( a.length == 1 ) a[0] else mk(EBlock(a),0);
 	}
 
 	function unexpected( tk ) : Dynamic {
-		throw Error.EUnexpected(tokenString(tk));
+		error(EUnexpected(tokenString(tk)),tokenMin,tokenMax);
 		return null;
 	}
 	
 	inline function push(tk) {
+		#if hscriptPos
+		tokens.push( { t : tk, min : tokenMin, max : tokenMax } );
+		tokenMin = oldTokenMin;
+		tokenMax = oldTokenMax;
+		#else
 		tokens.add(tk);
+		#end
 	}
 	
 	inline function ensure(tk) {
 		var t = token();
 		if( t != tk ) unexpected(t);
 	}
+	
+	inline function expr(e:Expr) {
+		#if hscriptPos
+		return e.e;
+		#else
+		return e;
+		#end
+	}
+	
+	inline function pmin(e:Expr) {
+		#if hscriptPos
+		return e.pmin;
+		#else
+		return 0;
+		#end
+	}
+
+	inline function pmax(e:Expr) {
+		#if hscriptPos
+		return e.pmax;
+		#else
+		return 0;
+		#end
+	}
+	
+	inline function mk(e,?pmin,?pmax) : Expr {
+		#if hscriptPos
+		if( pmin == null ) pmin = tokenMin;
+		if( pmax == null ) pmax = tokenMax;
+		return { e : e, pmin : pmin, pmax : pmax };
+		#else
+		return e;
+		#end
+	}
 
 	function isBlock(e) {
-		return switch( e ) {
+		return switch( expr(e) ) {
 		case EBlock(_), EObject(_): true;
 		case EFunction(_,e,_,_): isBlock(e);
 		case EVar(_,_,e): e != null && isBlock(e);
@@ -155,7 +229,7 @@ class Parser {
 		return e;
 	}
 
-	function parseObject() {
+	function parseObject(p1) {
 		// parse object
 		var fl = new Array();
 		while( true ) {
@@ -186,35 +260,36 @@ class Parser {
 				unexpected(tk);
 			}
 		}
-		return parseExprNext(EObject(fl));
+		return parseExprNext(mk(EObject(fl),p1));
 	}
 
 	function parseExpr() {
 		var tk = token();
+		var p1 = tokenMin;
 		switch( tk ) {
 		case TId(id):
 			var e = parseStructure(id);
 			if( e == null )
-				e = EIdent(id);
+				e = mk(EIdent(id));
 			return parseExprNext(e);
 		case TConst(c):
-			return parseExprNext(EConst(c));
+			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
 			var e = parseExpr();
 			ensure(TPClose);
-			return parseExprNext(EParent(e));
+			return parseExprNext(mk(EParent(e),p1,pmax(e)));
 		case TBrOpen:
 			tk = token();
 			switch( tk ) {
 			case TBrClose:
-				return parseExprNext(EObject([]));
+				return parseExprNext(mk(EObject([]),p1));
 			case TId(id):
 				var tk2 = token();
 				push(tk2);
 				push(tk);
 				switch( tk2 ) {
 				case TDoubleDot:
-					return parseExprNext(parseObject());
+					return parseExprNext(parseObject(p1));
 				default:
 				}
 			case TConst(c):
@@ -226,7 +301,7 @@ class Parser {
 						push(tk);
 						switch( tk2 ) {
 						case TDoubleDot:
-							return parseExprNext(parseObject());
+							return parseExprNext(parseObject(p1));
 						default:
 						}
 					default:
@@ -245,7 +320,7 @@ class Parser {
 					break;
 				push(tk);
 			}
-			return EBlock(a);
+			return mk(EBlock(a),p1);
 		case TOp(op):
 			var found;
 			for( x in unopsPrefix )
@@ -262,7 +337,7 @@ class Parser {
 				if( tk == TComma )
 					tk = token();
 			}
-			return parseExprNext(EArrayDecl(a));
+			return parseExprNext(mk(EArrayDecl(a),p1));
 		default:
 			return unexpected(tk);
 		}
@@ -276,24 +351,26 @@ class Parser {
 	}
 
 	function makeUnop( op, e ) {
-		return switch( e ) {
-		case EBinop(bop,e1,e2): EBinop(bop,makeUnop(op,e1),e2);
-		default: EUnop(op,true,e);
+		return switch( expr(e) ) {
+		case EBinop(bop, e1, e2): mk(EBinop(bop, makeUnop(op, e1), e2),pmin(e1),pmax(e2));
+		default: mk(EUnop(op,true,e),pmin(e),pmax(e));
 		}
 	}
 
 	function makeBinop( op, e1, e ) {
-		return switch( e ) {
+		return switch( expr(e) ) {
 		case EBinop(op2,e2,e3):
 			if( priority(op) > priority(op2) )
-				EBinop(op2,makeBinop(op,e1,e2),e3);
+				mk(EBinop(op2,makeBinop(op,e1,e2),e3),pmin(e1),pmax(e3));
 			else
-				EBinop(op,e1,e);
-		default: EBinop(op,e1,e);
+				mk(EBinop(op, e1, e),pmin(e1),pmax(e));
+		default:
+			mk(EBinop(op,e1,e),pmin(e1),pmax(e));
 		}
 	}
 
 	function parseStructure(id) {
+		var p1 = tokenMin;
 		return switch( id ) {
 		case "if":
 			var cond = parseExpr();
@@ -311,7 +388,7 @@ class Parser {
 				push(tk);
 				if( semic ) push(TSemicolon);
 			}
-			EIf(cond,e1,e2);
+			mk(EIf(cond,e1,e2),p1,(e2 == null) ? tokenMax : pmax(e2));
 		case "var":
 			var tk = token();
 			var ident = null;
@@ -330,11 +407,11 @@ class Parser {
 				e = parseExpr();
 			else
 				push(tk);
-			EVar(ident,t,e);
+			mk(EVar(ident,t,e),p1,(e == null) ? tokenMax : pmax(e));
 		case "while":
 			var econd = parseExpr();
 			var e = parseExpr();
-			EWhile(econd,e);
+			mk(EWhile(econd,e),p1,pmax(e));
 		case "for":
 			ensure(TPOpen);
 			var tk = token();
@@ -347,9 +424,10 @@ class Parser {
 			if( !Type.enumEq(tk,TId("in")) ) unexpected(tk);
 			var eiter = parseExpr();
 			ensure(TPClose);
-			EFor(vname,eiter,parseExpr());
-		case "break": EBreak;
-		case "continue": EContinue;
+			var e = parseExpr();
+			mk(EFor(vname,eiter,e),p1,pmax(e));
+		case "break": mk(EBreak);
+		case "continue": mk(EContinue);
 		case "else": unexpected(TId(id));
 		case "function":
 			var tk = token();
@@ -391,11 +469,13 @@ class Parser {
 				else
 					ret = parseType();
 			}
-			EFunction(args, parseExpr(), name, ret);
+			var body = parseExpr();
+			mk(EFunction(args, body, name, ret),p1,pmax(body));
 		case "return":
 			var tk = token();
 			push(tk);
-			EReturn(if( tk == TSemicolon ) null else parseExpr());
+			var e = if( tk == TSemicolon ) null else parseExpr();
+			mk(EReturn(e),p1,if( e == null ) tokenMax else pmax(e));
 		case "new":
 			var a = new Array();
 			var tk = token();
@@ -418,9 +498,11 @@ class Parser {
 					unexpected(tk);
 				}
 			}
-			ENew(a.join("."),parseExprList(TPClose));
+			var args = parseExprList(TPClose);
+			mk(ENew(a.join("."),args),p1);
 		case "throw":
-			EThrow( parseExpr() );
+			var e = parseExpr();
+			mk(EThrow(e),p1,pmax(e));
 		case "try":
 			var e = parseExpr();
 			var tk = token();
@@ -440,7 +522,8 @@ class Parser {
 				if( !Type.enumEq(tk, TId("Dynamic")) ) unexpected(tk);
 			}
 			ensure(TPClose);
-			ETry(e,vname,t,parseExpr());
+			var ec = parseExpr();
+			mk(ETry(e,vname,t,ec),p1,pmax(ec));
 		default:
 			null;
 		}
@@ -452,11 +535,11 @@ class Parser {
 		case TOp(op):
 			for( x in unopsSuffix )
 				if( x == op ) {
-					if( isBlock(e1) || switch(e1) { case EParent(_): true; default: false; } ) {
+					if( isBlock(e1) || switch(expr(e1)) { case EParent(_): true; default: false; } ) {
 						push(tk);
 						return e1;
 					}
-					return parseExprNext(EUnop(op,false,e1));
+					return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
 				}
 			return makeBinop(op,e1,parseExpr());
 		case TDot:
@@ -466,18 +549,18 @@ class Parser {
 			case TId(id): field = id;
 			default: unexpected(tk);
 			}
-			return parseExprNext(EField(e1,field));
+			return parseExprNext(mk(EField(e1,field),pmin(e1)));
 		case TPOpen:
-			return parseExprNext(ECall(e1,parseExprList(TPClose)));
+			return parseExprNext(mk(ECall(e1,parseExprList(TPClose)),pmin(e1)));
 		case TBkOpen:
 			var e2 = parseExpr();
 			ensure(TBkClose);
-			return parseExprNext(EArray(e1,e2));
+			return parseExprNext(mk(EArray(e1,e2),pmin(e1)));
 		case TQuestion:
 			var e2 = parseExpr();
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
-			return EIf(e1,e2,e3);
+			return mk(EIf(e1,e2,e3),pmin(e1),pmax(e3));
 		default:
 			push(tk);
 			return e1;
@@ -577,7 +660,7 @@ class Parser {
 		var tk = token();
 		if( tk == etk )
 			return args;
-		tokens.add(tk);
+		push(tk);
 		while( true ) {
 			args.push(parseExpr());
 			tk = token();
@@ -590,8 +673,15 @@ class Parser {
 		}
 		return args;
 	}
+	
+	inline function incPos() {
+		#if hscriptPos
+		readPos++;
+		#end
+	}
 
 	function readChar() {
+		incPos();
 		return try input.readByte() catch( e : Dynamic ) 0;
 	}
 
@@ -601,12 +691,14 @@ class Parser {
 		var esc = false;
 		var old = line;
 		var s = input;
+		var p1 = readPos - 1;
 		while( true ) {
 			try {
+				incPos();
 				c = s.readByte();
 			} catch( e : Dynamic ) {
 				line = old;
-				throw Error.EUnterminatedString;
+				error(EUnterminatedString, p1, p1);
 			}
 			if( esc ) {
 				esc = false;
@@ -615,15 +707,19 @@ class Parser {
 				case 'r'.code: b.writeByte(13);
 				case 't'.code: b.writeByte(9);
 				case "'".code, '"'.code, '\\'.code: b.writeByte(c);
-				case '/'.code: if( allowJSON ) b.writeByte(c) else throw Error.EInvalidChar(c);
+				case '/'.code: if( allowJSON ) b.writeByte(c) else invalidChar(c);
 				case "u".code:
-					if( !allowJSON ) throw Error.EInvalidChar(c);
+					if( !allowJSON ) throw invalidChar(c);
 					var code;
 					try {
+						incPos();
+						incPos();
+						incPos();
+						incPos();
 						code = s.readString(4);
 					} catch( e : Dynamic ) {
 						line = old;
-						throw Error.EUnterminatedString;
+						error(EUnterminatedString, p1, p1);
 					}
 					var k = 0;
 					for( i in 0...4 ) {
@@ -637,7 +733,7 @@ class Parser {
 						case 97,98,99,100,101,102: // a-f
 							k += char - 87;
 						default:
-							throw Error.EInvalidChar(char);
+							invalidChar(char);
 						}
 					}
 					// encode k in UTF8
@@ -651,7 +747,7 @@ class Parser {
 						b.writeByte( 0x80 | ((k >> 6) & 63) );
 						b.writeByte( 0x80 | (k & 63) );
 					}
-				default: throw Error.EInvalidChar(c);
+				default: invalidChar(c);
 				}
 			} else if( c == 92 )
 				esc = true;
@@ -666,20 +762,44 @@ class Parser {
 	}
 
 	function token() {
+		#if hscriptPos
+		var t = tokens.pop();
+		if( t != null ) {
+			tokenMin = t.min;
+			tokenMax = t.max;
+			return t.t;
+		}
+		oldTokenMin = tokenMin;
+		oldTokenMax = tokenMax;
+		tokenMin = (this.char < 0) ? readPos : readPos - 1;
+		var t = _token();
+		tokenMax = (this.char < 0) ? readPos - 1 : readPos - 2;
+		trace(t + ":" + tokenMin + ":" + tokenMax);
+		return t;
+	}
+	function _token() {
+		#else
 		if( !tokens.isEmpty() )
 			return tokens.pop();
+		#end
 		var char;
-		if( this.char == null )
+		if( this.char < 0 )
 			char = readChar();
 		else {
 			char = this.char;
-			this.char = null;
+			this.char = -1;
 		}
 		while( true ) {
 			switch( char ) {
 			case 0: return TEof;
 			case 32,9,13: // space, tab, CR
+				#if hscriptPos
+				tokenMin++;
+				#end
 			case 10: line++; // LF
+				#if hscriptPos
+				tokenMin++;
+				#end
 			case 48,49,50,51,52,53,54,55,56,57: // 0...9
 				var n = (char - 48) * 1.0;
 				var exp = 0;
@@ -693,16 +813,16 @@ class Parser {
 						if( exp > 0 ) {
 							// in case of '...'
 							if( exp == 10 && readChar() == 46 ) {
-								tokens.add(TOp("..."));
+								push(TOp("..."));
 								var i = Std.int(n);
 								return TConst( (i == n) ? CInt(i) : CFloat(n) );
 							}
-							throw Error.EInvalidChar(char);
+							invalidChar(char);
 						}
 						exp = 1;
 					case 120: // x
 						if( n > 0 || exp > 0 )
-							throw Error.EInvalidChar(char);
+							invalidChar(char);
 						// read hexa
 						var n = haxe.Int32.ofInt(0);
 						while( true ) {
@@ -753,7 +873,7 @@ class Parser {
 				case 46:
 					char = readChar();
 					if( char != 46 )
-						throw Error.EInvalidChar(char);
+						invalidChar(char);
 					return TOp("...");
 				default:
 					this.char = char;
@@ -792,7 +912,7 @@ class Parser {
 						id += String.fromCharCode(char);
 					}
 				}
-				throw Error.EInvalidChar(char);
+				invalidChar(char);
 			}
 			char = readChar();
 		}
@@ -804,8 +924,10 @@ class Parser {
 		var s = input;
 		if( c == 47 ) { // comment
 			try {
-				while( char != 10 && char != 13 )
+				while( char != 10 && char != 13 ) {
+					incPos();
 					char = s.readByte();
+				}
 				this.char = char;
 			} catch( e : Dynamic ) {
 			}
@@ -817,15 +939,17 @@ class Parser {
 				while( true ) {
 					while( char != 42 ) {
 						if( char == 10 ) line++;
+						incPos();
 						char = s.readByte();
 					}
+					incPos();
 					char = s.readByte();
 					if( char == 47 )
 						break;
 				}
 			} catch( e : Dynamic ) {
 				line = old;
-				throw Error.EUnterminatedComment;
+				error(EUnterminatedComment, tokenMin, tokenMin);
 			}
 			return token();
 		}
