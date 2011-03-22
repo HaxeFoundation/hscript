@@ -69,18 +69,18 @@ class Parser {
 	var ops : Array<Bool>;
 	var idents : Array<Bool>;
 
-
-	// only used for hscriptPos, but needs to be defined
+	#if hscriptPos
 	var readPos : Int;
 	var tokenMin : Int;
 	var tokenMax : Int;
-
-
-	#if hscriptPos
 	var oldTokenMin : Int;
 	var oldTokenMax : Int;
 	var tokens : List<{ min : Int, max : Int, t : Token }>;
 	#else
+	static inline var p1 = 0;
+	static inline var readPos = 0;
+	static inline var tokenMin = 0;
+	static inline var tokenMax = 0;
 	var tokens : haxe.FastList<Token>;
 	#end
 
@@ -265,7 +265,9 @@ class Parser {
 
 	function parseExpr() {
 		var tk = token();
+		#if hscriptPos
 		var p1 = tokenMin;
+		#end
 		switch( tk ) {
 		case TId(id):
 			var e = parseStructure(id);
@@ -370,7 +372,9 @@ class Parser {
 	}
 
 	function parseStructure(id) {
+		#if hscriptPos
 		var p1 = tokenMin;
+		#end
 		return switch( id ) {
 		case "if":
 			var cond = parseExpr();
@@ -691,7 +695,9 @@ class Parser {
 		var esc = false;
 		var old = line;
 		var s = input;
+		#if hscriptPos
 		var p1 = readPos - 1;
+		#end
 		while( true ) {
 			try {
 				incPos();
