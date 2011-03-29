@@ -2,5 +2,5 @@
     <user name="ncannasse"/>
     <tag v="cross"/>
     <description>haXe Script is a scripting engine for a subset of the haXe language</description>
-    <version name="1.5.2">JSON support + prevent overflow of long digits sequences</version>
+    <version name="1.6">allowTypes, hscript.Macro, fixed operator precedence</version>
 </project>
