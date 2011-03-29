@@ -211,6 +211,10 @@ class Bytes {
 				doEncodeString(f.name);
 				doEncode(f.e);
 			}
+		case ETernary(cond, e1, e2):
+			doEncode(cond);
+			doEncode(e1);
+			doEncode(e2);
 		}
 	}
 

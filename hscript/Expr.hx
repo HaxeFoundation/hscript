@@ -63,6 +63,7 @@ enum Expr {
 	EThrow( e : Expr );
 	ETry( e : Expr, v : String, t : Null<CType>, ecatch : Expr );
 	EObject( fl : Array<{ name : String, e : Expr }> );
+	ETernary( cond : Expr, e1 : Expr, e2 : Expr );
 }
 
 enum CType {

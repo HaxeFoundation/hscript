@@ -49,9 +49,9 @@ class Parser {
 	public var line : Int;
 	public var opChars : String;
 	public var identChars : String;
-	public var opPriority : Array<String>;
-	public var unopsPrefix : Array<String>;
-	public var unopsSuffix : Array<String>;
+	public var opPriority : Hash<Int>;
+	public var opRightAssoc : Hash<Bool>;
+	public var unops : Hash<Bool>; // true if allow postfix
 
 	/**
 		activate JSON compatiblity
@@ -89,19 +89,28 @@ class Parser {
 		line = 1;
 		opChars = "+*/-=!><&|^%~";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
-		opPriority = [
-			"...",
-			"=",
-			"||","&&",
-			"==","!=",">","<",">=","<=",
-			"|","&","^",
-			"<<",">>",">>>",
-			"+","-",
-			"*","/",
-			"%"
+		var priorities = [
+			["%"],
+			["*", "/"],
+			["+", "-"],
+			["<<", ">>", ">>>"],
+			["|", "&", "^"],
+			["==", "!=", ">", "<", ">=", "<="],
+			["..."],
+			["&&"],
+			["||"],
+			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^="],
 		];
-		unopsPrefix = ["!","++","--","-","~"];
-		unopsSuffix = ["++", "--"];
+		opPriority = new Hash();
+		opRightAssoc = new Hash();
+		for( i in 0...priorities.length )
+			for( x in priorities[i] ) {
+				opPriority.set(x, i);
+				if( i == 9 ) opRightAssoc.set(x, true);
+			}
+		unops = new Hash();
+		for( x in ["!", "++", "--", "-", "~"] )
+			unops.set(x, x == "++" || x == "--");
 	}
 
 	public inline function error( err, pmin, pmax ) {
@@ -279,7 +288,7 @@ class Parser {
 		case TPOpen:
 			var e = parseExpr();
 			ensure(TPClose);
-			return parseExprNext(mk(EParent(e),p1,pmax(e)));
+			return parseExprNext(mk(EParent(e),p1,tokenMax));
 		case TBrOpen:
 			tk = token();
 			switch( tk ) {
@@ -324,10 +333,8 @@ class Parser {
 			}
 			return mk(EBlock(a),p1);
 		case TOp(op):
-			var found;
-			for( x in unopsPrefix )
-				if( x == op )
-					return makeUnop(op,parseExpr());
+			if( unops.exists(op) )
+				return makeUnop(op,parseExpr());
 			return unexpected(tk);
 		case TBkOpen:
 			var a = new Array();
@@ -345,16 +352,10 @@ class Parser {
 		}
 	}
 
-	function priority(op) {
-		for( i in 0...opPriority.length )
-			if( opPriority[i] == op )
-				return i;
-		return -1;
-	}
-
 	function makeUnop( op, e ) {
 		return switch( expr(e) ) {
-		case EBinop(bop, e1, e2): mk(EBinop(bop, makeUnop(op, e1), e2),pmin(e1),pmax(e2));
+		case EBinop(bop, e1, e2): mk(EBinop(bop, makeUnop(op, e1), e2), pmin(e1), pmax(e2));
+		case ETernary(e1,e2,e3): mk(ETernary(makeUnop(op,e1),e2,e3),pmin(e1)
 		default: mk(EUnop(op,true,e),pmin(e),pmax(e));
 		}
 	}
@@ -362,10 +363,15 @@ class Parser {
 	function makeBinop( op, e1, e ) {
 		return switch( expr(e) ) {
 		case EBinop(op2,e2,e3):
-			if( priority(op) > priority(op2) )
+			if( opPriority.get(op) <= opPriority.get(op2) && !opRightAssoc.exists(op) )
 				mk(EBinop(op2,makeBinop(op,e1,e2),e3),pmin(e1),pmax(e3));
 			else
-				mk(EBinop(op, e1, e),pmin(e1),pmax(e));
+				mk(EBinop(op, e1, e), pmin(e1), pmax(e));
+		case ETernary(e2,e3,e4):
+			if( opRightAssoc.exists(op) )
+				mk(EBinop(op,e1,e),pmin(e1),pmax(e));
+			else
+				mk(ETernary(makeBinop(op, e1, e2), e3, e4), pmin(e1), pmax(e));
 		default:
 			mk(EBinop(op,e1,e),pmin(e1),pmax(e));
 		}
@@ -537,14 +543,13 @@ class Parser {
 		var tk = token();
 		switch( tk ) {
 		case TOp(op):
-			for( x in unopsSuffix )
-				if( x == op ) {
-					if( isBlock(e1) || switch(expr(e1)) { case EParent(_): true; default: false; } ) {
-						push(tk);
-						return e1;
-					}
-					return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
+			if( unops.get(op) ) {
+				if( isBlock(e1) || switch(expr(e1)) { case EParent(_): true; default: false; } ) {
+					push(tk);
+					return e1;
 				}
+				return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
+			}
 			return makeBinop(op,e1,parseExpr());
 		case TDot:
 			tk = token();
@@ -564,7 +569,7 @@ class Parser {
 			var e2 = parseExpr();
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
-			return mk(EIf(e1,e2,e3),pmin(e1),pmax(e3));
+			return mk(ETernary(e1,e2,e3),pmin(e1),pmax(e3));
 		default:
 			push(tk);
 			return e1;

@@ -346,6 +346,8 @@ class Interp {
 			for( f in fl )
 				set(o,f.name,expr(f.e));
 			return o;
+		case ETernary(econd,e1,e2):
+			return if( expr(econd) == true ) expr(e1) else expr(e2);
 		}
 		return null;
 	}
