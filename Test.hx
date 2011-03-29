@@ -73,6 +73,8 @@ class Test {
 		test("{ x = 3; x; }", 3);
 		test("{ x : 3, y : {} }.x", 3);
 		test("function bug(){ \n }\nbug().x", null);
+		test("1 + 2 == 3", true);
+		test("-2 == 3 - 5", true);
 		trace("Done");
 	}
 

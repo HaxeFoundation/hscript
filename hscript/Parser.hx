@@ -355,7 +355,7 @@ class Parser {
 	function makeUnop( op, e ) {
 		return switch( expr(e) ) {
 		case EBinop(bop, e1, e2): mk(EBinop(bop, makeUnop(op, e1), e2), pmin(e1), pmax(e2));
-		case ETernary(e1,e2,e3): mk(ETernary(makeUnop(op,e1),e2,e3),pmin(e1)
+		case ETernary(e1, e2, e3): mk(ETernary(makeUnop(op, e1), e2, e3), pmin(e1), pmax(e3));
 		default: mk(EUnop(op,true,e),pmin(e),pmax(e));
 		}
 	}

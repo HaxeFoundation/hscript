@@ -198,6 +198,8 @@ class Macro {
 				for( f in fields )
 					tf.push( { field : f.name, expr : convert(f.e) } );
 				EObjectDecl(tf);
+			case ETernary(cond, e1, e2):
+				ETernary(convert(cond), convert(e1), convert(e2));
 		}, pos : #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
 	}
 
