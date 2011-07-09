@@ -115,7 +115,7 @@ class Macro {
 		case CTAnon(fields):
 			var tf = [];
 			for( f in fields )
-				tf.push( { name : f.name, isPublic : null, type : FVar(convertType(f.t)), pos : p } );
+				tf.push( { name : f.name, meta : [], doc : null, access : [], kind : FVar(convertType(f.t),null), pos : p } );
 			TAnonymous(tf);
 		};
 	}
@@ -174,8 +174,8 @@ class Macro {
 						opt : false,
 						value : null,
 					});
-				EFunction( {
-					name : name,
+				EFunction(name, {
+					params : [],
 					args : targs,
 					expr : convert(e),
 					ret : ret == null ? null : convertType(ret),
