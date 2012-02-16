@@ -813,7 +813,7 @@ class Parser {
 				#end
 			case 48,49,50,51,52,53,54,55,56,57: // 0...9
 				var n = (char - 48) * 1.0;
-				var exp = 0;
+				var exp = 0.;
 				while( true ) {
 					char = readChar();
 					exp *= 10;
@@ -830,7 +830,7 @@ class Parser {
 							}
 							invalidChar(char);
 						}
-						exp = 1;
+						exp = 1.;
 					case 120: // x
 						if( n > 0 || exp > 0 )
 							invalidChar(char);
