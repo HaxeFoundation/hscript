@@ -695,7 +695,7 @@ class Parser {
 	}
 
 	function readString( until ) {
-		var c;
+		var c = 0;
 		var b = new haxe.io.BytesOutput();
 		var esc = false;
 		var old = line;
