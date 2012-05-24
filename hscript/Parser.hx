@@ -450,7 +450,8 @@ class Parser {
 			var args = new Array();
 			tk = token();
 			if( tk != TPClose ) {
-				while( true ) {
+				var arg = true;
+				while( arg ) {
 					var name = null;
 					switch( tk ) {
 					case TId(id): name = id;
@@ -462,13 +463,15 @@ class Parser {
 						t = parseType();
 						tk = token();
 					}
-					args.push({ name : name, t : t });
+					args.push( { name : name, t : t } );
 					switch( tk ) {
 					case TComma:
-					case TPClose: break;
-					default: unexpected(tk);
+						tk = token();
+					case TPClose:
+						arg = false;
+					default:
+						unexpected(tk);
 					}
-					tk = token();
 				}
 			}
 			var ret = null;
@@ -493,7 +496,8 @@ class Parser {
 			case TId(id): a.push(id);
 			default: unexpected(tk);
 			}
-			while( true ) {
+			var next = true;
+			while( next ) {
 				tk = token();
 				switch( tk ) {
 				case TDot:
@@ -503,7 +507,7 @@ class Parser {
 					default: unexpected(tk);
 					}
 				case TPOpen:
-					break;
+					next = false;
 				default:
 					unexpected(tk);
 				}
