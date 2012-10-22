@@ -839,6 +839,23 @@ class Parser {
 						if( n > 0 || exp > 0 )
 							invalidChar(char);
 						// read hexa
+						#if haxe3
+						var n = 0;
+						while( true ) {
+							char = readChar();
+							switch( char ) {
+							case 48,49,50,51,52,53,54,55,56,57: // 0-9
+								n = (n << 4) + char - 48;
+							case 65,66,67,68,69,70: // A-F
+								n = (n << 4) + (char - 55);
+							case 97,98,99,100,101,102: // a-f
+								n = (n << 4) + (char - 87);
+							default:
+								this.char = char;
+								return TConst(CInt(n));
+							}
+						}
+						#else
 						var n = haxe.Int32.ofInt(0);
 						while( true ) {
 							char = readChar();
@@ -858,6 +875,7 @@ class Parser {
 								return TConst(v);
 							}
 						}
+						#end
 					default:
 						this.char = char;
 						var i = Std.int(n);
@@ -975,9 +993,11 @@ class Parser {
 	function constString( c ) {
 		return switch(c) {
 		case CInt(v): Std.string(v);
-		case CInt32(v): Std.string(v);
 		case CFloat(f): Std.string(f);
 		case CString(s): s; // TODO : escape + quote
+		#if !haxe3
+		case CInt32(v): Std.string(v);
+		#end
 		}
 	}
 

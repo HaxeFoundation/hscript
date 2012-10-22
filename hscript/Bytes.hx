@@ -87,13 +87,15 @@ class Bytes {
 				bout.addByte((v >> 16) & 0xFF);
 				bout.addByte(v >>> 24);
 			}
+		#if !haxe3
 		case CInt32(v):
 			bout.addByte(4);
 			var mid = haxe.Int32.toInt(haxe.Int32.and(v,haxe.Int32.ofInt(0xFFFFFF)));
 			bout.addByte(mid & 0xFF);
 			bout.addByte((mid >> 8) & 0xFF);
 			bout.addByte(mid >> 16);
-			bout.addByte(haxe.Int32.toInt(haxe.Int32.ushr(v,24)));
+			bout.addByte(haxe.Int32.toInt(haxe.Int32.ushr(v, 24)));
+		#end
 		case CFloat(f):
 			bout.addByte(2);
 			doEncodeString(Std.string(f));
@@ -115,11 +117,13 @@ class Bytes {
 			CFloat( Std.parseFloat(doDecodeString()) );
 		case 3:
 			CString( doDecodeString() );
+		#if !haxe3
 		case 4:
 			var i = bin.get(pin) | (bin.get(pin+1) << 8) | (bin.get(pin+2) << 16);
 			var j = bin.get(pin+3);
 			pin += 4;
-			CInt32(haxe.Int32.or(haxe.Int32.ofInt(i),haxe.Int32.shl(haxe.Int32.ofInt(j),24)));
+			CInt32(haxe.Int32.or(haxe.Int32.ofInt(i), haxe.Int32.shl(haxe.Int32.ofInt(j), 24)));
+		#end
 		default:
 			throw "Invalid code "+bin.get(pin-1);
 		}

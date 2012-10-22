@@ -28,7 +28,9 @@ enum Const {
 	CInt( v : Int );
 	CFloat( f : Float );
 	CString( s : String );
+	#if !haxe3
 	CInt32( v : haxe.Int32 );
+	#end
 }
 
 #if hscriptPos

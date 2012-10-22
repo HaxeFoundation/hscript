@@ -206,9 +206,11 @@ class Interp {
 		case EConst(c):
 			switch( c ) {
 			case CInt(v): return v;
-			case CInt32(v): return v;
 			case CFloat(f): return f;
 			case CString(s): return s;
+			#if !haxe3
+			case CInt32(v): return v;
+			#end
 			}
 		case EIdent(id):
 			var l = locals.get(id);
