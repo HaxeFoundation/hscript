@@ -159,8 +159,14 @@ class Macro {
 				EIf(convert(c), convert(e1), e2 == null ? null : convert(e2));
 			case EWhile(c, e):
 				EWhile(convert(c), convert(e), true);
+			#if (haxe_211 || haxe3)
+			case EFor(v, it, efor):
+				var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+				EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+			#else
 			case EFor(v, it, e):
 				EFor(v, convert(it), convert(e));
+			#end
 			case EBreak:
 				EBreak;
 			case EContinue:
