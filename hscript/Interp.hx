@@ -250,7 +250,7 @@ class Interp {
 			case "--":
 				return increment(e,prefix,-1);
 			case "~":
-				#if neko
+				#if (neko && !haxe3)
 				return haxe.Int32.complement(expr(e));
 				#else
 				return ~expr(e);
