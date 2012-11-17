@@ -71,7 +71,7 @@ class Test {
 		test("var y = 0; var add = function(a) y += a; add(5); add(3); y", 8);
 		test("var a = [1,[2,[3,[4,null]]]]; var t = 0; while( a != null ) { t += a[0]; a = a[1]; }; t",10);
 		test("var t = 0; for( x in 1...10 ) t += x; t",45);
-		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t",45,{ IntIter : IntIter });
+		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t",45,{ IntIter : #if (haxe3 || haxe_211) IntIterator #else IntIter #end });
 		test("var x = 1; try { var x = 66; throw 789; } catch( e : Dynamic ) e + x",790);
 		test("var x = 1; var f = function(x) throw x; try f(55) catch( e : Dynamic ) e + x",56);
 		test("var i=2; if( true ) --i; i",1);
