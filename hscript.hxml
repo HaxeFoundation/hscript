@@ -3,3 +3,4 @@
 --flash-strict
 -swf-version 9
 -main Test
+-dce no

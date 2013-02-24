@@ -17,13 +17,11 @@ class Test {
 		test("0",0);
 		test("0xFF", 255);
 		#if haxe3
-		test("n(0xBFFFFFFF)",0xBFFFFFFF);
-		test("n(0x7FFFFFFF)", 0x7FFFFFFF);
-		#else
-		#if !neko
+		test("0xBFFFFFFF",0xBFFFFFFF);
+		test("0x7FFFFFFF", 0x7FFFFFFF);
+		#elseif !neko
 		test("n(0xBFFFFFFF)",0xBFFFFFFF,{ n : haxe.Int32.toNativeInt });
 		test("n(0x7FFFFFFF)", 0x7FFFFFFF, { n : haxe.Int32.toNativeInt } );
-		#end
 		#end
 		test("-123",-123);
 		test("- 123",-123);
@@ -70,8 +68,12 @@ class Test {
 		test("(function(a,b) return a + b)(4,5)",9);
 		test("var y = 0; var add = function(a) y += a; add(5); add(3); y", 8);
 		test("var a = [1,[2,[3,[4,null]]]]; var t = 0; while( a != null ) { t += a[0]; a = a[1]; }; t",10);
-		test("var t = 0; for( x in 1...10 ) t += x; t",45);
-		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t",45,{ IntIter : #if (haxe3 || haxe_211) IntIterator #else IntIter #end });
+		test("var t = 0; for( x in 1...10 ) t += x; t", 45);
+		#if haxe3
+		test("var t = 0; for( x in new IntIterator(1,10) ) t +=x; t", 45);
+		#else
+		test("var t = 0; for( x in new IntIter(1,10) ) t +=x; t", 45);
+		#end
 		test("var x = 1; try { var x = 66; throw 789; } catch( e : Dynamic ) e + x",790);
 		test("var x = 1; var f = function(x) throw x; try f(55) catch( e : Dynamic ) e + x",56);
 		test("var i=2; if( true ) --i; i",1);

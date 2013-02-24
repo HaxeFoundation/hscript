@@ -224,6 +224,16 @@ class Interp {
 			locals.set(d.n,d.old);
 		}
 	}
+	
+	function resolve( id : String ) : Dynamic {
+		var l = locals.get(id);
+		if( l != null )
+			return l.r;
+		var v = variables.get(id);
+		if( v == null && !variables.exists(id) )
+			throw Error.EUnknownVariable(id);
+		return v;
+	}
 
 	public function expr( e : Expr ) : Dynamic {
 		switch( e ) {
@@ -237,13 +247,7 @@ class Interp {
 			#end
 			}
 		case EIdent(id):
-			var l = locals.get(id);
-			if( l != null )
-				return l.r;
-			var v = variables.get(id);
-			if( v == null && !variables.exists(id) )
-				throw Error.EUnknownVariable(id);
-			return v;
+			return resolve(id);
 		case EVar(n,_,e):
 			declared.push({ n : n, old : locals.get(n) });
 			locals.set(n,{ r : (e == null)?null:expr(e) });
@@ -439,7 +443,9 @@ class Interp {
 	}
 
 	function cnew( cl : String, args : Array<Dynamic> ) : Dynamic {
-		return Type.createInstance(Type.resolveClass(cl),args);
+		var c = Type.resolveClass(cl);
+		if( c == null ) c = resolve(cl);
+		return Type.createInstance(c,args);
 	}
 
 }
