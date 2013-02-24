@@ -30,7 +30,7 @@ class Bytes {
 	var bin : haxe.io.Bytes;
 	var bout : haxe.io.BytesBuffer;
 	var pin : Int;
-	var hstrings : Hash<Int>;
+	var hstrings : #if haxe3 Map<String,Int> #else Hash<Int> #end;
 	var strings : Array<String>;
 	var nstrings : Int;
 
@@ -38,7 +38,7 @@ class Bytes {
 		this.bin = bin;
 		pin = 0;
 		bout = new haxe.io.BytesBuffer();
-		hstrings = new Hash();
+		hstrings = #if haxe3 new Map() #else new Hash() #end;
 		strings = [null];
 		nstrings = 1;
 	}
@@ -47,7 +47,7 @@ class Bytes {
 		var vid = hstrings.get(v);
 		if( vid == null ) {
 			if( nstrings == 256 ) {
-				hstrings = new Hash();
+				hstrings = #if haxe3 new Map() #else new Hash() #end;
 				nstrings = 1;
 			}
 			hstrings.set(v,nstrings);

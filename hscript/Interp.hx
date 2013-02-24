@@ -33,15 +33,27 @@ private enum Stop {
 
 class Interp {
 
+	#if haxe3
+	public var variables : Map<String,Dynamic>;
+	var locals : Map<String,{ r : Dynamic }>;
+	var binops : Map<String, Expr -> Expr -> Dynamic >;
+	#else
 	public var variables : Hash<Dynamic>;
 	var locals : Hash<{ r : Dynamic }>;
-	var binops : Hash<Expr -> Expr -> Dynamic>;
+	var binops : Hash< Expr -> Expr -> Dynamic >;
+	#end
+	
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 
 	public function new() {
+		#if haxe3
+		locals = new Map();
+		variables = new Map<String,Dynamic>();
+		#else
 		locals = new Hash();
-		declared = new Array();
 		variables = new Hash();
+		#end
+		declared = new Array();
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
@@ -51,7 +63,11 @@ class Interp {
 
 	function initOps() {
 		var me = this;
+		#if haxe3
+		binops = new Map();
+		#else
 		binops = new Hash();
+		#end
 		binops.set("+",function(e1,e2) return me.expr(e1) + me.expr(e2));
 		binops.set("-",function(e1,e2) return me.expr(e1) - me.expr(e2));
 		binops.set("*",function(e1,e2) return me.expr(e1) * me.expr(e2));
@@ -170,7 +186,11 @@ class Interp {
 	}
 
 	public function execute( expr : Expr ) : Dynamic {
+		#if haxe3
+		locals = new Map();
+		#else
 		locals = new Hash();
+		#end
 		return exprReturn(expr);
 	}
 
@@ -187,8 +207,12 @@ class Interp {
 		return null;
 	}
 
-	function duplicate<T>( h : Hash<T> ) {
+	function duplicate<T>( h : #if haxe3 Map < String, T > #else Hash<T> #end ) {
+		#if haxe3
+		var h2 = new Map();
+		#else
 		var h2 = new Hash();
+		#end
 		for( k in h.keys() )
 			h2.set(k,h.get(k));
 		return h2;

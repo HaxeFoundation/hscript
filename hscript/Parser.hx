@@ -49,10 +49,16 @@ class Parser {
 	public var line : Int;
 	public var opChars : String;
 	public var identChars : String;
+	#if haxe3
+	public var opPriority : Map<String,Int>;
+	public var opRightAssoc : Map<String,Bool>;
+	public var unops : Map<String,Bool>; // true if allow postfix
+	#else
 	public var opPriority : Hash<Int>;
 	public var opRightAssoc : Hash<Bool>;
 	public var unops : Hash<Bool>; // true if allow postfix
-
+	#end
+	
 	/**
 		activate JSON compatiblity
 	**/
@@ -81,7 +87,12 @@ class Parser {
 	static inline var readPos = 0;
 	static inline var tokenMin = 0;
 	static inline var tokenMax = 0;
+	#if haxe3
+	var tokens : haxe.ds.GenericStack<Token>;
+	#else
 	var tokens : haxe.FastList<Token>;
+	#end
+	
 	#end
 
 
@@ -101,14 +112,20 @@ class Parser {
 			["||"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^="],
 		];
+		#if haxe3
+		opPriority = new Map();
+		opRightAssoc = new Map();
+		unops = new Map();
+		#else
 		opPriority = new Hash();
 		opRightAssoc = new Hash();
+		unops = new Hash();
+		#end
 		for( i in 0...priorities.length )
 			for( x in priorities[i] ) {
 				opPriority.set(x, i);
 				if( i == 9 ) opRightAssoc.set(x, true);
 			}
-		unops = new Hash();
 		for( x in ["!", "++", "--", "-", "~"] )
 			unops.set(x, x == "++" || x == "--");
 	}
@@ -136,8 +153,10 @@ class Parser {
 		tokenMin = oldTokenMin = 0;
 		tokenMax = oldTokenMax = 0;
 		tokens = new List();
+		#elseif haxe3
+		tokens = new haxe.ds.GenericStack<Token>();
 		#else
-		tokens = new haxe.FastList<Token>();
+		tokens = new FastList<Token>();
 		#end
 		char = -1;
 		input = s;
@@ -294,7 +313,7 @@ class Parser {
 			switch( tk ) {
 			case TBrClose:
 				return parseExprNext(mk(EObject([]),p1));
-			case TId(id):
+			case TId(_):
 				var tk2 = token();
 				push(tk2);
 				push(tk);
@@ -660,7 +679,7 @@ class Parser {
 		}
 		var t2 = parseType();
 		switch( t2 ) {
-		case CTFun(args, ret):
+		case CTFun(args, _):
 			args.unshift(t);
 			return t2;
 		default:
