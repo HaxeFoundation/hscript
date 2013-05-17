@@ -1,7 +1,7 @@
 @echo off
 rm -rf release
 mkdir release
-cp haxelib.xml release
+cp haxelib.json release
 cd release
 mkdir hscript
 cd ..
