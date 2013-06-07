@@ -13,7 +13,7 @@ var interp = new hscript.Interp();
 trace(interp.execute(ast));
 </pre>
 
-In case or parse or runtime error an `hscript.Expr.Error` is throwed. You can use `parser.line` to know the line number.
+In case of parse error an `hscript.Expr.Error` is throwed. You can use `parser.line` to know the line number.
 
 You can set some globaly accessible identifiers by using `interp.variables.set("name",value)`
 
