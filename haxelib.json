@@ -3,7 +3,7 @@
   "url": "http://code.google.com/p/hscript",
   "license": "GPL",
   "description": "Haxe Script is a scripting engine for a subset of the Haxe language",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "releasenote": "haxe3 support",
   "contributors": ["ncannasse"]
 }
