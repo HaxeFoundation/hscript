@@ -5,13 +5,13 @@ Parse and evalutate Haxe expressions.
 
 Usage :
 
-```haxe
+<pre>
 var expr = "var x = 4; 1 + 2 * x";
 var parser = new hscript.Parser();
 var ast = parser.parseString(expr);
 var interp = new hscript.Interp();
 trace(interp.execute(ast));
-```
+</pre>
 
 In case or parse or runtime error an `hscript.Expr.Error` is throwed. You can use `parser.line` to know the line number.
 
