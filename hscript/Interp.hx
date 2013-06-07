@@ -294,7 +294,7 @@ class Interp {
 			case EField(e,f):
 				var obj = expr(e);
 				if( obj == null ) throw Error.EInvalidAccess(f);
-				return call(obj,Reflect.field(obj,f),args);
+				return fcall(obj,f,args);
 			default:
 				return call(null,expr(e),args);
 			}
@@ -438,6 +438,10 @@ class Interp {
 		return v;
 	}
 
+	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
+		return call(o, Reflect.field(o, f), args);
+	}
+	
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
 		return Reflect.callMethod(o,f,args);
 	}
