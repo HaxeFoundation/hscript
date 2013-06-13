@@ -156,7 +156,7 @@ class Parser {
 		#elseif haxe3
 		tokens = new haxe.ds.GenericStack<Token>();
 		#else
-		tokens = new FastList<Token>();
+		tokens = new haxe.FastList<Token>();
 		#end
 		char = -1;
 		input = s;
