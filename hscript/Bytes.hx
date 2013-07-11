@@ -307,6 +307,8 @@ class Bytes {
 				fl.push({ name : name, e : e });
 			}
 			EObject(fl);
+		case 22:
+			ETernary(doDecode(),doDecode(),doDecode());
 		case 255:
 			null;
 		default:

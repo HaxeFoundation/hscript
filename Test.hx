@@ -84,6 +84,7 @@ class Test {
 		test("function bug(){ \n }\nbug().x", null);
 		test("1 + 2 == 3", true);
 		test("-2 == 3 - 5", true);
+    test("(true ? 6 : 999) - (false ? 333 : 1)",5);
 		trace("Done");
 	}
 
