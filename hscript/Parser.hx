@@ -130,14 +130,17 @@ class Parser {
 			unops.set(x, x == "++" || x == "--");
 	}
 
+  #if hscriptPos
 	public inline function error( err:ErrorDef, pmin:Int, pmax:Int ) {
-		#if hscriptPos
     var msg = untyped ("Error: Parse error: "+err+", char "+pmin+"-"+pmax);
 		throw msg;
-		#else
 		throw err;
-		#end
 	}
+	#else
+	public inline function error( err:Error, pmin:Int, pmax:Int ) {
+		throw err;
+	}
+	#end
 
 	public function invalidChar(c) {
 		error(EInvalidChar(c), readPos, readPos);
