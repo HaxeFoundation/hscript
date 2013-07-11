@@ -61,6 +61,15 @@ class Interp {
 		initOps();
 	}
 
+	public inline function error( err:ErrorDef, pmin:Int, pmax:Int ) {
+		#if hscriptPos
+    var msg = untyped ("Error: Interpreter error: "+err+", char "+pmin+"-"+pmax);
+		throw msg;
+		#else
+		throw err;
+		#end
+	}
+
 	function initOps() {
 		var me = this;
 		#if haxe3
@@ -104,7 +113,7 @@ class Interp {
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
-		switch( e1 ) {
+    switch( #if hscriptPos e1.e #else e1 #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			if( l == null )
@@ -115,19 +124,19 @@ class Interp {
 			v = set(expr(e),f,v);
 		case EArray(e,index):
 			expr(e)[expr(index)] = v;
-		default: throw Error.EInvalidOp("=");
+		default: error(EInvalidOp("="), 0, 0);
 		}
 		return v;
 	}
 
 	function assignOp( op, fop : Dynamic -> Dynamic -> Dynamic ) {
 		var me = this;
-		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
+		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop, e1, e2));
 	}
 
 	function evalAssignOp(op,fop,e1,e2) : Dynamic {
 		var v;
-		switch( e1 ) {
+    switch( #if hscriptPos e1.e #else e1 #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			v = fop(expr(e1),expr(e2));
@@ -145,13 +154,13 @@ class Interp {
 			v = fop(arr[index],expr(e2));
 			arr[index] = v;
 		default:
-			throw Error.EInvalidOp(op);
+			error(EInvalidOp(op), 0, 0);
 		}
 		return v;
 	}
 
 	function increment( e : Expr, prefix : Bool, delta : Int ) : Dynamic {
-		switch(e) {
+      switch( #if hscriptPos e.e #else e #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			var v : Dynamic = (l == null) ? variables.get(id) : l.r;
@@ -181,7 +190,7 @@ class Interp {
 				arr[index] = v + delta;
 			return v;
 		default:
-			throw Error.EInvalidOp((delta > 0)?"++":"--");
+			error(EInvalidOp((delta > 0)?"++":"--"), 0, 0);
 		}
 	}
 
@@ -231,12 +240,18 @@ class Interp {
 			return l.r;
 		var v = variables.get(id);
 		if( v == null && !variables.exists(id) )
-			throw Error.EUnknownVariable(id);
+			error(EUnknownVariable(id), 0, 0);
 		return v;
 	}
 
 	public function expr( e : Expr ) : Dynamic {
-		switch( e ) {
+    if (e==null) return null;
+    #if hscriptPos
+      if (e.e==null) return null;
+  		switch( e.e ) {
+    #else
+  		switch( e ) {
+    #end
 		case EConst(c):
 			switch( c ) {
 			case CInt(v): return v;
@@ -265,7 +280,7 @@ class Interp {
 			return get(expr(e),f);
 		case EBinop(op,e1,e2):
 			var fop = binops.get(op);
-			if( fop == null ) throw Error.EInvalidOp(op);
+			if( fop == null ) error(EInvalidOp(op), 0, 0);
 			return fop(e1,e2);
 		case EUnop(op,prefix,e):
 			switch(op) {
@@ -284,16 +299,16 @@ class Interp {
 				return ~expr(e);
 				#end
 			default:
-				throw Error.EInvalidOp(op);
+				error(EInvalidOp(op), 0, 0);
 			}
 		case ECall(e,params):
 			var args = new Array();
 			for( p in params )
 				args.push(expr(p));
-			switch(e) {
+      switch( #if hscriptPos e.e #else e #end ) {
 			case EField(e,f):
 				var obj = expr(e);
-				if( obj == null ) throw Error.EInvalidAccess(f);
+				if( obj == null ) error(EInvalidAccess(f), 0, 0);
 				return fcall(obj,f,args);
 			default:
 				return call(null,expr(e),args);
@@ -404,7 +419,7 @@ class Interp {
 		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
 		#end
-		if( v.hasNext == null || v.next == null ) throw Error.EInvalidIterator(v);
+		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v), 0, 0);
 		return v;
 	}
 
@@ -428,12 +443,12 @@ class Interp {
 	}
 
 	function get( o : Dynamic, f : String ) : Dynamic {
-		if( o == null ) throw Error.EInvalidAccess(f);
+		if( o == null ) error(EInvalidAccess(f), 0, 0);
 		return Reflect.field(o,f);
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
-		if( o == null ) throw Error.EInvalidAccess(f);
+		if( o == null ) error(EInvalidAccess(f), 0, 0);
 		Reflect.setField(o,f,v);
 		return v;
 	}
