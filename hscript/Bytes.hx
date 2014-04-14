@@ -64,7 +64,7 @@ class Bytes {
 		var id = bin.get(pin++);
 		if( id == 0 ) {
 			var len = bin.get(pin);
-			var str = bin.readString(pin+1,len);
+			var str = #if (haxe_ver < 3.103) bin.readString(pin+1,len); #else bin.getString(pin+1,len); #end
 			pin += len + 1;
 			if( strings.length == 255 )
 				strings = [null];
