@@ -61,9 +61,9 @@ class Interp {
 		initOps();
 	}
 
-  #if hscriptPos
+	#if hscriptPos
 	public inline function error( err:ErrorDef, pmin:Int, pmax:Int ) {
-    var msg = untyped ("Error: Interpreter error: "+err+", char "+pmin+"-"+pmax);
+		var msg = untyped ("Error: Interpreter error: "+err+", char "+pmin+"-"+pmax);
 		throw msg;
 		throw err;
 	}
@@ -116,7 +116,7 @@ class Interp {
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
-    switch( #if hscriptPos e1.e #else e1 #end ) {
+		switch( #if hscriptPos e1.e #else e1 #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			if( l == null )
@@ -139,7 +139,7 @@ class Interp {
 
 	function evalAssignOp(op,fop,e1,e2) : Dynamic {
 		var v;
-    switch( #if hscriptPos e1.e #else e1 #end ) {
+		switch( #if hscriptPos e1.e #else e1 #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			v = fop(expr(e1),expr(e2));
@@ -163,7 +163,7 @@ class Interp {
 	}
 
 	function increment( e : Expr, prefix : Bool, delta : Int ) : Dynamic {
-      switch( #if hscriptPos e.e #else e #end ) {
+		switch( #if hscriptPos e.e #else e #end ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			var v : Dynamic = (l == null) ? variables.get(id) : l.r;
@@ -248,13 +248,13 @@ class Interp {
 	}
 
 	public function expr( e : Expr ) : Dynamic {
-    if (e==null) return null;
-    #if hscriptPos
-      if (e.e==null) return null;
-  		switch( e.e ) {
-    #else
-  		switch( e ) {
-    #end
+		if (e==null) return null;
+		#if hscriptPos
+			if (e.e==null) return null;
+			switch( e.e ) {
+		#else
+			switch( e ) {
+		#end
 		case EConst(c):
 			switch( c ) {
 			case CInt(v): return v;
@@ -308,7 +308,7 @@ class Interp {
 			var args = new Array();
 			for( p in params )
 				args.push(expr(p));
-      switch( #if hscriptPos e.e #else e #end ) {
+			switch( #if hscriptPos e.e #else e #end ) {
 			case EField(e,f):
 				var obj = expr(e);
 				if( obj == null ) error(EInvalidAccess(f), 0, 0);

@@ -130,7 +130,7 @@ class Bytes {
 	}
 
 	function doEncode( exp : Expr ) {
-    var e = #if hscriptPos exp.e #else exp #end;
+		var e = #if hscriptPos exp.e #else exp #end;
 		bout.addByte(Type.enumIndex(e));
 		switch( e ) {
 		case EConst(c):
@@ -224,8 +224,7 @@ class Bytes {
 	}
 
 	function doDecode() : Expr {
-		var e =
-      switch( bin.get(pin++) ) {
+		var e = switch( bin.get(pin++) ) {
 		case 0:
 			EConst( doDecodeConst() );
 		case 1:
@@ -317,7 +316,7 @@ class Bytes {
 			throw "Invalid code "+bin.get(pin - 1);
 		}
 
-    return #if hscriptPos { e : e, pmin : 0, pmax : 0 } #else e #end;
+		return #if hscriptPos { e : e, pmin : 0, pmax : 0 } #else e #end;
 	}
 
 	public static function encode( e : Expr ) : haxe.io.Bytes {

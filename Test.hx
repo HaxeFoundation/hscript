@@ -84,7 +84,7 @@ class Test {
 		test("function bug(){ \n }\nbug().x", null);
 		test("1 + 2 == 3", true);
 		test("-2 == 3 - 5", true);
-    test("(true ? 6 : 999) - (false ? 333 : 1)",5);
+		test("(true ? 6 : 999) - (false ? 333 : 1)",5);
 
 		// Expect an interpreter error message with the name of the misspelled function
 		test("var msg=''; var obj = {}; obj.sum = function(a,b) return a + b; try { obj.sum_misspelled(1, 2); } catch (e:Dynamic) { msg = e+''; }; msg.indexOf('sum_misspelled')>=0",true);
