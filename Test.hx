@@ -84,6 +84,30 @@ class Test {
 		test("function bug(){ \n }\nbug().x", null);
 		test("1 + 2 == 3", true);
 		test("-2 == 3 - 5", true);
+    test("(true ? 6 : 999) - (false ? 333 : 1)",5);
+
+		// Expect an interpreter error message with the name of the misspelled function
+		test("var msg=''; var obj = {}; obj.sum = function(a,b) return a + b; try { obj.sum_misspelled(1, 2); } catch (e:Dynamic) { msg = e+''; }; msg.indexOf('sum_misspelled')>=0",true);
+
+		#if hscriptPos
+			// If compiled with hscriptPos, expect a formatted parser error message:
+			//	Error: Parse error: EUnexpected()),	 on line 2, char 21-21
+			//	> 1: var a=1; var b=2;
+			//	> 2: trace('a+b='+(a + b)));
+			//														^
+			//	> 3: trace('complete!');
+			//	> 4: 
+
+			try {
+				test("var a=1; var b=2;\ntrace('a+b='+(a + b)));\ntrace('complete!');\n",true);
+			} catch (e:Dynamic) {
+				if ((e+'').indexOf("on line 2, char 21")<0) {
+					trace(e);
+					throw "Expected nicely formatted parse error message";
+				}
+			}
+		#end
+
 		trace("Done");
 	}
 

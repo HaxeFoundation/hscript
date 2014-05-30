@@ -130,13 +130,17 @@ class Parser {
 			unops.set(x, x == "++" || x == "--");
 	}
 
-	public inline function error( err, pmin, pmax ) {
-		#if hscriptPos
-		throw new Error(err, pmin, pmax);
-		#else
+  #if hscriptPos
+	public inline function error( err:ErrorDef, pmin:Int, pmax:Int ) {
+    var msg = untyped ("Error: Parse error: "+err+", char "+pmin+"-"+pmax);
+		throw msg;
 		throw err;
-		#end
 	}
+	#else
+	public inline function error( err:Error, pmin:Int, pmax:Int ) {
+		throw err;
+	}
+	#end
 
 	public function invalidChar(c) {
 		error(EInvalidChar(c), readPos, readPos);
@@ -144,7 +148,16 @@ class Parser {
 
 	public function parseString( s : String ) {
 		line = 1;
+		#if hscriptPos
+		try {
+	 		var parsed = parse( new haxe.io.StringInput(s) );
+			return parsed;
+		} catch (e:Dynamic) {
+			throw formatParseError(e, s);
+		}
+		#else
 		return parse( new haxe.io.StringInput(s) );
+		#end
 	}
 
 	public function parse( s : haxe.io.Input ) {
@@ -1039,5 +1052,44 @@ class Parser {
 		case TDoubleDot: ":";
 		}
 	}
+
+	static private function formatParseError(msg:String, prog:String):String
+  {
+    var r = ~/char ([0-9]+)\-([0-9]+)/;
+    if (r.match(msg)) {
+      var error = "";
+      var char = Std.parseInt(r.matched(1));
+      var end = Std.parseInt(r.matched(1));
+   
+      var lines = prog.split("\n");
+      var line = 1;
+      var bbfor = "";
+      var before = "";
+      while (lines[0].length < char) {
+        bbfor = before;
+        before = lines.shift();
+        char -= before.length+1;
+        end -= before.length+1;
+        line++;
+      }
+      error += (r.replace(msg, "")+" on line "+line+", char "+char+"-"+end+"\n");
+      if (bbfor.length>0) { error += ("> "+(line-2)+": "+bbfor+"\n"); }
+      if (before.length>0) { error += ("> "+(line-1)+": "+before+"\n"); }
+      error += ("> "+(line)+": "+lines[0]+"\n");
+      var cnt = (line+":").length + char;
+      var spacer = " ";
+      while (cnt>0) {
+        spacer += " ";
+        cnt--;
+      }
+      error += ("  "+spacer+"^"+"\n");
+      if (lines.length>1) { error += ("> "+(line+1)+": "+lines[1]+"\n"); }
+      if (lines.length>2) { error += ("> "+(line+2)+": "+lines[2]+"\n"); }
+
+      return error;
+    } else {
+      return msg;
+    }
+  }
 
 }
