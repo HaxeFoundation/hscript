@@ -1082,7 +1082,7 @@ class Parser {
 				spacer += " ";
 				cnt--;
 			}
-			error += ("	 "+spacer+"^"+"\n");
+			error += ("  "+spacer+"^"+"\n");
 			if (lines.length>1) { error += ("> "+(line+1)+": "+lines[1]+"\n"); }
 			if (lines.length>2) { error += ("> "+(line+2)+": "+lines[2]+"\n"); }
 
