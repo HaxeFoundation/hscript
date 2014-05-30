@@ -91,18 +91,17 @@ class Test {
 
 		#if hscriptPos
 			// If compiled with hscriptPos, expect a formatted parser error message:
-			//	Error: Parse error: EUnexpected()),	 on line 2, char 21-21
+			//	Uncaught exception - test.hscript.hx:2: characters 21-21 : EUnexpected())
 			//	> 1: var a=1; var b=2;
 			//	> 2: trace('a+b='+(a + b)));
 			//														^
 			//	> 3: trace('complete!');
-			//	> 4: 
+			//	> 4:
 
 			try {
 				test("var a=1; var b=2;\ntrace('a+b='+(a + b)));\ntrace('complete!');\n",true);
 			} catch (e:Dynamic) {
-				if ((e+'').indexOf("on line 2, char 21")<0) {
-					trace(e);
+				if ((e+'').indexOf("characters 21")<0) {
 					throw "Expected nicely formatted parse error message";
 				}
 			}

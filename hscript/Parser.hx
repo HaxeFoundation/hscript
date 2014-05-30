@@ -132,9 +132,8 @@ class Parser {
 
 	#if hscriptPos
 	public inline function error( err:ErrorDef, pmin:Int, pmax:Int ) {
-		var msg = untyped ("Error: Parse error: "+err+", char "+pmin+"-"+pmax);
+		var msg = untyped (err+", char "+pmin+"-"+pmax);
 		throw msg;
-		throw err;
 	}
 	#else
 	public inline function error( err:Error, pmin:Int, pmax:Int ) {
@@ -146,14 +145,14 @@ class Parser {
 		error(EInvalidChar(c), readPos, readPos);
 	}
 
-	public function parseString( s : String ) {
+	public function parseString( s:String, debugFilename:String='[hscript]', debugVerbose:Bool=false ) {
 		line = 1;
 		#if hscriptPos
 		try {
 	 		var parsed = parse( new haxe.io.StringInput(s) );
 			return parsed;
 		} catch (e:Dynamic) {
-			throw formatParseError(e, s);
+			throw formatParseError(e, s, debugFilename, debugVerbose);
 		}
 		#else
 		return parse( new haxe.io.StringInput(s) );
@@ -1053,9 +1052,9 @@ class Parser {
 		}
 	}
 
-	static private function formatParseError(msg:String, prog:String):String
+	static private function formatParseError(msg:String, prog:String, debugFilename:String='[hscript]', debugVerbose:Bool=false):String
 	{
-		var r = ~/char ([0-9]+)\-([0-9]+)/;
+		var r = ~/, char ([0-9]+)\-([0-9]+)/;
 		if (r.match(msg)) {
 			var error = "";
 			var char = Std.parseInt(r.matched(1));
@@ -1072,7 +1071,9 @@ class Parser {
 				end -= before.length+1;
 				line++;
 			}
-			error += (r.replace(msg, "")+" on line "+line+", char "+char+"-"+end+"\n");
+			error += debugFilename+":"+line+": characters "+char+"-"+end+" : "+(r.replace(msg, ""));
+      if (!debugVerbose) return error;
+      error += "\n";
 			if (bbfor.length>0) { error += ("> "+(line-2)+": "+bbfor+"\n"); }
 			if (before.length>0) { error += ("> "+(line-1)+": "+before+"\n"); }
 			error += ("> "+(line)+": "+lines[0]+"\n");
