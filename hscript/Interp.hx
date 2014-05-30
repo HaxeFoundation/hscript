@@ -457,7 +457,11 @@ class Interp {
 	}
 
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
-		return call(o, Reflect.field(o, f), args);
+		var call_o = Reflect.field(o, f);
+		if (call_o==null) {
+			error(EInvalidAccess(f), 0, 0);
+		}
+		return call(o, call_o, args);
 	}
 	
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
