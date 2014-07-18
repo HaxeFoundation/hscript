@@ -42,7 +42,7 @@ class Interp {
 	var locals : Hash<{ r : Dynamic }>;
 	var binops : Hash< Expr -> Expr -> Dynamic >;
 	#end
-	
+
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 
 	public function new() {
@@ -224,7 +224,7 @@ class Interp {
 			locals.set(d.n,d.old);
 		}
 	}
-	
+
 	function resolve( id : String ) : Dynamic {
 		var l = locals.get(id);
 		if( l != null )
@@ -441,7 +441,7 @@ class Interp {
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
 		return call(o, Reflect.field(o, f), args);
 	}
-	
+
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
 		return Reflect.callMethod(o,f,args);
 	}

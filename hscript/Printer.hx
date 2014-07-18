@@ -1,0 +1,240 @@
+package hscript;
+import hscript.Expr;
+
+class Printer {
+
+	var buf : StringBuf;
+	var tabs : String;
+
+	public function new() {
+	}
+
+	public function exprToString( e : Expr ) {
+		buf = new StringBuf();
+		tabs = "";
+		expr(e);
+		return buf.toString();
+	}
+
+	inline function add<T>(s:T) buf.add(s);
+
+	function type( t : CType ) {
+		switch( t ) {
+		case CTPath(path, params):
+			add(path.join("."));
+			if( params != null ) {
+				add("<");
+				var first = true;
+				for( p in params ) {
+					if( first ) first = false else add(", ");
+					type(p);
+				}
+				add(">");
+			}
+		case CTFun(args, ret):
+			if( args.length == 0 )
+				add("Void -> ");
+			else {
+				for( a in args ) {
+					type(a);
+					add(" -> ");
+				}
+			}
+			type(ret);
+		case CTAnon(fields):
+			add("{");
+			var first = true;
+			for( f in fields ) {
+				if( first ) { first = false; add(" "); } else add(", ");
+				add(f.name + " : ");
+				type(f.t);
+			}
+			add(first ? "}" : " }");
+		case CTParent(t):
+			add("(");
+			type(t);
+			add(")");
+		}
+	}
+
+	function addType( t : CType ) {
+		if( t != null ) {
+			add(" : ");
+			type(t);
+		}
+	}
+
+	function expr( e : Expr) {
+		if( e == null ) {
+			add("??NULL??");
+			return;
+		}
+		switch( e ) {
+		case EConst(c):
+			switch( c ) {
+			case CInt(i): add(i);
+			case CFloat(f): add(f);
+			case CString(s): add('"'); add(s.split('"').join('\\"').split("\n").join("\\n").split("\r").join("\\r").split("\t").join("\\t")); add('"');
+			}
+		case EIdent(v):
+			add(v);
+		case EVar(n, t, e):
+			add("var " + n);
+			addType(t);
+			if( e != null ) {
+				add(" = ");
+				expr(e);
+			}
+		case EParent(e):
+			add("("); expr(e); add(")");
+		case EBlock(el):
+			if( el.length == 0 ) {
+				add("{}");
+			} else {
+				tabs += "\t";
+				add("{\n");
+				for( e in el ) {
+					add(tabs);
+					expr(e);
+					add(";\n");
+				}
+				tabs = tabs.substr(1);
+				add("}");
+			}
+		case EField(e, f):
+			expr(e);
+			add("." + f);
+		case EBinop(op, e1, e2):
+			expr(e1);
+			add(" " + op + " ");
+			expr(e2);
+		case EUnop(op, pre, e):
+			if( pre ) {
+				add(op);
+				expr(e);
+			} else {
+				expr(e);
+				add(op);
+			}
+		case ECall(e, args):
+			if( e == null )
+				expr(e);
+			else switch( e ) {
+			case EField(_), EIdent(_), EConst(_):
+				expr(e);
+			default:
+				add("(");
+				expr(e);
+				add(")");
+			}
+			add("(");
+			var first = true;
+			for( a in args ) {
+				if( first ) first = false else add(", ");
+				expr(a);
+			}
+			add(")");
+		case EIf(cond,e1,e2):
+			add("if( ");
+			expr(cond);
+			add(" ) ");
+			expr(e1);
+			if( e2 != null ) {
+				add(" else ");
+				expr(e2);
+			}
+		case EWhile(cond,e):
+			add("while( ");
+			expr(cond);
+			add(" ) ");
+			expr(e);
+		case EFor(v, it, e):
+			add("for( "+v+" in ");
+			expr(it);
+			add(" ) ");
+			expr(e);
+		case EBreak:
+			add("break");
+		case EContinue:
+			add("continue");
+		case EFunction(params, e, name, ret):
+			add("function");
+			if( name != null )
+				add(" " + name);
+			add("(");
+			var first = true;
+			for( a in params ) {
+				if( first ) first = false else add(", ");
+				add(a.name);
+				addType(a.t);
+			}
+			add(")");
+			addType(ret);
+			add(" ");
+			expr(e);
+		case EReturn(e):
+			add("return");
+			if( e != null ) {
+				add(" ");
+				expr(e);
+			}
+		case EArray(e,index):
+			expr(e);
+			add("[");
+			expr(index);
+			add("]");
+		case EArrayDecl(el):
+			add("[");
+			var first = true;
+			for( e in el ) {
+				if( first ) first = false else add(", ");
+				expr(e);
+			}
+			add("]");
+		case ENew(cl, args):
+			add("new " + cl + "(");
+			var first = true;
+			for( e in args ) {
+				if( first ) first = false else add(", ");
+				expr(e);
+			}
+			add(")");
+		case EThrow(e):
+			add("throw ");
+			expr(e);
+		case ETry(e, v, t, ecatch):
+			add("try ");
+			expr(e);
+			add(" catch( " + v);
+			addType(t);
+			add(") ");
+			expr(ecatch);
+		case EObject(fl):
+			if( fl.length == 0 ) {
+				add("{}");
+			} else {
+				tabs += "\t";
+				add("{\n");
+				for( f in fl ) {
+					add(tabs);
+					add(f.name+" : ");
+					expr(f.e);
+					add(",\n");
+				}
+				tabs = tabs.substr(1);
+				add("}");
+			}
+		case ETernary(c,e1,e2):
+			expr(c);
+			add(" ? ");
+			expr(e1);
+			add(" : ");
+			expr(e2);
+		}
+	}
+
+	public static function toString( e : Expr ) {
+		return new Printer().exprToString(e);
+	}
+
+}
