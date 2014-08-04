@@ -13,7 +13,7 @@ class Tools {
 		case EBinop(_, e1, e2): f(e1); f(e2);
 		case EUnop(_, _, e): f(e);
 		case ECall(e, args): f(e); for( a in args ) f(a);
-		case EIf(c, e1, e2): f(e); f(e1); if( e2 != null ) f(e2);
+		case EIf(c, e1, e2): f(c); f(e1); if( e2 != null ) f(e2);
 		case EWhile(c, e): f(c); f(e);
 		case EFor(_, it, e): f(it); f(e);
 		case EBreak,EContinue:
@@ -39,7 +39,7 @@ class Tools {
 		case EBinop(op, e1, e2): EBinop(op, f(e1), f(e2));
 		case EUnop(op, pre, e): EUnop(op, pre, f(e));
 		case ECall(e, args): ECall(f(e),[for( a in args ) f(a)]);
-		case EIf(c, e1, e2): EIf(f(e),f(e1),if( e2 != null ) f(e2) else null);
+		case EIf(c, e1, e2): EIf(f(c),f(e1),if( e2 != null ) f(e2) else null);
 		case EWhile(c, e): EWhile(f(c),f(e));
 		case EFor(v, it, e): EFor(v, f(it), f(e));
 		case EBreak, EContinue: e;
