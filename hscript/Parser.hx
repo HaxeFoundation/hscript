@@ -232,7 +232,7 @@ class Parser {
 
 	function isBlock(e) {
 		return switch( expr(e) ) {
-		case EBlock(_), EObject(_): true;
+		case EBlock(_), EObject(_), ESwitch(_): true;
 		case EFunction(_,e,_,_): isBlock(e);
 		case EVar(_,_,e): e != null && isBlock(e);
 		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);
@@ -570,16 +570,17 @@ class Parser {
 					while( true ) {
 						var e = parseExpr();
 						c.values.push(e);
-						switch( token() ) {
+						tk = token();
+						switch( tk ) {
 						case TComma:
 							// next expr
-						case TSemicolon:
+						case TDoubleDot:
 							break;
 						default:
 							unexpected(tk);
 						}
 					}
-					c.expr = parseExpr();
+					c.expr = parseFullExpr();
 				case TId("default"):
 					if( def != null ) unexpected(tk);
 					ensure(TSemicolon);
