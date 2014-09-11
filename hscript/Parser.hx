@@ -469,25 +469,32 @@ class Parser {
 			var args = new Array();
 			tk = token();
 			if( tk != TPClose ) {
-				var arg = true;
-				while( arg ) {
-					var name = null;
+				var done = false;
+				while( !done ) {
+					var name = null, opt = false;
+					switch( tk ) {
+					case TQuestion:
+						opt = true;
+						tk = token();
+					default:
+					}
 					switch( tk ) {
 					case TId(id): name = id;
 					default: unexpected(tk);
 					}
 					tk = token();
-					var t = null;
+					var arg : Argument = { name : name };
+					args.push(arg);
+					if( opt ) arg.opt = true;
 					if( tk == TDoubleDot && allowTypes ) {
-						t = parseType();
+						arg.t = parseType();
 						tk = token();
 					}
-					args.push( { name : name, t : t } );
 					switch( tk ) {
 					case TComma:
 						tk = token();
 					case TPClose:
-						arg = false;
+						done = true;
 					default:
 						unexpected(tk);
 					}

@@ -345,8 +345,34 @@ class Interp {
 		case EFunction(params,fexpr,name,_):
 			var capturedLocals = duplicate(locals);
 			var me = this;
+			var hasOpt = false, minParams = 0;
+			for( p in params )
+				if( p.opt )
+					hasOpt = true;
+				else
+					minParams++;
 			var f = function(args:Array<Dynamic>) {
-				if( args.length != params.length ) throw "Invalid number of parameters";
+				if( args.length != params.length ) {
+					if( args.length < minParams ) {
+						var str = "Invalid number of parameters. Got " + args.length + ", required " + minParams;
+						if( name != null ) str += " for function '" + name+"'";
+						throw str;
+					}
+					// make sure mandatory args are forced
+					var args2 = [];
+					var extraParams = args.length - minParams;
+					var pos = 0;
+					for( p in params )
+						if( p.opt ) {
+							if( extraParams > 0 ) {
+								args2.push(args[pos++]);
+								extraParams--;
+							} else
+								args2.push(null);
+						} else
+							args2.push(args[pos++]);
+					args = args2;
+				}
 				var old = me.locals;
 				me.locals = me.duplicate(capturedLocals);
 				for( i in 0...params.length )

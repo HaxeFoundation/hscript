@@ -57,7 +57,7 @@ enum Expr {
 	EFor( v : String, it : Expr, e : Expr );
 	EBreak;
 	EContinue;
-	EFunction( args : Array<{ name : String, t : Null<CType> }>, e : Expr, ?name : String, ?ret : CType );
+	EFunction( args : Array<Argument>, e : Expr, ?name : String, ?ret : CType );
 	EReturn( ?e : Expr );
 	EArray( e : Expr, index : Expr );
 	EArrayDecl( e : Array<Expr> );
@@ -68,6 +68,8 @@ enum Expr {
 	ETernary( cond : Expr, e1 : Expr, e2 : Expr );
 	ESwitch( e : Expr, cases : Array<{ values : Array<Expr>, expr : Expr }>, ?defaultExpr : Expr);
 }
+
+typedef Argument = { name : String, ?t : CType, ?opt : Bool };
 
 enum CType {
 	CTPath( path : Array<String>, ?params : Array<CType> );
