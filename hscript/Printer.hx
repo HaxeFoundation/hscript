@@ -165,6 +165,7 @@ class Printer {
 			var first = true;
 			for( a in params ) {
 				if( first ) first = false else add(", ");
+				if( a.opt ) add("?");
 				add(a.name);
 				addType(a.t);
 			}
@@ -230,6 +231,27 @@ class Printer {
 			expr(e1);
 			add(" : ");
 			expr(e2);
+		case ESwitch(e, cases, def):
+			add("switch( ");
+			expr(e);
+			add(") {");
+			for( c in cases ) {
+				add("case ");
+				var first = true;
+				for( v in c.values ) {
+					if( first ) first = false else add(", ");
+					expr(v);
+				}
+				add(": ");
+				expr(c.expr);
+				add(";\n");
+			}
+			if( def != null ) {
+				add("default: ");
+				expr(def);
+				add(";\n");
+			}
+			add("}");
 		}
 	}
 
