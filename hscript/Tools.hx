@@ -26,6 +26,13 @@ class Tools {
 		case ETry(e, _, _, c): f(e); f(c);
 		case EObject(fl): for( fi in fl ) f(fi.e);
 		case ETernary(c, e1, e2): f(c); f(e1); f(e2);
+		case ESwitch(e, cases, def):
+			f(e);
+			for( c in cases ) {
+				for( v in c.values ) f(v);
+				f(c.expr);
+			}
+			if( def != null ) f(def);
 		}
 	}
 
@@ -52,6 +59,7 @@ class Tools {
 		case ETry(e, v, t, c): ETry(f(e), v, t, f(c));
 		case EObject(fl): EObject([for( fi in fl ) { name : fi.name, e : f(fi.e) }]);
 		case ETernary(c, e1, e2): ETernary(f(c), f(e1), f(e2));
+		case ESwitch(e, cases, def): ESwitch(f(e), [for( c in cases ) { values : [for( v in c.values ) f(v)], expr : f(c.expr) } ], def == null ? null : f(def));
 		}
 	}
 

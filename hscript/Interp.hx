@@ -378,6 +378,23 @@ class Interp {
 			return o;
 		case ETernary(econd,e1,e2):
 			return if( expr(econd) == true ) expr(e1) else expr(e2);
+		case ESwitch(e, cases, def):
+			var val : Dynamic = expr(e);
+			var match = false;
+			for( c in cases ) {
+				for( v in c.values )
+					if( expr(v) == val ) {
+						match = true;
+						break;
+					}
+				if( match ) {
+					val = expr(c.expr);
+					break;
+				}
+			}
+			if( !match )
+				val = def == null ? null : expr(def);
+			return val;
 		}
 		return null;
 	}

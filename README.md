@@ -69,7 +69,7 @@ limitations
 Compared to Haxe, limitations are :
 
 - no type declarations (classes, enums, typedefs) : only expressions
-- no switch construct
+- switch construct is supported but not pattern matching (no variable capture, we use strict equality to compare case values and switch valueà
 - only one variable declaration is allowed in var
 - the parser supports optional types for var and function if allowTypes is set, but the interpreter ignore them
 - you can enable per-expression position tracking by compiling with -D hscriptPos 

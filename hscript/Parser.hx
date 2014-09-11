@@ -58,7 +58,7 @@ class Parser {
 	public var opRightAssoc : Hash<Bool>;
 	public var unops : Hash<Bool>; // true if allow postfix
 	#end
-	
+
 	/**
 		activate JSON compatiblity
 	**/
@@ -92,7 +92,7 @@ class Parser {
 	#else
 	var tokens : haxe.FastList<Token>;
 	#end
-	
+
 	#end
 
 
@@ -556,7 +556,41 @@ class Parser {
 			}
 			ensure(TPClose);
 			var ec = parseExpr();
-			mk(ETry(e,vname,t,ec),p1,pmax(ec));
+			mk(ETry(e, vname, t, ec), p1, pmax(ec));
+		case "switch":
+			var e = parseExpr();
+			var def = null, cases = [];
+			ensure(TBrOpen);
+			while( true ) {
+				var tk = token();
+				switch( tk ) {
+				case TId("case"):
+					var c = { values : [], expr : null };
+					cases.push(c);
+					while( true ) {
+						var e = parseExpr();
+						c.values.push(e);
+						switch( token() ) {
+						case TComma:
+							// next expr
+						case TSemicolon:
+							break;
+						default:
+							unexpected(tk);
+						}
+					}
+					c.expr = parseExpr();
+				case TId("default"):
+					if( def != null ) unexpected(tk);
+					ensure(TSemicolon);
+					def = parseExpr();
+				case TBrClose:
+					break;
+				default:
+					unexpected(tk);
+				}
+			}
+			mk(ESwitch(e, cases, def), p1, tokenMax);
 		default:
 			null;
 		}
