@@ -43,6 +43,7 @@ class Interp {
 	var binops : Hash< Expr -> Expr -> Dynamic >;
 	#end
 
+	var depth : Int;
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 
 	#if hscriptPos
@@ -51,13 +52,10 @@ class Interp {
 
 	public function new() {
 		#if haxe3
-		locals = new Map();
 		variables = new Map<String,Dynamic>();
 		#else
-		locals = new Hash();
 		variables = new Hash();
 		#end
-		declared = new Array();
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
@@ -195,11 +193,13 @@ class Interp {
 	}
 
 	public function execute( expr : Expr ) : Dynamic {
+		depth = 0;
 		#if haxe3
 		locals = new Map();
 		#else
 		locals = new Hash();
 		#end
+		declared = new Array();
 		return exprReturn(expr);
 	}
 
@@ -373,7 +373,8 @@ class Interp {
 							args2.push(args[pos++]);
 					args = args2;
 				}
-				var old = me.locals;
+				var old = me.locals, depth = me.depth;
+				me.depth++;
 				me.locals = me.duplicate(capturedLocals);
 				for( i in 0...params.length )
 					me.locals.set(params[i].name,{ r : args[i] });
@@ -382,6 +383,7 @@ class Interp {
 					r = me.exprReturn(fexpr);
 				} catch( e : Dynamic ) {
 					me.locals = old;
+					me.depth = depth;
 					#if neko
 					neko.Lib.rethrow(e);
 					#else
@@ -389,11 +391,22 @@ class Interp {
 					#end
 				}
 				me.locals = old;
+				me.depth = depth;
 				return r;
 			};
 			var f = Reflect.makeVarArgs(f);
-			if( name != null )
-				variables.set(name,f);
+			if( name != null ) {
+				if( depth == 0 ) {
+					// global function
+					variables.set(name, f);
+				} else {
+					// function-in-function is a local function
+					declared.push( { n : name, old : locals.get(name) } );
+					var ref = { r : f };
+					locals.set(name, ref);
+					capturedLocals.set(name, ref); // allow self-recursion
+				}
+			}
 			return f;
 		case EArrayDecl(arr):
 			var a = new Array();
