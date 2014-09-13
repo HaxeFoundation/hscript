@@ -219,6 +219,17 @@ class Bytes {
 			doEncode(cond);
 			doEncode(e1);
 			doEncode(e2);
+		case ESwitch(e, cases, def):
+			doEncode(e);
+			for( c in cases ) {
+				if( c.values.length == 0 ) throw "assert";
+				for( v in c.values )
+					doEncode(v);
+				bout.addByte(255);
+				doEncode(c.expr);
+			}
+			bout.addByte(255);
+			if( def == null ) bout.addByte(255) else doEncode(def);
 		}
 	}
 
@@ -271,9 +282,9 @@ class Bytes {
 		case 13:
 			EContinue;
 		case 14:
-			var params = new Array();
+			var params = new Array<Argument>();
 			for( i in 0...bin.get(pin++) )
-				params.push({ name : doDecodeString(), t : null });
+				params.push({ name : doDecodeString() });
 			var e = doDecode();
 			var name = doDecodeString();
 			EFunction(params,e,(name == "") ? null: name);
@@ -307,6 +318,27 @@ class Bytes {
 				fl.push({ name : name, e : e });
 			}
 			EObject(fl);
+		case 22:
+			var cond = doDecode();
+			var e1 = doDecode();
+			var e2 = doDecode();
+			ETernary(cond, e1, e2);
+		case 23:
+			var e = doDecode();
+			var cases = [];
+			while( true ) {
+				var v = doDecode();
+				if( v == null ) break;
+				var values = [v];
+				while( true ) {
+					v = doDecode();
+					if( v == null ) break;
+					values.push(v);
+				}
+				cases.push( { values : values, expr : doDecode() } );
+			}
+			var def = doDecode();
+			ESwitch(e, cases, def);
 		case 255:
 			null;
 		default:
