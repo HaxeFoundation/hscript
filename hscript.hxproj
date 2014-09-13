@@ -21,6 +21,7 @@
   <build>
     <option directives="" />
     <option flashStrict="True" />
+    <option noInlineOnDebug="False" />
     <option mainClass="Test" />
     <option enabledebug="False" />
     <option additional="-dce no" />
@@ -47,6 +48,7 @@
     <hidden path="hscript9.swf" />
     <hidden path="release.bat" />
     <hidden path="release.zip" />
+    <hidden path="obj" />
   </hiddenPaths>
   <!-- Executed before build -->
   <preBuildCommand />
@@ -56,6 +58,7 @@
   <options>
     <option showHiddenPaths="False" />
     <option testMovie="Default" />
+    <option testMovieCommand="" />
   </options>
   <!-- Plugin storage -->
   <storage />

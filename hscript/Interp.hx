@@ -148,7 +148,7 @@ class Interp {
 			v = fop(arr[index],expr(e2));
 			arr[index] = v;
 		default:
-			error(EInvalidOp(op));
+			return error(EInvalidOp(op));
 		}
 		return v;
 	}
@@ -188,7 +188,7 @@ class Interp {
 				arr[index] = v + delta;
 			return v;
 		default:
-			error(EInvalidOp((delta > 0)?"++":"--"));
+			return error(EInvalidOp((delta > 0)?"++":"--"));
 		}
 	}
 
@@ -242,12 +242,13 @@ class Interp {
 		#end
 	}
 
-	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) {
+	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) : Dynamic {
 		#if hscriptPos
 		throw new Error(e, curExpr.pmin, curExpr.pmax);
 		#else
 		throw e;
 		#end
+		return null;
 	}
 
 	function resolve( id : String ) : Dynamic {
