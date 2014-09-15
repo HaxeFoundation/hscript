@@ -606,7 +606,7 @@ class Parser {
 						mk(EBlock(exprs), pmin(exprs[0]), pmax(exprs[exprs.length - 1]));
 				case TId("default"):
 					if( def != null ) unexpected(tk);
-					ensure(TSemicolon);
+					ensure(TDoubleDot);
 					var exprs = [];
 					while( true ) {
 						tk = token();
