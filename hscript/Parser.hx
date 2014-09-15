@@ -587,11 +587,43 @@ class Parser {
 							unexpected(tk);
 						}
 					}
-					c.expr = parseFullExpr();
+					var exprs = [];
+					while( true ) {
+						tk = token();
+						push(tk);
+						switch( tk ) {
+						case TId("case"), TId("default"), TBrClose:
+							break;
+						default:
+							exprs.push(parseFullExpr());
+						}
+					}
+					c.expr = if( exprs.length == 1)
+						exprs[0];
+					else if( exprs.length == 0 )
+						mk(EBlock([]), tokenMin, tokenMin);
+					else
+						mk(EBlock(exprs), pmin(exprs[0]), pmax(exprs[exprs.length - 1]));
 				case TId("default"):
 					if( def != null ) unexpected(tk);
 					ensure(TSemicolon);
-					def = parseExpr();
+					var exprs = [];
+					while( true ) {
+						tk = token();
+						push(tk);
+						switch( tk ) {
+						case TId("case"), TId("default"), TBrClose:
+							break;
+						default:
+							exprs.push(parseFullExpr());
+						}
+					}
+					def = if( exprs.length == 1)
+						exprs[0];
+					else if( exprs.length == 0 )
+						mk(EBlock([]), tokenMin, tokenMin);
+					else
+						mk(EBlock(exprs), pmin(exprs[0]), pmax(exprs[exprs.length - 1]));
 				case TBrClose:
 					break;
 				default:
