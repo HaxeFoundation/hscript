@@ -74,6 +74,7 @@ class Parser {
 	var char : Int;
 	var ops : Array<Bool>;
 	var idents : Array<Bool>;
+	var uid : Int = 0;
 
 	#if hscriptPos
 	var readPos : Int;
@@ -144,6 +145,7 @@ class Parser {
 
 	public function parseString( s : String ) {
 		line = 1;
+		uid = 0;
 		return parse( new haxe.io.StringInput(s) );
 	}
 
@@ -365,10 +367,40 @@ class Parser {
 				if( tk == TComma )
 					tk = token();
 			}
+			if( a.length == 1 )
+				switch( expr(a[0]) ) {
+				case EFor(_), EWhile(_):
+					var tmp = "__a_" + (uid++);
+					var e = mk(EBlock([
+						mk(EVar(tmp, null, mk(EArrayDecl([]), p1)), p1),
+						mapCompr(tmp, a[0]),
+						mk(EIdent(tmp),p1),
+					]),p1);
+					return parseExprNext(e);
+				default:
+				}
 			return parseExprNext(mk(EArrayDecl(a),p1));
 		default:
 			return unexpected(tk);
 		}
+	}
+
+	function mapCompr( tmp : String, e : Expr ) {
+		var edef = switch( expr(e) ) {
+		case EFor(v, it, e2):
+			EFor(v, it, mapCompr(tmp, e2));
+		case EWhile(cond, e2):
+			EWhile(cond, mapCompr(tmp, e2));
+		case EIf(cond, e1, e2) if( e2 == null ):
+			EIf(cond, mapCompr(tmp, e1), null);
+		case EBlock([e]):
+			EBlock([mapCompr(tmp, e)]);
+		case EParent(e2):
+			EParent(mapCompr(tmp, e2));
+		default:
+			ECall( mk(EField(mk(EIdent(tmp), pmin(e), pmax(e)), "push"), pmin(e), pmax(e)), [e]);
+		}
+		return mk(edef, pmin(e), pmax(e));
 	}
 
 	function makeUnop( op, e ) {
