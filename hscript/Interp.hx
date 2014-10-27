@@ -53,8 +53,10 @@ class Interp {
 	public function new() {
 		#if haxe3
 		variables = new Map<String,Dynamic>();
+		locals = new Map();
 		#else
 		variables = new Hash();
+		locals = new Hash();
 		#end
 		variables.set("null",null);
 		variables.set("true",true);
