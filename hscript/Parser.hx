@@ -737,7 +737,8 @@ class Parser {
 						}
 						unexpected(t);
 					}
-				}
+				} else
+					push(t);
 			default:
 				push(t);
 			}
