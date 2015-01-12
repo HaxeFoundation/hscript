@@ -64,12 +64,12 @@ class Printer {
 		}
 	}
 
-	function expr( e : Expr) {
+	function expr( e : Expr ) {
 		if( e == null ) {
 			add("??NULL??");
 			return;
 		}
-		switch( e ) {
+		switch( #if hscriptPos e.e #else e #end ) {
 		case EConst(c):
 			switch( c ) {
 			case CInt(i): add(i);
@@ -119,7 +119,7 @@ class Printer {
 		case ECall(e, args):
 			if( e == null )
 				expr(e);
-			else switch( e ) {
+			else switch( #if hscriptPos e.e #else e #end ) {
 			case EField(_), EIdent(_), EConst(_):
 				expr(e);
 			default:
