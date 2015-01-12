@@ -84,7 +84,6 @@ class Test {
 		test("function bug(){ \n }\nbug().x", null);
 		test("1 + 2 == 3", true);
 		test("-2 == 3 - 5", true);
-		test("var x = 1; try { if x {x = 2;} } catch( e : Dynamic ) x",1);
 		trace("Done");
 	}
 
