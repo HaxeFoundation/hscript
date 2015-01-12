@@ -434,9 +434,7 @@ class Parser {
 		#end
 		return switch( id ) {
 		case "if":
-			ensure(TPOpen);
 			var cond = parseExpr();
-			ensure(TPClose);
 			var e1 = parseExpr();
 			var e2 = null;
 			var semic = false;
