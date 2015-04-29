@@ -44,6 +44,7 @@ class Interp {
 	#end
 
 	var depth : Int;
+	var inTry : Bool;
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
 
 	#if hscriptPos
@@ -382,17 +383,20 @@ class Interp {
 				for( i in 0...params.length )
 					me.locals.set(params[i].name,{ r : args[i] });
 				var r = null;
-				try {
+				if( inTry )
+					try {
+						r = me.exprReturn(fexpr);
+					} catch( e : Dynamic ) {
+						me.locals = old;
+						me.depth = depth;
+						#if neko
+						neko.Lib.rethrow(e);
+						#else
+						throw e;
+						#end
+					}
+				else
 					r = me.exprReturn(fexpr);
-				} catch( e : Dynamic ) {
-					me.locals = old;
-					me.depth = depth;
-					#if neko
-					neko.Lib.rethrow(e);
-					#else
-					throw e;
-					#end
-				}
 				me.locals = old;
 				me.depth = depth;
 				return r;
@@ -427,15 +431,20 @@ class Interp {
 			throw expr(e);
 		case ETry(e,n,_,ecatch):
 			var old = declared.length;
+			var oldTry = inTry;
 			try {
+				inTry = true;
 				var v : Dynamic = expr(e);
 				restore(old);
+				inTry = oldTry;
 				return v;
 			} catch( err : Stop ) {
+				inTry = oldTry;
 				throw err;
 			} catch( err : Dynamic ) {
 				// restore vars
 				restore(old);
+				inTry = oldTry;
 				// declare 'v'
 				declared.push({ n : n, old : locals.get(n) });
 				locals.set(n,{ r : err });
