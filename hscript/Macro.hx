@@ -227,6 +227,8 @@ class Macro {
 				EObjectDecl(tf);
 			case ETernary(cond, e1, e2):
 				ETernary(convert(cond), convert(e1), convert(e2));
+			case ESwitch(e, cases, edef):
+				ESwitch(convert(e), [for( c in cases ) { values : [for( v in c.values ) convert(v)], expr : convert(c.expr) } ], edef == null ? null : convert(edef));
 		}, pos : #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
 	}
 

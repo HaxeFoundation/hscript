@@ -1,3 +1,5 @@
+import hscript.Macro;
+
 class Test {
 
 	static function test(x,v:Dynamic,?vars : Dynamic) {
