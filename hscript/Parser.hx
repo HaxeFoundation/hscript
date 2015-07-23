@@ -243,6 +243,7 @@ class Parser {
 		case EWhile(_,e): isBlock(e);
 		case EFor(_,_,e): isBlock(e);
 		case EReturn(e): e != null && isBlock(e);
+		case ETry(_, _, _, e): isBlock(e);
 		default: false;
 		}
 	}
