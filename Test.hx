@@ -2,8 +2,9 @@ import hscript.Macro;
 
 class Test {
 
-	static function test(x,v:Dynamic,?vars : Dynamic) {
+	static function test(x,v:Dynamic,?vars : Dynamic,allowTypes=false) {
 		var p = new hscript.Parser();
+		p.allowTypes = allowTypes;
 		var program = p.parseString(x);
 		var bytes = hscript.Bytes.encode(program);
 		program = hscript.Bytes.decode(bytes);
@@ -86,6 +87,8 @@ class Test {
 		test("function bug(){ \n }\nbug().x", null);
 		test("1 + 2 == 3", true);
 		test("-2 == 3 - 5", true);
+		test("var x=-3; x", -3);
+		test("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
 		trace("Done");
 	}
 

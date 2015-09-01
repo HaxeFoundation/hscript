@@ -735,7 +735,12 @@ class Parser {
 						t = token();
 						switch( t ) {
 						case TComma: continue;
-						case TOp(op): if( op ==	">" ) break;
+						case TOp(op):
+							if( op == ">" ) break;
+							if( op.charCodeAt(0) == ">".code ) {
+								tokens.add(TOp(op.substr(1)));
+								break;
+							}
 						default:
 						}
 						unexpected(t);
@@ -1049,6 +1054,12 @@ class Parser {
 			case 34: return TConst( CString(readString(34)) );
 			case 63: return TQuestion;
 			case 58: return TDoubleDot;
+			case '='.code:
+				char = readChar();
+				if( char == '='.code )
+					return TOp("==");
+				this.char = char;
+				return TOp("=");
 			default:
 				if( ops[char] ) {
 					var op = String.fromCharCode(char);
