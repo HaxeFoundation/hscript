@@ -1066,7 +1066,7 @@ class Parser {
 					while( true ) {
 						char = readChar();
 						if( !ops[char] ) {
-							if( op.charCodeAt(0) == 47 )
+							if( op.charCodeAt(0) == '/'.code )
 								return tokenComment(op,char);
 							this.char = char;
 							return TOp(op);
@@ -1095,9 +1095,9 @@ class Parser {
 	function tokenComment( op : String, char : Int ) {
 		var c = op.charCodeAt(1);
 		var s = input;
-		if( c == 47 ) { // comment
+		if( c == '/'.code ) { // comment
 			try {
-				while( char != 10 && char != 13 ) {
+				while( char != '\r'.code && char != '\n'.code ) {
 					incPos();
 					char = s.readByte();
 				}
@@ -1106,18 +1106,22 @@ class Parser {
 			}
 			return token();
 		}
-		if( c == 42 ) { /* comment */
+		if( c == '*'.code ) { /* comment */
 			var old = line;
+			if( op == "/**/" ) {
+				this.char = char;
+				return token();
+			}
 			try {
 				while( true ) {
-					while( char != 42 ) {
-						if( char == 10 ) line++;
+					while( char != '*'.code ) {
+						if( char == '\n'.code ) line++;
 						incPos();
 						char = s.readByte();
 					}
 					incPos();
 					char = s.readByte();
-					if( char == 47 )
+					if( char == '/'.code )
 						break;
 				}
 			} catch( e : Dynamic ) {

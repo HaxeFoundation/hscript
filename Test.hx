@@ -89,6 +89,7 @@ class Test {
 		test("-2 == 3 - 5", true);
 		test("var x=-3; x", -3);
 		test("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
+		test("/**/0", 0);
 		trace("Done");
 	}
 
