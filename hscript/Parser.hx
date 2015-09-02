@@ -1054,24 +1054,20 @@ class Parser {
 			case 34: return TConst( CString(readString(34)) );
 			case 63: return TQuestion;
 			case 58: return TDoubleDot;
-			case '='.code:
-				char = readChar();
-				if( char == '='.code )
-					return TOp("==");
-				this.char = char;
-				return TOp("=");
 			default:
 				if( ops[char] ) {
 					var op = String.fromCharCode(char);
-					while( true ) {
+                    			var oldChar = char;
+                    			while( true ) {
 						char = readChar();
-						if( !ops[char] ) {
-							if( op.charCodeAt(0) == '/'.code )
-								return tokenComment(op,char);
-							this.char = char;
+						if( !ops[char] || (oldChar == '='.code && char != '='.code) || (op.length == 2 && char == '*'.code)) {
+                            				if(op.charCodeAt(0) == '/'.code)
+                                				return tokenComment(op,char);
+                            				this.char = char;
 							return TOp(op);
 						}
-						op += String.fromCharCode(char);
+                        			op += String.fromCharCode(char);
+                        			oldChar = char;
 					}
 				}
 				if( idents[char] ) {
@@ -1093,11 +1089,11 @@ class Parser {
 	}
 
 	function tokenComment( op : String, char : Int ) {
-		var c = op.charCodeAt(1);
+        	var c = op.charCodeAt(1);
 		var s = input;
-		if( c == '/'.code ) { // comment
+		if( c == 47 ) { // comment
 			try {
-				while( char != '\r'.code && char != '\n'.code ) {
+				while( char != 10 && char != 13 ) {
 					incPos();
 					char = s.readByte();
 				}
@@ -1106,22 +1102,18 @@ class Parser {
 			}
 			return token();
 		}
-		if( c == '*'.code ) { /* comment */
-			var old = line;
-			if( op == "/**/" ) {
-				this.char = char;
-				return token();
-			}
+		if( c == 42 ) { /* comment */
+            		var old = line;
 			try {
 				while( true ) {
-					while( char != '*'.code ) {
-						if( char == '\n'.code ) line++;
+					while( char != 42 ) {
+						if( char == 10 ) line++;
 						incPos();
 						char = s.readByte();
 					}
 					incPos();
 					char = s.readByte();
-					if( char == '/'.code )
+					if( char == 47 )
 						break;
 				}
 			} catch( e : Dynamic ) {
