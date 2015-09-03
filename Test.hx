@@ -90,6 +90,7 @@ class Test {
 		test("var x=-3; x", -3);
 		test("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
 		test("/**/0", 0);
+		test("x=1;x*=-2", -2);
 		trace("Done");
 	}
 

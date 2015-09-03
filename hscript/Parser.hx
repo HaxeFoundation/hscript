@@ -1063,14 +1063,16 @@ class Parser {
 			default:
 				if( ops[char] ) {
 					var op = String.fromCharCode(char);
+					var prev = -1;
 					while( true ) {
 						char = readChar();
-						if( !ops[char] ) {
+						if( !ops[char] || prev == '='.code ) {
 							if( op.charCodeAt(0) == '/'.code )
 								return tokenComment(op,char);
 							this.char = char;
 							return TOp(op);
 						}
+						prev = char;
 						op += String.fromCharCode(char);
 					}
 				}
