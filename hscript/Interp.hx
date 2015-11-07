@@ -59,6 +59,7 @@ class Interp {
 		variables = new Hash();
 		locals = new Hash();
 		#end
+		declared = new Array();
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
