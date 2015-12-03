@@ -113,9 +113,6 @@ class RunScript {
 		info("   C:\\>haxelib run hscript Host.localhost()");
 		info("   mycomputer");
 		info("");
-		info("   C:\\>haxe build.hxml && haxelib run hscript Sys.putenv('MY_IP', new Host(''))");
-		info("   192.168.248.1");
-		info("");
 		info("   C:\\>for /f %i in ('haxelib run hscript \"new Host('')\"') do @set MY_IP=%i");
 		info("   C:\\>echo %MY_IP%");
 		info("   192.168.248.1");
