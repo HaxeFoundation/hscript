@@ -24,7 +24,6 @@ class RunScript {
 			Sys.setCwd(workingDirectory);
 		} catch (e:Dynamic) {
 			error("Failed to set current working directory to [" + workingDirectory + "]");
-			Sys.exit(1);
 		}
 
 		if (args.length == 0) {
@@ -71,13 +70,21 @@ class RunScript {
 		interp.variables.set("StringTools", StringTools);
 		interp.variables.set("Sys", Sys);
 		interp.variables.set("Xml", Xml);
-		interp.variables.set("sys.FileSystem", sys.FileSystem);
-		interp.variables.set("sys.io.File", sys.io.File);
-		interp.variables.set("sys.net.Host", sys.net.Host);
-		interp.variables.set("haxe.Json", haxe.Json);
-		interp.variables.set("haxe.Http", haxe.Http);
-		interp.variables.set("haxe.Serializer", haxe.Serializer);
-		interp.variables.set("haxe.Unserializer", haxe.Unserializer);
+		interp.variables.set("sys", {
+			"FileSystem": sys.FileSystem,
+			"io": {
+				"File": sys.io.File
+			},
+			"net": {
+				"Host": sys.net.Host
+			}
+		});
+		interp.variables.set("haxe", {
+			"Json": haxe.Json,
+			"Http": haxe.Http,
+			"Serializer": haxe.Serializer,
+			"Unserializer": haxe.Unserializer
+		});
 		
 		info(interp.execute(program));		
 	}
