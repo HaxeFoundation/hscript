@@ -64,28 +64,20 @@ class RunScript {
 		var program = parser.parseString(script);
 		var interp = new hscript.Interp();
 		
-		// export classes of default package
+		// export some useful classes
 		interp.variables.set("Array", Array);
 		interp.variables.set("DateTools", DateTools);
 		interp.variables.set("Math", Math);
 		interp.variables.set("StringTools", StringTools);
 		interp.variables.set("Sys", Sys);
 		interp.variables.set("Xml", Xml);
-
-		// export classes of sys.io package
-		interp.variables.set("FileSystem", FileSystem);
-		
-		// export classes of sys.io package
-		interp.variables.set("File", File);
-		
-		// export classes of sys.net package
-		interp.variables.set("Host", Host);
-		
-		// export classes of haxe package
-		interp.variables.set("Json", Json);
-		interp.variables.set("Http", Http);
-		interp.variables.set("Serializer", Serializer);
-		interp.variables.set("Unserializer", Unserializer);
+		interp.variables.set("sys.FileSystem", sys.FileSystem);
+		interp.variables.set("sys.io.File", sys.io.File);
+		interp.variables.set("sys.net.Host", sys.net.Host);
+		interp.variables.set("haxe.Json", haxe.Json);
+		interp.variables.set("haxe.Http", haxe.Http);
+		interp.variables.set("haxe.Serializer", haxe.Serializer);
+		interp.variables.set("haxe.Unserializer", haxe.Unserializer);
 		
 		info(interp.execute(program));		
 	}
@@ -101,22 +93,26 @@ class RunScript {
 		info("   or: haxelib run hscript --file SCRIPTPATH");
 		info("");
 		info("examples:");
-		info("   C:\\>haxelib run hscript var x = 4; 1 + 2 * x");
+		info("   haxelib run hscript var x = 4; 1 + 2 * x");
 		info("   9");
 		info("");
-		info("   C:\\>haxelib run hscript \"5 | 6\"");
+		info("   haxelib run hscript \"5 | 6\"");
 		info("   7");
 		info("");
-		info("   C:\\>haxelib run hscript for(i in 0...5) Sys.stdout().writeString(i + ', '); 'done'");
+		info("   haxelib run hscript for(i in 0...5) Sys.stdout().writeString(i + ', '); 'done'");
 		info("   0, 1, 2, 3, 4, done");
 		info("");
-		info("   C:\\>haxelib run hscript Host.localhost()");
+		info("   haxelib run hscript sys.net.Host.localhost()");
 		info("   mycomputer");
 		info("");
-		info("   C:\\>for /f %i in ('haxelib run hscript \"new Host('')\"') do @set MY_IP=%i");
-		info("   C:\\>echo %MY_IP%");
+		if(Sys.systemName() == "Windows") {
+			info("   for /f %i in ('haxelib run hscript \"new sys.net.Host('')\"') do @set MY_IP=%i");
+			info("   echo %MY_IP%");
+		} else {
+			info("   MY_IP=$(haxelib run hscript \"new sys.net.Host('')\"')");
+			info("   echo $MY_IP");
+		}
 		info("   192.168.248.1");
-
 		if(exit)
 			Sys.exit(0);
 	}
