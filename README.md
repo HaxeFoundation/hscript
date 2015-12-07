@@ -15,13 +15,13 @@ It is dynamically typed but allow all Haxe expressions apart from type (class,en
 Usage
 -----
 
-<pre>
-	var expr = "var x = 4; 1 + 2 * x";
-	var parser = new hscript.Parser();
-	var ast = parser.parseString(expr);
-	var interp = new hscript.Interp();
-	trace(interp.execute(ast));
-</pre>
+```haxe
+var expr = "var x = 4; 1 + 2 * x";
+var parser = new hscript.Parser();
+var ast = parser.parseString(expr);
+var interp = new hscript.Interp();
+trace(interp.execute(ast));
+```
 
 In case of a parsing error an `hscript.Expr.Error` is thrown. You can use `parser.line` to know the line number.
 
@@ -31,20 +31,20 @@ Example
 -------
 
 Here's a small example of Haxe Script usage :
-<pre>
-	var script = "
-		var sum = 0;
-		for( a in angles )
-			sum += Math.cos(a);
-		sum; 
-	";
-	var parser = new hscript.Parser();
-	var program = parser.parseString(script);
-	var interp = new hscript.Interp();
-	interp.variables.set("Math",Math); // share the Math class
-	interp.variables.set("angles",[0,1,2,3]); // set the angles list
-	trace( interp.execute(program) ); 
-</pre>
+```haxe
+var script = "
+	var sum = 0;
+	for( a in angles )
+		sum += Math.cos(a);
+	sum; 
+";
+var parser = new hscript.Parser();
+var program = parser.parseString(script);
+var interp = new hscript.Interp();
+interp.variables.set("Math",Math); // share the Math class
+interp.variables.set("angles",[0,1,2,3]); // set the angles list
+trace( interp.execute(program) ); 
+```
 
 This will calculate the sum of the cosines of the angles given as input.
 
