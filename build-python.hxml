@@ -1,0 +1,2 @@
+build-each.hxml
+-python bin/Test.py

@@ -1,0 +1,61 @@
+language: haxe
+
+os:
+  - linux
+  - osx
+
+haxe:
+  - "3.2.1"
+  - development
+
+addons:
+  apt:
+    packages:
+      # Python
+      - python3
+      # PHP
+      - php5-cli
+      # C#
+      - mono-devel
+      - mono-mcs
+      # Flash
+      - libcurl3:i386
+      - libglib2.0-0:i386
+      - libx11-6:i386
+      - libxext6:i386
+      - libxt6:i386
+      - libxcursor1:i386
+      - libnss3:i386
+      - libgtk2.0-0:i386
+
+install:
+  # os-specific config
+  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
+      export DISPLAY=:99.0;
+      export AUDIODEV=null;
+    elif [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+      brew update;
+      brew install mono;
+      brew install python3;
+    fi
+  # Download and setup a standalone flash player debugger
+  - haxe flash/install.hxml
+  # Install haxelibs
+  - haxelib install hxcpp
+  - haxelib install hxjava
+  - haxelib install hxcs
+  - haxelib list
+
+script:
+  - pushd script;
+    haxe build.hxml;
+    popd;
+  - haxe build-interp.hxml
+  - haxe build-neko.hxml         && neko bin/Test.n
+  - haxe build-js.hxml           && node bin/Test.js
+  - haxe build-java.hxml         && java -jar bin/Test.jar
+  - haxe build-cs.hxml           && mono bin/bin/Test.exe
+  - haxe build-cpp.hxml          && ./bin/Test
+  - haxe build-flash.hxml -D fdb && haxe flash/run.hxml bin/Test.swf
+  - haxe build-php.hxml          && php bin/index.php
+  - haxe build-python.hxml       && python3 bin/Test.py

@@ -1,6 +1,8 @@
 hscript
 =======
 
+[![TravisCI Build Status](https://travis-ci.org/HaxeFoundation/hscript.svg?branch=master)](https://travis-ci.org/HaxeFoundation/hscript)
+
 Parse and evalutate Haxe expressions.
 
 
