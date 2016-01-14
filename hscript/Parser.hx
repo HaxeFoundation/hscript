@@ -180,6 +180,7 @@ class Parser {
 
 	function unexpected( tk ) : Dynamic {
 		error(EUnexpected(tokenString(tk)),tokenMin,tokenMax);
+		return null;
 	}
 
 	inline function push(tk) {
@@ -1090,6 +1091,7 @@ class Parser {
 			}
 			char = readChar();
 		}
+		return null;
 	}
 
 	function tokenComment( op : String, char : Int ) {
