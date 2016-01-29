@@ -528,17 +528,17 @@ class Interp {
 
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
-		return Reflect.field(o,f);
+		return Reflect.getProperty(o,f);
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
-		Reflect.setField(o,f,v);
+		Reflect.setProperty(o,f,v);
 		return v;
 	}
 
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
-		return call(o, Reflect.field(o, f), args);
+		return call(o, Reflect.getProperty(o, f), args);
 	}
 
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
