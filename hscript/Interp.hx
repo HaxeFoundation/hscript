@@ -528,7 +528,16 @@ class Interp {
 
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
-		return Reflect.getProperty(o,f);
+		#if php
+			// https://github.com/HaxeFoundation/haxe/issues/4915
+			return try {
+				Reflect.getProperty(o, f);
+			} catch (e:Dynamic) {
+				Reflect.field(o, f);
+			}
+		#else
+			return Reflect.getProperty(o, f);
+		#end
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
@@ -538,7 +547,7 @@ class Interp {
 	}
 
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
-		return call(o, Reflect.getProperty(o, f), args);
+		return call(o, get(o, f), args);
 	}
 
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
