@@ -11,6 +11,9 @@ haxe:
 addons:
   apt:
     packages:
+      # C++
+      - gcc-multilib
+      - g++-multilib
       # Python
       - python3
       # PHP
@@ -41,7 +44,15 @@ install:
   # Download and setup a standalone flash player debugger
   - haxe flash/install.hxml
   # Install haxelibs
-  - haxelib install hxcpp
+  - if [ "${TRAVIS_HAXE_VERSION}" = "development" ]; then
+      haxelib git hxcpp https://github.com/HaxeFoundation/hxcpp.git;
+      pushd $(haxelib path hxcpp | head -1);
+        pushd tools/hxcpp; haxe compile.hxml; popd;
+        pushd project; neko build.n; popd;
+      popd;
+    else
+      haxelib install hxcpp;
+    fi
   - haxelib install hxjava
   - haxelib install hxcs
   - haxelib list
