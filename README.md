@@ -55,7 +55,7 @@ Advanced Usage
 
 When compiled with `-D hscriptPos` you will get fine error reporting at parsing time.
 
-You can subclass `hscript.Interp` to override behaviors for `get`, `set`, `call`, `fcall` and `cnew` behaviors.
+You can subclass `hscript.Interp` to override behaviors for `get`, `set`, `call`, `fcall` and `cnew`.
 
 You can add more binary and unary operations to the parser by setting `opPriority`, `opRightAssoc` and `unops` content.
 
