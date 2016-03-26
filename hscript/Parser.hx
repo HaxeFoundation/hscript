@@ -858,7 +858,7 @@ class Parser {
 				case "'".code, '"'.code, '\\'.code: b.writeByte(c);
 				case '/'.code: if( allowJSON ) b.writeByte(c) else invalidChar(c);
 				case "u".code:
-					if( !allowJSON ) throw invalidChar(c);
+					if( !allowJSON ) invalidChar(c);
 					var code = null;
 					try {
 						incPos();
