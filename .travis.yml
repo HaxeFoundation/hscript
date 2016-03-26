@@ -55,12 +55,13 @@ install:
     fi
   - haxelib install hxjava
   - haxelib install hxcs
+  - haxelib dev hscript .
   - haxelib list
 
 script:
-  - pushd script;
-    haxe build.hxml;
-    popd;
+  - pushd script &&
+    haxe build.hxml &&
+    popd
   - haxe build-interp.hxml
   - haxe build-neko.hxml         && neko bin/Test.n
   - haxe build-js.hxml           && node bin/Test.js
