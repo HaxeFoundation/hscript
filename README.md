@@ -6,11 +6,11 @@ hscript
 Parse and evalutate Haxe expressions.
 
 
-In some projects it's sometime useful to be able to interpret some code dynamically, without any recompile.
+In some projects it's sometimes useful to be able to interpret some code dynamically, without recompilation.
 
 Haxe script is a complete subset of the Haxe language.
 
-It is dynamically typed but allow all Haxe expressions apart from type (class,enum,typedef) declarations.
+It is dynamically typed but allows all Haxe expressions apart from type (class,enum,typedef) declarations.
 
 Usage
 -----
@@ -23,7 +23,7 @@ var interp = new hscript.Interp();
 trace(interp.execute(ast));
 ```
 
-In case of a parsing error an `hscript.Expr.Error` is thrown. You can use `parser.line` to know the line number.
+In case of a parsing error an `hscript.Expr.Error` is thrown. You can use `parser.line` to check the line number.
 
 You can set some globaly accessible identifiers by using `interp.variables.set("name",value)`
 
@@ -65,24 +65,24 @@ You can use `parser.allowTypes` to parse types for local vars, exceptions, funct
 
 You can use `new hscript.Macro(pos).convert(ast)` to convert an hscript AST to a Haxe macros one.
 
-limitations
+Limitations
 -----------
 
 Compared to Haxe, limitations are :
 
 - no type declarations (classes, enums, typedefs) : only expressions
-- switch construct is supported but not pattern matching (no variable capture, we use strict equality to compare case values and switch value)
-- only one variable declaration is allowed in var
-- the parser supports optional types for var and function if allowTypes is set, but the interpreter ignore them
-- you can enable per-expression position tracking by compiling with -D hscriptPos 
+- `switch` construct is supported but not pattern matching (no variable capture, we use strict equality to compare `case` values and `switch` value)
+- only one variable declaration is allowed in `var`
+- the parser supports optional types for `var` and `function` if `allowTypes` is set, but the interpreter ignores them
+- you can enable per-expression position tracking by compiling with `-D hscriptPos`
 
 Install
 -------
 
-In order to install Haxe Script, use haxelib install hscript and compile your program with -lib hscript.
+In order to install Haxe Script, use `haxelib install hscript` and compile your program with `-lib hscript`.
 
 There are only three files in hscript :
 
-  - hscript.Expr : contains enums declarations
-  - hscript.Parser : a small parser that turns a string into an expression structure (AST)
-  - hscript.Interp : a small interpreter that execute the AST and returns the latest evaluated value
+  - `hscript.Expr` : contains enums declarations
+  - `hscript.Parser` : a small parser that turns a string into an expression structure (AST)
+  - `hscript.Interp` : a small interpreter that execute the AST and returns the latest evaluated value
