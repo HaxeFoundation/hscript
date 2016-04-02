@@ -4,10 +4,9 @@ mkdir release
 cp haxelib.json README.md extraParams.hxml release
 cd release
 mkdir hscript
+mkdir script
 cd ..
 cp hscript/*.hx release/hscript
-cd release
-mkdir script
 cp script/*.hx* release/script
 cd release/script
 haxe build.hxml
