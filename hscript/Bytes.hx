@@ -130,6 +130,9 @@ class Bytes {
 	}
 
 	function doEncode( e : Expr ) {
+		#if hscriptPos
+		var e = e.e;
+		#end
 		bout.addByte(Type.enumIndex(e));
 		switch( e ) {
 		case EConst(c):
@@ -234,6 +237,11 @@ class Bytes {
 	}
 
 	function doDecode() : Expr {
+	#if hscriptPos
+		return { e : _doDecode(), pmin : 0, pmax : 0 };
+	}
+	function _doDecode() : ExprDef {
+	#end
 		return switch( bin.get(pin++) ) {
 		case 0:
 			EConst( doDecodeConst() );

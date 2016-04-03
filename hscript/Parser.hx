@@ -738,7 +738,11 @@ class Parser {
 						case TOp(op):
 							if( op == ">" ) break;
 							if( op.charCodeAt(0) == ">".code ) {
+								#if hscriptPos
+								tokens.add({ t : TOp(op.substr(1)), min : tokenMax - op.length - 1, max : tokenMax });
+								#else
 								tokens.add(TOp(op.substr(1)));
+								#end								
 								break;
 							}
 						default:
