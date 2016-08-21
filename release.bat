@@ -15,4 +15,5 @@ haxe -xml release/haxedoc.xml hscript.Interp hscript.Parser hscript.Bytes hscrip
 7z a -tzip release.zip release
 rm -rf release
 haxelib submit release.zip
+echo Remember to "git tag vX.Y.Z && git push --tags"
 pause
