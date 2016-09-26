@@ -120,12 +120,13 @@ class Interp {
 		case EField(e,f):
 			v = set(expr(e),f,v);
 		case EArray(e, index):
-			var arr = expr(e);
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
 			if (isMap(arr)) {
-				//TODO
+				setMapValue(arr, index, v);
 			}
 			else {
-				arr[expr(index)] = v;
+				arr[index] = v;
 			}
 			
 		default:
@@ -154,10 +155,11 @@ class Interp {
 			v = fop(get(obj,f),expr(e2));
 			v = set(obj,f,v);
 		case EArray(e, index):
-			var arr = expr(e);
-			var index = expr(index);
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
 			if (isMap(arr)) {
-				v = null;//TODO
+				v = fop(getMapValue(arr, index), expr(e2));
+				setMapValue(arr, index, v);
 			}
 			else {
 				v = fop(arr[index],expr(e2));
@@ -194,10 +196,18 @@ class Interp {
 				set(obj,f,v + delta);
 			return v;
 		case EArray(e, index):
-			var arr = expr(e);
-			var index = expr(index);
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
 			if (isMap(arr)) {
-				return null;//todo
+				var v = getMapValue(arr, index);
+				if (prefix) {
+					v += delta;
+					setMapValue(arr, index, v);
+				}
+				else {
+					setMapValue(arr, index, v + delta);
+				}
+				return v;
 			}
 			else {
 				var v = arr[index];
@@ -586,6 +596,29 @@ class Interp {
 				case 'haxe.ds.ObjectMap': getObjectMapValue(map, key);
 				case 'haxe.ds.EnumValueMap': getEnumValueMapValue(map, key);
 				default: null;
+			}
+		}
+	}
+
+	@:generic function setGenericMapValue<K>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic):Void {
+		map.set(key, value);
+	}
+	inline function setEnumValueMapValue<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic) return setGenericMapValue(map, key, value);
+	inline function setObjectMapValue<K: { }>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic) return setGenericMapValue(map, key, value);
+	
+	function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
+		var className = {
+			var clasS = Type.getClass(map);
+			clasS == null ? null : Type.getClassName(clasS);
+		}
+		
+		return {
+			switch(className) {
+				case 'haxe.ds.StringMap': setGenericMapValue((map:haxe.ds.StringMap<Dynamic>), key, value);
+				case 'haxe.ds.IntMap': setGenericMapValue((map:haxe.ds.IntMap<Dynamic>), key, value);
+				case 'haxe.ds.ObjectMap': setObjectMapValue(map, key, value);
+				case 'haxe.ds.EnumValueMap': setEnumValueMapValue(map, key, value);
+				default: throw '$className is not a Map';
 			}
 		}
 	}

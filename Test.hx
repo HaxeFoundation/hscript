@@ -1,3 +1,4 @@
+import haxe.ds.EnumValueMap;
 import haxe.ds.Option;
 import hscript.Macro;
 import haxe.unit.*;
@@ -97,14 +98,45 @@ class Test extends TestCase {
 	}
 	
 	function testMap():Void {
-		assertScript('stringMap["foo"] == "Foo" && stringMap["Foo"] == null', true, { stringMap:["foo" => "Foo", "bar" => "Bar"] });
-		assertScript('intMap[100]', "one hundred", { intMap:[100 => "one hundred"] } );
-		
 		var objKey = { ok:true };
-		assertScript('objMap[key]', "ok", { objMap:[objKey => "ok"], key:objKey });
-
-		var enumKey = Option.Some( { ok:true } );
-		assertScript('enumMap[key]', "ok", { enumMap:[enumKey => "ok", Option.None => ""], key:enumKey });
+		var vars = {
+			stringMap: ["foo" => "Foo", "bar" => "Bar"],
+			intMap:[100 => "one hundred"],
+			objKey: objKey,
+			objMap:[objKey => "ok"],
+			enumKey:Option.Some("some"),
+			enumMap:new EnumValueMap<Option<String>, String>(),
+			stringIntMap: ["foo" => 100]
+		}
+		vars.enumMap.set(vars.enumKey, "ok");
+		
+		assertScript('stringMap["foo"]', "Foo", vars);
+		assertScript('intMap[100]', "one hundred", vars);
+		assertScript('objMap[objKey]', "ok", vars);
+		assertScript('enumMap[enumKey]', "ok", vars);
+		assertScript('stringMap["a"] = "A"; stringMap["a"]', "A", vars);
+		assertScript('intMap[200] = objMap[{foo:false}] = enumMap[enumKey] = "A"', "A", vars);
+		assertEquals('A', vars.intMap[200]);
+		assertEquals('A', vars.enumMap.get(vars.enumKey));
+		for (key in vars.objMap.keys()) {
+			if (key != objKey) {
+				assertEquals(false, (key:Dynamic).foo);
+				assertEquals('A', vars.objMap[key]);
+			}
+		}
+		
+		assertScript('
+			var keys = [];
+			for (key in stringMap.keys()) keys.push(key);
+			keys.sort(function(s1, s2) return s1 > s2 ? 1 : (s2 > s1 ? -1 : 0));
+			keys.join("_");
+		', 'a_bar_foo', vars);
+		assertScript('stringMap.remove("foo"); stringMap.exists("foo");', false, vars);
+		assertScript('stringMap["foo"] = "a"; stringMap["foo"] += "b"', 'ab', vars);
+		assertEquals('ab', vars.stringMap['foo']);
+		assertScript('stringIntMap["foo"]++', 100, vars);
+		assertEquals(101, vars.stringIntMap['foo']);
+		assertScript('++stringIntMap["foo"]', 102, vars);
 	}
 
 	static function main() {
