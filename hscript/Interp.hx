@@ -444,10 +444,47 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			var a = new Array();
-			for( e in arr )
-				a.push(expr(e));
-			return a;
+			if (arr.length > 0 && arr[0].match(Expr.EBinop("=>", _))) {
+				var isAllString:Bool = true;
+				var isAllInt:Bool = true;
+				var isAllObject:Bool = true;
+				var isAllEnum:Bool = true;
+				var keys:Array<Dynamic> = [];
+				var values:Array<Dynamic> = [];
+				for (e in arr) {
+					switch(e) {
+						case Expr.EBinop("=>", eKey, eValue): {
+							var key:Dynamic = expr(eKey);
+							var value:Dynamic = expr(eValue);
+							isAllString = isAllString && Std.is(key, String);
+							isAllInt = isAllInt && Std.is(key, Int);
+							isAllObject = isAllObject && Reflect.isObject(key);
+							isAllEnum = isAllEnum && Reflect.isEnumValue(key);
+							keys.push(key);
+							values.push(value);
+						}
+						default: throw("=> expected");
+					}
+				}
+				var map:Dynamic = {
+					if (isAllInt) new haxe.ds.IntMap<Dynamic>();
+					else if (isAllString) new haxe.ds.StringMap<Dynamic>();
+					else if (isAllEnum) new haxe.ds.EnumValueMap<Dynamic, Dynamic>();
+					else if (isAllObject) new haxe.ds.ObjectMap<Dynamic, Dynamic>();
+					else throw 'Inconsistent key types';
+				}
+				for (n in 0...keys.length) {
+					setMapValue(map, keys[n], values[n]);
+				}
+				return map;
+			}
+			else {
+				var a = new Array();
+				for ( e in arr ) {
+					a.push(expr(e));
+				}
+				return a;
+			}
 		case EArray(e, index):
 			var arr:Dynamic = expr(e);
 			var index:Dynamic = expr(index);
