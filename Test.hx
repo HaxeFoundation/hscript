@@ -1,3 +1,4 @@
+import haxe.ds.Option;
 import hscript.Macro;
 import haxe.unit.*;
 
@@ -93,6 +94,17 @@ class Test extends TestCase {
 		assertScript("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
 		assertScript("/**/0", 0);
 		assertScript("x=1;x*=-2", -2);
+	}
+	
+	function testMap():Void {
+		assertScript('stringMap["foo"] == "Foo" && stringMap["Foo"] == null', true, { stringMap:["foo" => "Foo", "bar" => "Bar"] });
+		assertScript('intMap[100]', "one hundred", { intMap:[100 => "one hundred"] } );
+		
+		var objKey = { ok:true };
+		assertScript('objMap[key]', "ok", { objMap:[objKey => "ok"], key:objKey });
+
+		var enumKey = Option.Some( { ok:true } );
+		assertScript('enumMap[key]', "ok", { enumMap:[enumKey => "ok", Option.None => ""], key:enumKey });
 	}
 
 	static function main() {
