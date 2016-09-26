@@ -119,8 +119,15 @@ class Interp {
 				l.r = v;
 		case EField(e,f):
 			v = set(expr(e),f,v);
-		case EArray(e,index):
-			expr(e)[expr(index)] = v;
+		case EArray(e, index):
+			var arr = expr(e);
+			if (isMap(arr)) {
+				//TODO
+			}
+			else {
+				arr[expr(index)] = v;
+			}
+			
 		default:
 			error(EInvalidOp("="));
 		}
@@ -146,11 +153,16 @@ class Interp {
 			var obj = expr(e);
 			v = fop(get(obj,f),expr(e2));
 			v = set(obj,f,v);
-		case EArray(e,index):
+		case EArray(e, index):
 			var arr = expr(e);
 			var index = expr(index);
-			v = fop(arr[index],expr(e2));
-			arr[index] = v;
+			if (isMap(arr)) {
+				v = null;//TODO
+			}
+			else {
+				v = fop(arr[index],expr(e2));
+				arr[index] = v;
+			}
 		default:
 			return error(EInvalidOp(op));
 		}
@@ -181,16 +193,21 @@ class Interp {
 			} else
 				set(obj,f,v + delta);
 			return v;
-		case EArray(e,index):
+		case EArray(e, index):
 			var arr = expr(e);
 			var index = expr(index);
-			var v = arr[index];
-			if( prefix ) {
-				v += delta;
-				arr[index] = v;
-			} else
-				arr[index] = v + delta;
-			return v;
+			if (isMap(arr)) {
+				return null;//todo
+			}
+			else {
+				var v = arr[index];
+				if( prefix ) {
+					v += delta;
+					arr[index] = v;
+				} else
+					arr[index] = v + delta;
+				return v;
+			}
 		default:
 			return error(EInvalidOp((delta > 0)?"++":"--"));
 		}
@@ -421,8 +438,15 @@ class Interp {
 			for( e in arr )
 				a.push(expr(e));
 			return a;
-		case EArray(e,index):
-			return expr(e)[expr(index)];
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				return getMapValue(arr, index);
+			}
+			else {
+				return arr[index];
+			}
 		case ENew(cl,params):
 			var a = new Array();
 			for( e in params )
@@ -526,18 +550,96 @@ class Interp {
 		restore(old);
 	}
 
-	function get( o : Dynamic, f : String ) : Dynamic {
-		if( o == null ) error(EInvalidAccess(f));
-		#if php
-			// https://github.com/HaxeFoundation/haxe/issues/4915
-			return try {
-				Reflect.getProperty(o, f);
-			} catch (e:Dynamic) {
-				Reflect.field(o, f);
+	inline function isMap(o:Dynamic):Bool {
+		var className = {
+			var clasS = Type.getClass(o);
+			clasS == null ? null : Type.getClassName(clasS);
+		}
+		
+		return {
+			switch(className) {
+				case 'haxe.ds.StringMap'
+					| 'haxe.ds.IntMap'
+					| 'haxe.ds.ObjectMap'
+					| 'haxe.ds.EnumValueMap': true;
+				default: false;
 			}
-		#else
-			return Reflect.getProperty(o, f);
-		#end
+		}
+	}
+	
+	@:generic function getGenericMapValue<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
+		return map.get(key);
+	}
+	inline function getEnumValueMapValue<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapValue(map, key);
+	inline function getObjectMapValue<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapValue(map, key);
+	
+	function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
+		var className = {
+			var clasS = Type.getClass(map);
+			clasS == null ? null : Type.getClassName(clasS);
+		}
+		
+		return {
+			switch(className) {
+				case 'haxe.ds.StringMap': getGenericMapValue((map:haxe.ds.StringMap<Dynamic>), key);
+				case 'haxe.ds.IntMap': getGenericMapValue((map:haxe.ds.IntMap<Dynamic>), key);
+				case 'haxe.ds.ObjectMap': getObjectMapValue(map, key);
+				case 'haxe.ds.EnumValueMap': getEnumValueMapValue(map, key);
+				default: null;
+			}
+		}
+	}
+	
+	@:generic function getMapProperty<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
+		return {
+			switch(key) {
+				case 'get': map.get;
+				case 'set': map.set;
+				case 'exists': map.exists;
+				case 'remove': map.remove;
+				case 'keys': map.keys;
+				case 'iterator': map.iterator;
+				case 'toString': map.toString;
+				default: null;
+			}
+		}
+	}
+	inline function getEnumValueMapProperty<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getMapProperty(map, key);
+	inline function getObjectMapProperty<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getMapProperty(map, key);
+	
+	function get( o : Dynamic, f : String ) : Dynamic {
+		if ( o == null ) error(EInvalidAccess(f));
+		var result = {
+			#if php
+				// https://github.com/HaxeFoundation/haxe/issues/4915
+				try {
+					Reflect.getProperty(o, f);
+				} catch (e:Dynamic) {
+					Reflect.field(o, f);
+				}
+			#else
+				Reflect.getProperty(o, f);
+			#end
+		}
+		
+		if (result == null) {
+			var className = {
+				var clasS = Type.getClass(o);
+				clasS == null ? null : Type.getClassName(clasS);
+			}
+			
+			result = {
+				switch(className) {
+					case 'haxe.ds.StringMap': getMapProperty((o:haxe.ds.StringMap<Dynamic>), f);
+					case 'haxe.ds.IntMap': getMapProperty((o:haxe.ds.IntMap<Dynamic>), f);
+					case 'haxe.ds.ObjectMap': getObjectMapProperty(o, f);
+					case 'haxe.ds.EnumValueMap': getEnumValueMapProperty(o, f);
+					default: null;
+				}
+			}
+		}
+		
+		return result;
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
