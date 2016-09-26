@@ -590,7 +590,7 @@ class Interp {
 		}
 	}
 	
-	@:generic function getMapProperty<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
+	@:generic function getGenericMapProperty<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
 		return {
 			switch(key) {
 				case 'get': map.get;
@@ -604,8 +604,8 @@ class Interp {
 			}
 		}
 	}
-	inline function getEnumValueMapProperty<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getMapProperty(map, key);
-	inline function getObjectMapProperty<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getMapProperty(map, key);
+	inline function getEnumValueMapProperty<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapProperty(map, key);
+	inline function getObjectMapProperty<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapProperty(map, key);
 	
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
@@ -630,8 +630,8 @@ class Interp {
 			
 			result = {
 				switch(className) {
-					case 'haxe.ds.StringMap': getMapProperty((o:haxe.ds.StringMap<Dynamic>), f);
-					case 'haxe.ds.IntMap': getMapProperty((o:haxe.ds.IntMap<Dynamic>), f);
+					case 'haxe.ds.StringMap': getGenericMapProperty((o:haxe.ds.StringMap<Dynamic>), f);
+					case 'haxe.ds.IntMap': getGenericMapProperty((o:haxe.ds.IntMap<Dynamic>), f);
 					case 'haxe.ds.ObjectMap': getObjectMapProperty(o, f);
 					case 'haxe.ds.EnumValueMap': getEnumValueMapProperty(o, f);
 					default: null;
