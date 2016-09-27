@@ -125,14 +125,12 @@ class Test extends TestCase {
 			}
 		}
 		
-		#if haxe3
 		assertScript('
 			var keys = [];
 			for (key in stringMap.keys()) keys.push(key);
 			keys.sort(function(s1, s2) return s1 > s2 ? 1 : (s2 > s1 ? -1 : 0));
 			keys.join("_");
 		', 'a_bar_foo', vars);
-		#end
 		assertScript('stringMap.remove("foo"); stringMap.exists("foo");', false, vars);
 		assertScript('stringMap["foo"] = "a"; stringMap["foo"] += "b"', 'ab', vars);
 		assertEquals('ab', vars.stringMap['foo']);
@@ -140,7 +138,9 @@ class Test extends TestCase {
 		assertEquals(101, vars.stringIntMap['foo']);
 		assertScript('++stringIntMap["foo"]', 102, vars);
 		assertScript('var newMap = ["foo"=>"foo"]; newMap["foo"];', 'foo', vars);
+		#if (haxe_ver >= 3.3) && php
 		assertScript('var newMap = [enumKey=>"foo"]; newMap[enumKey];', 'foo', vars);
+		#end
 		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
 	}
 
