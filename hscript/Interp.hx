@@ -598,18 +598,15 @@ class Interp {
 	}
 
 	inline function isMap(o:Dynamic):Bool {
-		return Std.is(o, haxe.ds.StringMap)
-			|| Std.is(o, haxe.ds.IntMap)
-			|| Std.is(o, haxe.ds.ObjectMap)
-			|| Std.is(o, haxe.ds.EnumValueMap);
+		return Std.is(o, haxe.Constraints.IMap);
 	}
 	
 	inline function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
-		return cast(map, Map.IMap<Dynamic, Dynamic>).get(key);
+		return cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).get(key);
 	}
 
 	inline function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
-		cast(map, Map.IMap<Dynamic, Dynamic>).set(key, value);
+		cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).set(key, value);
 	}
 	
 	function get( o : Dynamic, f : String ) : Dynamic {
@@ -628,7 +625,7 @@ class Interp {
 		}
 		
 		if (result == null && isMap(o)) {
-			var map = cast(o, Map.IMap<Dynamic, Dynamic>);
+			var map = cast(o, haxe.Constraints.IMap<Dynamic, Dynamic>);
 			result = switch(f) {
 				case 'get': map.get;
 				case 'set': map.set;
