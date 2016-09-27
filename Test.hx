@@ -141,7 +141,7 @@ class Test extends TestCase {
 		var parser = new hscript.Parser();
 		assertScript('var newMap = ["foo"=>"foo"]; newMap["foo"];', 'foo', vars);
 		assertScript('var newMap = [enumKey=>"foo"]; newMap[enumKey];', 'foo', vars);
-		assertScript('var newMap = [{a:"a"}=>"foo", "A"=>"foobar", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
+		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
 	}
 
 	static function main() {
