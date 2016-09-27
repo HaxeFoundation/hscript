@@ -569,8 +569,8 @@ class Interp {
 	}
 
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
-		#if (flash && !flash9)
-		if( v.iterator != null ) v = v.iterator();
+		#if ((flash && !flash9) || php)
+		if ( v.iterator != null ) v = v.iterator();
 		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
 		#end
