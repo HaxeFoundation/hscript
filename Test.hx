@@ -138,7 +138,7 @@ class Test extends TestCase {
 		assertEquals(101, vars.stringIntMap['foo']);
 		assertScript('++stringIntMap["foo"]', 102, vars);
 		assertScript('var newMap = ["foo"=>"foo"]; newMap["foo"];', 'foo', vars);
-		#if (haxe_ver >= 3.3) && php
+		#if (!php || (haxe_ver >= 3.3))
 		assertScript('var newMap = [enumKey=>"foo"]; newMap[enumKey];', 'foo', vars);
 		#end
 		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
