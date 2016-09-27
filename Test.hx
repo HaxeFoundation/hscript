@@ -137,8 +137,6 @@ class Test extends TestCase {
 		assertScript('stringIntMap["foo"]++', 100, vars);
 		assertEquals(101, vars.stringIntMap['foo']);
 		assertScript('++stringIntMap["foo"]', 102, vars);
-		
-		var parser = new hscript.Parser();
 		assertScript('var newMap = ["foo"=>"foo"]; newMap["foo"];', 'foo', vars);
 		assertScript('var newMap = [enumKey=>"foo"]; newMap[enumKey];', 'foo', vars);
 		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
