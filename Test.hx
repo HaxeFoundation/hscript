@@ -125,12 +125,14 @@ class Test extends TestCase {
 			}
 		}
 		
+		#if (!php || (haxe_ver >= 3.3))
 		assertScript('
 			var keys = [];
 			for (key in stringMap.keys()) keys.push(key);
 			keys.sort(function(s1, s2) return s1 > s2 ? 1 : (s2 > s1 ? -1 : 0));
 			keys.join("_");
 		', 'a_bar_foo', vars);
+		#end
 		assertScript('stringMap.remove("foo"); stringMap.exists("foo");', false, vars);
 		assertScript('stringMap["foo"] = "a"; stringMap["foo"] += "b"', 'ab', vars);
 		assertEquals('ab', vars.stringMap['foo']);
