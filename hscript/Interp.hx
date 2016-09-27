@@ -598,88 +598,23 @@ class Interp {
 	}
 
 	inline function isMap(o:Dynamic):Bool {
-		var className = {
-			var clasS = Type.getClass(o);
-			clasS == null ? null : Type.getClassName(clasS);
-		}
-		
-		return {
-			switch(className) {
-				case 'haxe.ds.StringMap'
-					| 'haxe.ds.IntMap'
-					| 'haxe.ds.ObjectMap'
-					| 'haxe.ds.EnumValueMap': true;
-				default: false;
-			}
-		}
+		return Std.is(o, haxe.ds.StringMap)
+			|| Std.is(o, haxe.ds.IntMap)
+			|| Std.is(o, haxe.ds.ObjectMap)
+			|| Std.is(o, haxe.ds.EnumValueMap);
 	}
 	
-	@:generic function getGenericMapValue<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
-		return map.get(key);
-	}
-	inline function getEnumValueMapValue<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapValue(map, key);
-	inline function getObjectMapValue<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapValue(map, key);
-	
-	function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
-		var className = {
-			var clasS = Type.getClass(map);
-			clasS == null ? null : Type.getClassName(clasS);
-		}
-		
-		return {
-			switch(className) {
-				case 'haxe.ds.StringMap': getGenericMapValue((map:haxe.ds.StringMap<Dynamic>), key);
-				case 'haxe.ds.IntMap': getGenericMapValue((map:haxe.ds.IntMap<Dynamic>), key);
-				case 'haxe.ds.ObjectMap': getObjectMapValue(map, key);
-				case 'haxe.ds.EnumValueMap': getEnumValueMapValue(map, key);
-				default: null;
-			}
-		}
+	inline function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
+		return cast(map, Map.IMap<Dynamic, Dynamic>).get(key);
 	}
 
-	@:generic function setGenericMapValue<K>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic):Void {
-		map.set(key, value);
+	inline function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
+		cast(map, Map.IMap<Dynamic, Dynamic>).set(key, value);
 	}
-	inline function setEnumValueMapValue<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic) return setGenericMapValue(map, key, value);
-	inline function setObjectMapValue<K: { }>(map:Map<K, Dynamic>, key:Dynamic, value:Dynamic) return setGenericMapValue(map, key, value);
-	
-	function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
-		var className = {
-			var clasS = Type.getClass(map);
-			clasS == null ? null : Type.getClassName(clasS);
-		}
-		
-		return {
-			switch(className) {
-				case 'haxe.ds.StringMap': setGenericMapValue((map:haxe.ds.StringMap<Dynamic>), key, value);
-				case 'haxe.ds.IntMap': setGenericMapValue((map:haxe.ds.IntMap<Dynamic>), key, value);
-				case 'haxe.ds.ObjectMap': setObjectMapValue(map, key, value);
-				case 'haxe.ds.EnumValueMap': setEnumValueMapValue(map, key, value);
-				default: throw '$className is not a Map';
-			}
-		}
-	}
-	
-	@:generic function getGenericMapProperty<K>(map:Map<K, Dynamic>, key:Dynamic):Dynamic {
-		return {
-			switch(key) {
-				case 'get': map.get;
-				case 'set': map.set;
-				case 'exists': map.exists;
-				case 'remove': map.remove;
-				case 'keys': map.keys;
-				case 'iterator': map.iterator;
-				case 'toString': map.toString;
-				default: null;
-			}
-		}
-	}
-	inline function getEnumValueMapProperty<K:EnumValue>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapProperty(map, key);
-	inline function getObjectMapProperty<K: { }>(map:Map<K, Dynamic>, key:Dynamic) return getGenericMapProperty(map, key);
 	
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
-		var result = {
+		var result:Dynamic = {
 			#if php
 				// https://github.com/HaxeFoundation/haxe/issues/4915
 				try {
@@ -692,20 +627,17 @@ class Interp {
 			#end
 		}
 		
-		if (result == null) {
-			var className = {
-				var clasS = Type.getClass(o);
-				clasS == null ? null : Type.getClassName(clasS);
-			}
-			
-			result = {
-				switch(className) {
-					case 'haxe.ds.StringMap': getGenericMapProperty((o:haxe.ds.StringMap<Dynamic>), f);
-					case 'haxe.ds.IntMap': getGenericMapProperty((o:haxe.ds.IntMap<Dynamic>), f);
-					case 'haxe.ds.ObjectMap': getObjectMapProperty(o, f);
-					case 'haxe.ds.EnumValueMap': getEnumValueMapProperty(o, f);
-					default: null;
-				}
+		if (result == null && isMap(o)) {
+			var map = cast(o, Map.IMap<Dynamic, Dynamic>);
+			result = switch(f) {
+				case 'get': map.get;
+				case 'set': map.set;
+				case 'exists': map.exists;
+				case 'remove': map.remove;
+				case 'keys': map.keys;
+				case 'iterator': map.iterator;
+				case 'toString': map.toString;
+				default: null;
 			}
 		}
 		
