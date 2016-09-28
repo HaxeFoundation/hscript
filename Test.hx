@@ -1,3 +1,5 @@
+import haxe.ds.EnumValueMap;
+import haxe.ds.Option;
 import hscript.Macro;
 import haxe.unit.*;
 
@@ -93,6 +95,55 @@ class Test extends TestCase {
 		assertScript("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
 		assertScript("/**/0", 0);
 		assertScript("x=1;x*=-2", -2);
+	}
+	
+	function testMap():Void {
+		var objKey = { ok:true };
+		var vars = {
+			stringMap: ["foo" => "Foo", "bar" => "Bar"],
+			intMap:[100 => "one hundred"],
+			objKey: objKey,
+			objMap:[objKey => "ok"],
+			enumKey:Option.Some("some"),
+			enumMap:new EnumValueMap<Option<String>, String>(),
+			stringIntMap: ["foo" => 100]
+		}
+		vars.enumMap.set(vars.enumKey, "ok");
+		
+		assertScript('stringMap["foo"]', "Foo", vars);
+		assertScript('intMap[100]', "one hundred", vars);
+		assertScript('objMap[objKey]', "ok", vars);
+		assertScript('enumMap[enumKey]', "ok", vars);
+		assertScript('stringMap["a"] = "A"; stringMap["a"]', "A", vars);
+		assertScript('intMap[200] = objMap[{foo:false}] = enumMap[enumKey] = "A"', "A", vars);
+		assertEquals('A', vars.intMap[200]);
+		assertEquals('A', vars.enumMap.get(vars.enumKey));
+		for (key in vars.objMap.keys()) {
+			if (key != objKey) {
+				assertEquals(false, (key:Dynamic).foo);
+				assertEquals('A', vars.objMap[key]);
+			}
+		}
+		
+		#if (!php || (haxe_ver >= 3.3))
+		assertScript('
+			var keys = [];
+			for (key in stringMap.keys()) keys.push(key);
+			keys.sort(function(s1, s2) return s1 > s2 ? 1 : (s2 > s1 ? -1 : 0));
+			keys.join("_");
+		', 'a_bar_foo', vars);
+		#end
+		assertScript('stringMap.remove("foo"); stringMap.exists("foo");', false, vars);
+		assertScript('stringMap["foo"] = "a"; stringMap["foo"] += "b"', 'ab', vars);
+		assertEquals('ab', vars.stringMap['foo']);
+		assertScript('stringIntMap["foo"]++', 100, vars);
+		assertEquals(101, vars.stringIntMap['foo']);
+		assertScript('++stringIntMap["foo"]', 102, vars);
+		assertScript('var newMap = ["foo"=>"foo"]; newMap["foo"];', 'foo', vars);
+		#if (!php || (haxe_ver >= 3.3))
+		assertScript('var newMap = [enumKey=>"foo"]; newMap[enumKey];', 'foo', vars);
+		#end
+		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
 	}
 
 	static function main() {

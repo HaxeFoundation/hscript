@@ -111,7 +111,7 @@ class Parser {
 			["..."],
 			["&&"],
 			["||"],
-			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^="],
+			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
 		];
 		#if haxe3
 		opPriority = new Map();
@@ -1062,6 +1062,8 @@ class Parser {
 				char = readChar();
 				if( char == '='.code )
 					return TOp("==");
+				else if ( char == '>'.code )
+					return TOp("=>");
 				this.char = char;
 				return TOp("=");
 			default:
