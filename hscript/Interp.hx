@@ -611,7 +611,7 @@ class Interp {
 	
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
-		var result:Dynamic = {
+		return {
 			#if php
 				// https://github.com/HaxeFoundation/haxe/issues/4915
 				try {
@@ -623,22 +623,6 @@ class Interp {
 				Reflect.getProperty(o, f);
 			#end
 		}
-		
-		if (result == null && isMap(o)) {
-			var map = cast(o, haxe.Constraints.IMap<Dynamic, Dynamic>);
-			result = switch(f) {
-				case 'get': map.get;
-				case 'set': map.set;
-				case 'exists': map.exists;
-				case 'remove': map.remove;
-				case 'keys': map.keys;
-				case 'iterator': map.iterator;
-				case 'toString': map.toString;
-				default: null;
-			}
-		}
-		
-		return result;
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
