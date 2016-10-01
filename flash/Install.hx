@@ -1,5 +1,4 @@
 import Sys.*;
-import sys.FileSystem.*;
 import sys.io.File.*;
 import haxe.*;
 import haxe.io.*;
@@ -10,9 +9,9 @@ class Install {
 		case "Linux":
 			"https://fpdownload.macromedia.com/pub/flashplayer/updaters/11/flashplayer_11_sa_debug.i386.tar.gz";
 		case "Mac":
-			"https://fpdownload.macromedia.com/pub/flashplayer/updaters/19/flashplayer_19_sa_debug.dmg";
+			"https://fpdownload.macromedia.com/pub/flashplayer/updaters/21/flashplayer_21_sa_debug.dmg";
 		case "Windows":
-			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/19/flashplayer_19_sa_debug.exe";
+			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/21/flashplayer_21_sa_debug.exe";
 		case _:
 			throw "unsupported system";
 	}
@@ -47,8 +46,8 @@ class Install {
 				if (command("tar", ["-xf", Path.withoutDirectory(fpDownload), "-C", "flash"]) != 0)
 					throw "failed to extract flash player";
 			case "Mac":
-				if (command("brew", ["install", "caskroom/cask/brew-cask"]) != 0)
-					throw "failed to brew install caskroom/cask/brew-cask";
+				if (command("brew", ["tap", "caskroom/cask"]) != 0)
+					throw "failed to brew tap caskroom/cask";
 				if (command("brew", ["cask", "install", "flash-player-debugger", "--appdir=flash"]) != 0)
 					throw "failed to install flash-player-debugger";
 			case "Windows":
@@ -73,5 +72,20 @@ class Install {
 			throw e;
 		};
 		http.customRequest(false, write(saveAs));
+	}
+	static function createDirectory(dir:String):Void {
+		try {
+			sys.FileSystem.createDirectory(dir);
+		} catch(e:Dynamic) {
+			switch (systemName()) {
+				case "Mac", "Linux":
+					if (command("sudo", ["mkdir", "-p", dir]) != 0)
+						throw 'cannot create $dir';
+					if (command("sudo", ["chmod", "a+rw", dir]) != 0)
+						throw 'cannot set permission of $dir';
+				case _:
+					neko.Lib.rethrow(e);
+			}
+		}
 	}
 }
