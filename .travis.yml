@@ -4,6 +4,8 @@ os:
   - linux
   - osx
 
+osx_image: xcode6.4
+
 haxe:
   - "3.2.1"
   - development
