@@ -177,6 +177,9 @@ class Bytes {
 		case EWhile(cond,e):
 			doEncode(cond);
 			doEncode(e);
+		case EDoWhile(cond,e):
+			doEncode(cond);
+			doEncode(e);
 		case EFor(v,it,e):
 			doEncodeString(v);
 			doEncode(it);
@@ -347,6 +350,9 @@ class Bytes {
 			}
 			var def = doDecode();
 			ESwitch(e, cases, def);
+		case 24:
+			var cond = doDecode();
+			EDoWhile(cond,doDecode());
 		case 255:
 			null;
 		default:

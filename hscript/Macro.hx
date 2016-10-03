@@ -180,6 +180,8 @@ class Macro {
 				EIf(convert(c), convert(e1), e2 == null ? null : convert(e2));
 			case EWhile(c, e):
 				EWhile(convert(c), convert(e), true);
+			case EDoWhile(c, e):
+				EWhile(convert(c), convert(e), false);
 			#if (haxe_211 || haxe3)
 			case EFor(v, it, efor):
 				var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;

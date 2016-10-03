@@ -148,6 +148,12 @@ class Printer {
 			expr(cond);
 			add(" ) ");
 			expr(e);
+		case EDoWhile(cond,e):
+			add("do ");
+			expr(e);
+			add(" while ( ");
+			expr(cond);
+			add(" )");
 		case EFor(v, it, e):
 			add("for( "+v+" in ");
 			expr(it);

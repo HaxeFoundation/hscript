@@ -241,6 +241,7 @@ class Parser {
 		case EBinop(_,_,e): isBlock(e);
 		case EUnop(_,prefix,e): !prefix && isBlock(e);
 		case EWhile(_,e): isBlock(e);
+		case EDoWhile(_,e): isBlock(e);
 		case EFor(_,_,e): isBlock(e);
 		case EReturn(e): e != null && isBlock(e);
 		case ETry(_, _, _, e): isBlock(e);
@@ -370,7 +371,7 @@ class Parser {
 			}
 			if( a.length == 1 )
 				switch( expr(a[0]) ) {
-				case EFor(_), EWhile(_):
+				case EFor(_), EWhile(_), EDoWhile(_):
 					var tmp = "__a_" + (uid++);
 					var e = mk(EBlock([
 						mk(EVar(tmp, null, mk(EArrayDecl([]), p1)), p1),
@@ -392,6 +393,8 @@ class Parser {
 			EFor(v, it, mapCompr(tmp, e2));
 		case EWhile(cond, e2):
 			EWhile(cond, mapCompr(tmp, e2));
+		case EDoWhile(cond, e2):
+			EDoWhile(cond, mapCompr(tmp, e2));
 		case EIf(cond, e1, e2) if( e2 == null ):
 			EIf(cond, mapCompr(tmp, e1), null);
 		case EBlock([e]):
@@ -476,6 +479,16 @@ class Parser {
 			var econd = parseExpr();
 			var e = parseExpr();
 			mk(EWhile(econd,e),p1,pmax(e));
+		case "do":
+		  var e = parseExpr();
+			var tk = token();
+			switch(tk)
+			{
+				case TId("while"): // Valid
+				default: unexpected(tk);
+			}
+			var econd = parseExpr();
+			mk(EDoWhile(econd,e),p1,pmax(econd));
 		case "for":
 			ensure(TPOpen);
 			var tk = token();
