@@ -365,6 +365,9 @@ class Interp {
 		case EWhile(econd,e):
 			whileLoop(econd,e);
 			return null;
+		case EDoWhile(econd,e):
+			doWhileLoop(econd,e);
+			return null;
 		case EFor(v,it,e):
 			forLoop(v,it,e);
 			return null;
@@ -550,6 +553,23 @@ class Interp {
 			return val;
 		}
 		return null;
+	}
+
+	function doWhileLoop(econd,e) {
+		var old = declared.length;
+		do {
+			try {
+				expr(e);
+			} catch( err : Stop ) {
+				switch(err) {
+				case SContinue:
+				case SBreak: break;
+				case SReturn(_): throw err;
+				}
+			}
+		}
+		while( expr(econd) == true );
+		restore(old);
 	}
 
 	function whileLoop(econd,e) {

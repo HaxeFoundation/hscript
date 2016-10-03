@@ -75,6 +75,7 @@ class Test extends TestCase {
 		assertScript("(function(a,b) return a + b)(4,5)",9);
 		assertScript("var y = 0; var add = function(a) y += a; add(5); add(3); y", 8);
 		assertScript("var a = [1,[2,[3,[4,null]]]]; var t = 0; while( a != null ) { t += a[0]; a = a[1]; }; t",10);
+		assertScript("var a = false; do { a = true; } while (!a); a;",true);
 		assertScript("var t = 0; for( x in 1...10 ) t += x; t", 45);
 		#if haxe3
 		assertScript("var t = 0; for( x in new IntIterator(1,10) ) t +=x; t", 45);
