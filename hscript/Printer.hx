@@ -153,7 +153,7 @@ class Printer {
 			expr(e);
 			add(" while ( ");
 			expr(cond);
-			add(" );\n");
+			add(" )");
 		case EFor(v, it, e):
 			add("for( "+v+" in ");
 			expr(it);
