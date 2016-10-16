@@ -30,13 +30,24 @@ class Run {
 				}
 				c;
 			case "Mac":
-				command("flash/Flash Player Debugger.app/Contents/MacOS/Flash Player Debugger", [fullPath(swf)]);
+				command("/Applications/Flash Player Debugger.app/Contents/MacOS/Flash Player Debugger", [fullPath(swf)]);
 			case "Windows":
 				command("flash\\flashplayer.exe", [fullPath(swf)]);
 			case _:
 				throw "unsupported platform";
 		}
-		println(getContent(flashlog));
+		if (exists(flashlog))
+			println(getContent(flashlog));
+		else {
+			println('does not exist: $flashlog');
+			var parts = Path.normalize(flashlog).split("/");
+			println(parts);
+			for (i in 0...parts.length-1) {
+				var path = parts.splice(0, i+1).join("/");
+				println('ls $path');
+				command("ls", [path]);
+			}
+		}
 		exit(exitCode);
 	}
 }
