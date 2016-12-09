@@ -77,6 +77,7 @@ class Parser {
 	var uid : Int = 0;
 
 	#if hscriptPos
+	var origin : String;
 	var readPos : Int;
 	var tokenMin : Int;
 	var tokenMax : Int;
@@ -133,7 +134,7 @@ class Parser {
 
 	public inline function error( err, pmin, pmax ) {
 		#if hscriptPos
-		throw new Error(err, pmin, pmax);
+		throw new Error(err, pmin, pmax, origin, line);
 		#else
 		throw err;
 		#end
@@ -143,14 +144,15 @@ class Parser {
 		error(EInvalidChar(c), readPos, readPos);
 	}
 
-	public function parseString( s : String ) {
-		line = 1;
+	public function parseString( s : String, ?origin : String = "hscript" ) {
 		uid = 0;
-		return parse( new haxe.io.StringInput(s) );
+		return parse( new haxe.io.StringInput(s), origin );
 	}
 
-	public function parse( s : haxe.io.Input ) {
+	public function parse( s : haxe.io.Input, ?origin : String = "hscript" ) {
+		line = 1;
 		#if hscriptPos
+		this.origin = origin;
 		readPos = 0;
 		tokenMin = oldTokenMin = 0;
 		tokenMax = oldTokenMax = 0;
@@ -226,7 +228,7 @@ class Parser {
 		#if hscriptPos
 		if( pmin == null ) pmin = tokenMin;
 		if( pmax == null ) pmax = tokenMax;
-		return { e : e, pmin : pmin, pmax : pmax };
+		return { e : e, pmin : pmin, pmax : pmax, origin : origin, line : line };
 		#else
 		return e;
 		#end
@@ -480,7 +482,7 @@ class Parser {
 			var e = parseExpr();
 			mk(EWhile(econd,e),p1,pmax(e));
 		case "do":
-		  var e = parseExpr();
+			var e = parseExpr();
 			var tk = token();
 			switch(tk)
 			{

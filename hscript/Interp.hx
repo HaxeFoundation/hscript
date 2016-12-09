@@ -23,6 +23,7 @@
  * DAMAGE.
  */
 package hscript;
+import haxe.PosInfos;
 import hscript.Expr;
 
 private enum Stop {
@@ -63,8 +64,16 @@ class Interp {
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
-		variables.set("trace",function(e) haxe.Log.trace(Std.string(e),cast { fileName : "hscript", lineNumber : 0 }));
+		variables.set("trace",function(e) haxe.Log.trace(Std.string(e), posInfos()));
 		initOps();
+	}
+
+	public function posInfos(): PosInfos {
+		#if hscriptPos
+			return cast { fileName : curExpr.origin, lineNumber : curExpr.line };
+		#else
+			return cast { fileName : "hscript", lineNumber : 0 };
+		#end
 	}
 
 	function initOps() {
@@ -275,7 +284,7 @@ class Interp {
 
 	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) : Dynamic {
 		#if hscriptPos
-		throw new Error(e, curExpr.pmin, curExpr.pmax);
+		throw new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line);
 		#else
 		throw e;
 		#end
@@ -361,7 +370,7 @@ class Interp {
 				return call(null,expr(e),args);
 			}
 		case EIf(econd,e1,e2):
-			return if( expr(econd) == true ) expr(e1) else if( e2 == null ) null else expr(e2);
+			return if( expr(econd) == true ) expr(e1) else if( #if hscriptPos e2.e #else e2 #end == null ) null else expr(e2);
 		case EWhile(econd,e):
 			whileLoop(econd,e);
 			return null;
@@ -447,7 +456,7 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			if (arr.length > 0 && arr[0].match(Expr.EBinop("=>", _))) {
+			if (arr.length > 0 && arr[0] #if hscriptPos .e #else #end .match(EBinop("=>", _))) {
 				var isAllString:Bool = true;
 				var isAllInt:Bool = true;
 				var isAllObject:Bool = true;
@@ -455,8 +464,8 @@ class Interp {
 				var keys:Array<Dynamic> = [];
 				var values:Array<Dynamic> = [];
 				for (e in arr) {
-					switch(e) {
-						case Expr.EBinop("=>", eKey, eValue): {
+					switch(#if hscriptPos e.e #else e #end) {
+						case EBinop("=>", eKey, eValue): {
 							var key:Dynamic = expr(eKey);
 							var value:Dynamic = expr(eValue);
 							isAllString = isAllString && Std.is(key, String);
