@@ -70,10 +70,10 @@ class Interp {
 
 	public function posInfos(): PosInfos {
 		#if hscriptPos
-			return cast { fileName : curExpr.origin, lineNumber : curExpr.line };
-		#else
-			return cast { fileName : "hscript", lineNumber : 0 };
+			if (curExpr != null)
+				return cast { fileName : curExpr.origin, lineNumber : curExpr.line };
 		#end
+		return cast { fileName : "hscript", lineNumber : 0 };
 	}
 
 	function initOps() {
