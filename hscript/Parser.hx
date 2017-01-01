@@ -226,6 +226,7 @@ class Parser {
 
 	inline function mk(e,?pmin,?pmax) : Expr {
 		#if hscriptPos
+		if( e == null ) return null;
 		if( pmin == null ) pmin = tokenMin;
 		if( pmax == null ) pmax = tokenMax;
 		return { e : e, pmin : pmin, pmax : pmax, origin : origin, line : line };
