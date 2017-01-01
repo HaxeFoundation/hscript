@@ -370,7 +370,7 @@ class Interp {
 				return call(null,expr(e),args);
 			}
 		case EIf(econd,e1,e2):
-			return if( expr(econd) == true ) expr(e1) else if( #if hscriptPos e2.e #else e2 #end == null ) null else expr(e2);
+			return if( expr(econd) == true ) expr(e1) else if( e2 == null ) null else expr(e2);
 		case EWhile(econd,e):
 			whileLoop(econd,e);
 			return null;
@@ -456,7 +456,7 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			if (arr.length > 0 && arr[0] #if hscriptPos .e #else #end .match(EBinop("=>", _))) {
+			if (arr.length > 0 && edef(arr[0]).match(EBinop("=>", _))) {
 				var isAllString:Bool = true;
 				var isAllInt:Bool = true;
 				var isAllObject:Bool = true;
@@ -464,7 +464,7 @@ class Interp {
 				var keys:Array<Dynamic> = [];
 				var values:Array<Dynamic> = [];
 				for (e in arr) {
-					switch(#if hscriptPos e.e #else e #end) {
+					switch(edef(e)) {
 						case EBinop("=>", eKey, eValue): {
 							var key:Dynamic = expr(eKey);
 							var value:Dynamic = expr(eValue);
