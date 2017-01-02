@@ -23,6 +23,7 @@
  * DAMAGE.
  */
 package hscript;
+import haxe.PosInfos;
 import hscript.Expr;
 
 private enum Stop {
@@ -63,8 +64,16 @@ class Interp {
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
-		variables.set("trace",function(e) haxe.Log.trace(Std.string(e),cast { fileName : "hscript", lineNumber : 0 }));
+		variables.set("trace",function(e) haxe.Log.trace(Std.string(e), posInfos()));
 		initOps();
+	}
+
+	public function posInfos(): PosInfos {
+		#if hscriptPos
+			if (curExpr != null)
+				return cast { fileName : curExpr.origin, lineNumber : curExpr.line };
+		#end
+		return cast { fileName : "hscript", lineNumber : 0 };
 	}
 
 	function initOps() {
@@ -275,7 +284,7 @@ class Interp {
 
 	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) : Dynamic {
 		#if hscriptPos
-		throw new Error(e, curExpr.pmin, curExpr.pmax);
+		throw new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line);
 		#else
 		throw e;
 		#end
@@ -447,7 +456,7 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			if (arr.length > 0 && arr[0].match(Expr.EBinop("=>", _))) {
+			if (arr.length > 0 && edef(arr[0]).match(EBinop("=>", _))) {
 				var isAllString:Bool = true;
 				var isAllInt:Bool = true;
 				var isAllObject:Bool = true;
@@ -455,8 +464,8 @@ class Interp {
 				var keys:Array<Dynamic> = [];
 				var values:Array<Dynamic> = [];
 				for (e in arr) {
-					switch(e) {
-						case Expr.EBinop("=>", eKey, eValue): {
+					switch(edef(e)) {
+						case EBinop("=>", eKey, eValue): {
 							var key:Dynamic = expr(eKey);
 							var value:Dynamic = expr(eValue);
 							isAllString = isAllString && Std.is(key, String);

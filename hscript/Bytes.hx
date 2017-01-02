@@ -74,6 +74,13 @@ class Bytes {
 		return strings[id];
 	}
 
+	function doEncodeInt(v: Int) {
+		bout.addByte(v & 0xFF);
+		bout.addByte((v >> 8) & 0xFF);
+		bout.addByte((v >> 16) & 0xFF);
+		bout.addByte(v >>> 24);
+	}
+
 	function doEncodeConst( c : Const ) {
 		switch( c ) {
 		case CInt(v):
@@ -82,10 +89,7 @@ class Bytes {
 				bout.addByte(v);
 			} else {
 				bout.addByte(1);
-				bout.addByte(v & 0xFF);
-				bout.addByte((v >> 8) & 0xFF);
-				bout.addByte((v >> 16) & 0xFF);
-				bout.addByte(v >>> 24);
+				doEncodeInt(v);
 			}
 		#if !haxe3
 		case CInt32(v):
@@ -105,13 +109,18 @@ class Bytes {
 		}
 	}
 
+	function doDecodeInt() {
+		var i = bin.get(pin) | (bin.get(pin+1) << 8) | (bin.get(pin+2) << 16) | (bin.get(pin+3) << 24);
+		pin += 4;
+		return i;
+	}
+
 	function doDecodeConst() {
 		return switch( bin.get(pin++) ) {
 		case 0:
 			CInt(bin.get(pin++));
 		case 1:
-			var i = bin.get(pin) | (bin.get(pin+1) << 8) | (bin.get(pin+2) << 16) | (bin.get(pin+3) << 24);
-			pin += 4;
+			var i = doDecodeInt();
 			CInt(i);
 		case 2:
 			CFloat( Std.parseFloat(doDecodeString()) );
@@ -131,6 +140,8 @@ class Bytes {
 
 	function doEncode( e : Expr ) {
 		#if hscriptPos
+		doEncodeString(e.origin);
+		doEncodeInt(e.line);
 		var e = e.e;
 		#end
 		bout.addByte(Type.enumIndex(e));
@@ -241,7 +252,9 @@ class Bytes {
 
 	function doDecode() : Expr {
 	#if hscriptPos
-		return { e : _doDecode(), pmin : 0, pmax : 0 };
+		var origin = doDecodeString();
+		var line = doDecodeInt();
+		return { e : _doDecode(), pmin : 0, pmax : 0, origin : origin, line : line };
 	}
 	function _doDecode() : ExprDef {
 	#end
