@@ -310,6 +310,12 @@ class Parser {
 				e = mk(EIdent(id));
 			return parseExprNext(e);
 		case TConst(c):
+			switch (c) {
+				case CString(s, interpolated):
+					if (interpolated)
+						return parseExprNext(interpolate(s));
+				default:
+			}
 			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
 			var e = parseExpr();
@@ -388,6 +394,70 @@ class Parser {
 		default:
 			return unexpected(tk);
 		}
+	}
+	
+	function interpolate(s:String) {
+		var exprs:Array<Expr> = [];
+		var dollarIndex = s.indexOf('$');
+
+		while (dollarIndex > -1) {
+			var i = dollarIndex;
+			var char = s.charAt(++i);
+			switch (char) {
+				case '$':
+					s = s.substring(0, i) + s.substr(i + 1);
+				case '{':
+					var expr = "";
+					var depth = 0;
+					
+					var precedingSub = s.substring(0, i - 1);
+					if (precedingSub != "")
+						exprs.push(mk(EConst(CString(precedingSub))));
+					
+					while (depth >= 0) {
+						char = s.charAt(++i);
+						if (char == '{')
+							depth++;
+						else if (char == '}') {
+							depth--;
+							if (depth < 0)
+								break;
+						}
+						expr += char;
+					}
+					
+					exprs.push(parseString(expr #if hscriptPos, origin #end));
+					s = s.substr(i + 1);
+				case c if (c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'): // [a-zA-Z_]
+					var ident = c;
+					var precedingSub = s.substring(0, i - 1);
+					if (precedingSub != "")
+						exprs.push(mk(EConst(CString(precedingSub))));
+					while (true) {
+						char = s.charAt(++i);
+						if (char == '_' 
+						|| char >= 'a' && char <= 'z' 
+						|| char >= 'A' && char <= 'Z' 
+						|| char >= '0' && char <= '9') // [a-zA-Z0-9_]
+							ident += char;
+						else break;
+					}
+					exprs.push(mk(EIdent(ident)));
+					s = s.substr(i);
+			}
+			dollarIndex = s.indexOf('$');
+		}
+		
+		if (exprs.length == 0)
+			exprs.push(mk(EConst(CString(s))));
+
+		var expr = exprs[0];
+		for (i in 1...exprs.length) {
+			var nextExpr = exprs[i];
+			expr = mk(EBinop('+', expr, nextExpr));
+		}
+
+		return expr;
 	}
 
 	function mapCompr( tmp : String, e : Expr ) {
@@ -1070,7 +1140,7 @@ class Parser {
 			case 125: return TBrClose;
 			case 91: return TBkOpen;
 			case 93: return TBkClose;
-			case 39: return TConst( CString(readString(39)) );
+			case 39: return TConst( CString(readString(39), true) );
 			case 34: return TConst( CString(readString(34)) );
 			case 63: return TQuestion;
 			case 58: return TDoubleDot;
