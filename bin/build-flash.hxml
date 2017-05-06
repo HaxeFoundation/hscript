@@ -1,4 +1,4 @@
-build-each.hxml
+bin/build-each.hxml
 -swf bin/Test.swf
 -swf-header 800:600:30:FFFFFF
 --flash-strict
