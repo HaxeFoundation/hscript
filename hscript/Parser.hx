@@ -983,7 +983,7 @@ class Parser {
 							// in case of '...'
 							if( exp == 10 && readChar() == 46 ) {
 								push(TOp("..."));
-								var i = Std.int(n);
+								var i = Std.int(n) & 0xFFFFFFFF;
 								return TConst( (i == n) ? CInt(i) : CFloat(n) );
 							}
 							invalidChar(char);
@@ -1006,7 +1006,7 @@ class Parser {
 								n = (n << 4) + (char - 87);
 							default:
 								this.char = char;
-								return TConst(CInt(n));
+								return TConst(CInt(n & 0xFFFFFFFF));
 							}
 						}
 						#else
