@@ -414,7 +414,7 @@ class Parser {
 					if (precedingSub != "")
 						exprs.push(mk(EConst(CString(precedingSub))));
 					
-					while (depth >= 0) {
+					while (i < s.length) {
 						char = s.charAt(++i);
 						if (char == '{')
 							depth++;
@@ -445,7 +445,7 @@ class Parser {
 					exprs.push(mk(EIdent(ident)));
 					s = s.substr(i);
 			}
-			dollarIndex = s.indexOf('$');
+			dollarIndex = s.indexOf('$', i);
 		}
 		
 		if (exprs.length == 0)
