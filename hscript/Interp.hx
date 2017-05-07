@@ -122,10 +122,28 @@ class Interp {
 		switch( edef(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
-			if( l == null )
-				variables.set(id,v)
-			else
-				l.r = v;
+			if( l == null ){
+				#if hscriptMandatoryVar
+				if (variables.get(id)!=null){
+					variables.set(id,v);
+				} else {
+					error(EUnknownVariable(id));
+				}
+				#else
+				variables.set(id,v);
+				#end
+			}
+			else {
+ 				#if hscriptMandatoryVar
+				if (l.r!=null){
+					l.r = v;	
+				} else {
+					error(EUnknownVariable(id));
+				}
+				#else
+				l.r = v;	
+				#end
+			}
 		case EField(e,f):
 			v = set(expr(e),f,v);
 		case EArray(e, index):
