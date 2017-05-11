@@ -4,6 +4,8 @@ os:
   - linux
   - osx
 
+sudo: false
+dist: trusty
 osx_image: xcode6.4
 
 haxe:
