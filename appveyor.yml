@@ -6,7 +6,7 @@ environment:
 
 install:
   # Install the haxe chocolatey package (https://chocolatey.org/packages/haxe)
-  - cinst haxe -version 3.2.1 -y
+  - cinst haxe -version 3.4.2 -y
   - RefreshEnv
   # Setup haxelib
   - mkdir "%HAXELIB_ROOT%"
