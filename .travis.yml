@@ -6,7 +6,6 @@ os:
 
 sudo: false
 dist: trusty
-osx_image: xcode6.4
 
 haxe:
   - "3.2.1"
@@ -27,17 +26,8 @@ addons:
       - mono-devel
       - mono-mcs
       # Flash
-      - libcurl3:i386
-      - libglib2.0-0:i386
-      - libx11-6:i386
-      - libxext6:i386
-      - libxt6:i386
-      - libxcursor1:i386
-      - libnss3:i386
-      - libgtk2.0-0:i386
-      # haxe development tmp fix
-      - zlib1g
-      - libpcre3
+      - libglib2.0
+      - libfreetype6
 
 install:
   # os-specific config
@@ -48,7 +38,6 @@ install:
       brew update;
       brew install mono;
       brew install python3;
-      brew install pcre bdw-gc; haxelib setup ~/haxelib/;
     fi
   # Download and setup a standalone flash player debugger
   - haxe flash/install.hxml

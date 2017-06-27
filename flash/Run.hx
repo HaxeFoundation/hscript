@@ -21,12 +21,13 @@ class Run {
 		var exitCode = switch (systemName()) {
 			case "Linux":
 				// The flash player has some issues with unexplained crashes,
-				// but if it runs about 8 times, it should succeed one of those...
+				// but if it runs about 16 times, it should succeed one of those...
 				var c = -1;
-				for (i in 0...8) {
-					if ((c = command("xvfb-run", ["flash/flashplayerdebugger", swf])) == 0)
+				for (i in 0...16) {
+					if ((c = command("xvfb-run", ["-a", "flash/flashplayerdebugger", swf])) == 0)
 						break;
 					println('retry... (${i+1})');
+					sleep(1.5);
 				}
 				c;
 			case "Mac":

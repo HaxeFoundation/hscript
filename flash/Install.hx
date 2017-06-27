@@ -7,11 +7,11 @@ class Install {
 	// https://www.adobe.com/support/flashplayer/downloads.html
 	static var fpDownload(default, never) = switch (systemName()) {
 		case "Linux":
-			"https://fpdownload.macromedia.com/pub/flashplayer/updaters/11/flashplayer_11_sa_debug.i386.tar.gz";
+			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/25/flash_player_sa_linux_debug.x86_64.tar.gz";
 		case "Mac":
-			"https://fpdownload.macromedia.com/pub/flashplayer/updaters/21/flashplayer_21_sa_debug.dmg";
+			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/25/flashplayer_25_sa_debug.dmg";
 		case "Windows":
-			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/21/flashplayer_21_sa_debug.exe";
+			"http://fpdownload.macromedia.com/pub/flashplayer/updaters/25/flashplayer_25_sa_debug.exe";
 		case _:
 			throw "unsupported system";
 	}
@@ -46,6 +46,9 @@ class Install {
 				if (command("tar", ["-xf", Path.withoutDirectory(fpDownload), "-C", "flash"]) != 0)
 					throw "failed to extract flash player";
 			case "Mac":
+				// https://github.com/caskroom/homebrew-cask/pull/15381
+				if (command("brew", ["uninstall", "--force", "brew-cask"]) != 0)
+					throw "failed to brew uninstall --force brew-cask";
 				if (command("brew", ["tap", "caskroom/versions"]) != 0)
 					throw "failed to brew tap caskroom/versions";
 				if (command("brew", ["cask", "install", "flash-player-debugger"]) != 0)
@@ -84,7 +87,7 @@ class Install {
 					if (command("sudo", ["chmod", "a+rw", dir]) != 0)
 						throw 'cannot set permission of $dir';
 				case _:
-					neko.Lib.rethrow(e);
+					throw 'cannot create $dir: $e';
 			}
 		}
 	}
