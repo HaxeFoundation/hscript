@@ -70,14 +70,17 @@ enum Expr {
 	ETernary( cond : Expr, e1 : Expr, e2 : Expr );
 	ESwitch( e : Expr, cases : Array<{ values : Array<Expr>, expr : Expr }>, ?defaultExpr : Expr);
 	EDoWhile( cond : Expr, e : Expr);
+	EMeta( name : String, args : Array<Expr>, e : Expr );
 }
 
 typedef Argument = { name : String, ?t : CType, ?opt : Bool };
 
+typedef Metadata = Array<{ name : String, params : Array<Expr> }>;
+
 enum CType {
 	CTPath( path : Array<String>, ?params : Array<CType> );
 	CTFun( args : Array<CType>, ret : CType );
-	CTAnon( fields : Array<{ name : String, t : CType }> );
+	CTAnon( fields : Array<{ name : String, t : CType, ?meta : Metadata }> );
 	CTParent( t : CType );
 }
 
@@ -99,7 +102,7 @@ class Error {
 	private function errorDefToString(): String {
 		switch (e) {
 			case EInvalidChar(c):
-				return "Invalid character: '"+c+"'";
+				return "Invalid character: '"+String.fromCharCode(c)+"' ("+c+")";
 
 			case EUnexpected(s):
 				return "Unexpected token: \""+s+"\"";

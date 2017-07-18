@@ -137,7 +137,7 @@ class Interp {
 			else {
 				arr[index] = v;
 			}
-			
+
 		default:
 			error(EInvalidOp("="));
 		}
@@ -560,6 +560,8 @@ class Interp {
 			if( !match )
 				val = def == null ? null : expr(def);
 			return val;
+		case EMeta(_, _, e):
+			return expr(e);
 		}
 		return null;
 	}
@@ -629,7 +631,7 @@ class Interp {
 	inline function isMap(o:Dynamic):Bool {
 		return Std.is(o, haxe.Constraints.IMap);
 	}
-	
+
 	inline function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
 		return cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).get(key);
 	}
@@ -637,7 +639,7 @@ class Interp {
 	inline function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
 		cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).set(key, value);
 	}
-	
+
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
 		return {
