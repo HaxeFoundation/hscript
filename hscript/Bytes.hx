@@ -247,6 +247,11 @@ class Bytes {
 			}
 			bout.addByte(255);
 			if( def == null ) bout.addByte(255) else doEncode(def);
+		case EMeta(name,args,e):
+			doEncodeString(name);
+			bout.addByte(args == null ? 0 : args.length + 1);
+			if( args != null ) for( e in args ) doEncode(e);
+			doEncode(e);
 		}
 	}
 
@@ -366,6 +371,11 @@ class Bytes {
 		case 24:
 			var cond = doDecode();
 			EDoWhile(cond,doDecode());
+		case 25:
+			var name = doDecodeString();
+			var count = bin.get(pin++);
+			var args = count == 0 ? null : [for( i in 0...count - 1 ) doDecode()];
+			EMeta(name, args, doDecode());
 		case 255:
 			null;
 		default:
