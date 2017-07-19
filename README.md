@@ -64,6 +64,8 @@ You can use `parser.allowJSON` to allow JSON data.
 
 You can use `parser.allowTypes` to parse types for local vars, exceptions, function args and return types. Types are ignored by the interpreter.
 
+You can use `parser.allowMeta` to parse metadata before expressions on in anonymous types. Metadata are ignored by the interpreter.
+
 You can use `new hscript.Macro(pos).convert(ast)` to convert an hscript AST to a Haxe macros one.
 
 Limitations
