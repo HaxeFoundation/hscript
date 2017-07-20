@@ -129,8 +129,10 @@ class Macro {
 			TFunction(map(args,convertType), convertType(ret));
 		case CTAnon(fields):
 			var tf = [];
-			for( f in fields )
-				tf.push( { name : f.name, meta : [], doc : null, access : [], kind : FVar(convertType(f.t),null), pos : p } );
+			for( f in fields ) {
+				var meta = f.meta == null ? [] : [for( m in f.meta ) { name : m.name, params : m.params == null ? [] : [for( e in m.params ) convert(e)], pos : p }];
+				tf.push( { name : f.name, meta : meta, doc : null, access : [], kind : FVar(convertType(f.t), null), pos : p } );
+			}
 			TAnonymous(tf);
 		};
 	}
