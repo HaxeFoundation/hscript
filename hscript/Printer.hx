@@ -258,6 +258,20 @@ class Printer {
 				add(";\n");
 			}
 			add("}");
+		case EMeta(name, args, e):
+			add("@");
+			add(name);
+			if( args != null && args.length > 0 ) {
+				add("(");
+				var first = true;
+				for( a in args ) {
+					if( first ) first = false else add(", ");
+					expr(e);
+				}
+				add(")");
+			}
+			add(" ");
+			expr(e);
 		}
 	}
 
