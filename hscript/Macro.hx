@@ -79,6 +79,9 @@ class Macro {
 			#if haxe3
 			case OpArrow: "=>";
 			#end
+			#if (haxe_ver >= 4)
+			case OpIn: "...";
+			#end
 			};
 			binops.set(str, op);
 			if( assign )
@@ -184,14 +187,16 @@ class Macro {
 				EWhile(convert(c), convert(e), true);
 			case EDoWhile(c, e):
 				EWhile(convert(c), convert(e), false);
-			#if (haxe_211 || haxe3)
 			case EFor(v, it, efor):
-				var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
-				EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
-			#else
-			case EFor(v, it, e):
-				EFor(v, convert(it), convert(e));
-			#end
+				#if (haxe_ver >= 4)
+					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+				#elseif (haxe_211 || haxe3)
+					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+				#else
+					EFor(v, convert(it), convert(efor));
+				#end
 			case EBreak:
 				EBreak;
 			case EContinue:
