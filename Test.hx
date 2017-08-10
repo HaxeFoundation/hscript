@@ -1,6 +1,9 @@
 import haxe.ds.EnumValueMap;
 import haxe.ds.Option;
 import hscript.Macro;
+import hscript.Tools;
+import hscript.Async;
+import hscript.Printer;
 import haxe.unit.*;
 
 class Test extends TestCase {
@@ -97,7 +100,7 @@ class Test extends TestCase {
 		assertScript("/**/0", 0);
 		assertScript("x=1;x*=-2", -2);
 	}
-	
+
 	function testMap():Void {
 		var objKey = { ok:true };
 		var vars = {
@@ -110,7 +113,7 @@ class Test extends TestCase {
 			stringIntMap: ["foo" => 100]
 		}
 		vars.enumMap.set(vars.enumKey, "ok");
-		
+
 		assertScript('stringMap["foo"]', "Foo", vars);
 		assertScript('intMap[100]', "one hundred", vars);
 		assertScript('objMap[objKey]', "ok", vars);
