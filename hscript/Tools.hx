@@ -55,7 +55,7 @@ class Tools {
 				f(c.expr);
 			}
 			if( def != null ) f(def);
-		case EMeta(name, args, e): for( a in args ) f(a); f(e);
+		case EMeta(name, args, e): if( args != null ) for( a in args ) f(a); f(e);
 		}
 	}
 
@@ -84,7 +84,7 @@ class Tools {
 		case EObject(fl): EObject([for( fi in fl ) { name : fi.name, e : f(fi.e) }]);
 		case ETernary(c, e1, e2): ETernary(f(c), f(e1), f(e2));
 		case ESwitch(e, cases, def): ESwitch(f(e), [for( c in cases ) { values : [for( v in c.values ) f(v)], expr : f(c.expr) } ], def == null ? null : f(def));
-		case EMeta(name, args, e): EMeta(name, [for( a in args ) f(a)], f(e));
+		case EMeta(name, args, e): EMeta(name, args == null ? null : [for( a in args ) f(a)], f(e));
 		}
 	}
 
