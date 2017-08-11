@@ -95,39 +95,8 @@ class Error {
 		this.origin = origin;
 		this.line = line;
 	}
-
-	private function errorDefToString(): String {
-		switch (e) {
-			case EInvalidChar(c):
-				return "Invalid character: '"+String.fromCharCode(c)+"' ("+c+")";
-
-			case EUnexpected(s):
-				return "Unexpected token: \""+s+"\"";
-
-			case EUnterminatedString:
-				return "Unterminated string";
-
-			case EUnterminatedComment:
-				return "Unterminated comment";
-
-			case EUnknownVariable(v):
-				return "Unknown variable: "+v;
-
-			case EInvalidIterator(v):
-				return "Invalid iterator: "+v;
-
-			case EInvalidOp(op):
-				return "Invalid operator: "+op;
-
-			case EInvalidAccess(f):
-				return "Invalid access to field "+f;
-		}
-	}
-
 	public function toString(): String {
-		var message = errorDefToString();
-		message = origin + ":" + line + ": " + message;
-		return message;
+		return Printer.errorToString(this);
 	}
 }
 enum ErrorDef {

@@ -300,4 +300,23 @@ class Printer {
 		return new Printer().exprToString(e);
 	}
 
+	public static function errorToString( e : Expr.Error ) {
+		var message = switch( #if hscriptPos e.e #else e #end ) {
+			case EInvalidChar(c): "Invalid character: '"+String.fromCharCode(c)+"' ("+c+")";
+			case EUnexpected(s): "Unexpected token: \""+s+"\"";
+			case EUnterminatedString: "Unterminated string";
+			case EUnterminatedComment: "Unterminated comment";
+			case EUnknownVariable(v): "Unknown variable: "+v;
+			case EInvalidIterator(v): "Invalid iterator: "+v;
+			case EInvalidOp(op): "Invalid operator: "+op;
+			case EInvalidAccess(f): "Invalid access to field "+f;
+		};
+		#if hscriptPos
+		return e.origin + ":" + e.line + ": " + message;
+		#else
+		return message;
+		#end
+	}
+
+
 }
