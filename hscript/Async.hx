@@ -123,7 +123,7 @@ class Async {
 		if( !syncFlag )
 			return;
 		switch( e ) {
-		case ECall(_):
+		case ECall(_), EFunction(_):
 			syncFlag = false;
 		case EReturn(_):
 			// require specific handling to pass it to exit expr
@@ -167,11 +167,11 @@ class Async {
 			for( a in args )
 				varNames.push(a.name);
 			args.unshift( { name : "_onEnd", t : null } );
-			var rest = EIdent("_onEnd");
+			var frest = EIdent("_onEnd");
 			var oldFun = currentFun;
 			currentFun = name;
-			var body = toCps(body, rest, rest);
-			var f = EFunction(args, body, "a_" + name, t);
+			var body = toCps(body, frest, frest);
+			var f = EFunction(args, body, name, t);
 			restoreVars(vold);
 			return rest == null ? f : ECall(rest, [f]);
 		case EParent(e):
@@ -343,6 +343,11 @@ class AsyncInterp extends hscript.Interp {
 
 	public function setContext( api : Dynamic ) {
 
+		var funs = new Array();
+		for( v in variables.keys() )
+			if( Reflect.isFunction(variables.get(v)) )
+				funs.push({ v : v, obj : null });
+
 		variables.set("split", split);
 		variables.set("async", async);
 		variables.set("makeIterator", makeIterator);
@@ -354,12 +359,42 @@ class AsyncInterp extends hscript.Interp {
 			if( f.charCodeAt(0) == "_".code ) f = f.substr(1);
 			variables.set(f, fv);
 			// create the async wrapper if doesn't exists
-			if( f.substr(0, 2) != "a_" && !variables.exists("a_"+f) )
-				variables.set("a_" + f, Reflect.makeVarArgs(function(args) {
-					var onEnd = args.shift();
-					onEnd(Reflect.callMethod(api, fv, args));
-				}));
+			if( f.substr(0, 2) != "a_" )
+				funs.push({ v : f, obj : api });
 		}
+
+		for( v in funs ) {
+			if( variables.exists("a_" + v.v) ) continue;
+			var fv : Dynamic = variables.get(v.v);
+			var obj = v.obj;
+			variables.set("a_" + v.v, Reflect.makeVarArgs(function(args:Array<Dynamic>) {
+				var onEnd = args.shift();
+				onEnd(Reflect.callMethod(obj, fv, args));
+			}));
+		}
+	}
+
+	public function hasMethod( name : String ) {
+		var v = variables.get(name);
+		return v != null && Reflect.isFunction(v);
+	}
+
+	public function callValue( value : Dynamic, args : Array<Dynamic>, ?onResult : Dynamic -> Void, ?vthis : {} ) {
+		var oldThis = variables.get("this");
+		if( vthis != null )
+			variables.set("this", vthis);
+		if( onResult == null )
+			onResult = function(_) {};
+		args.unshift(onResult);
+		Reflect.callMethod(null, value, args);
+		variables.set("this", oldThis);
+	}
+
+	public function callAsync( id : String, args, ?onResult, ?vthis : {} ) {
+		var v = variables.get(id);
+		if( v == null )
+			throw "Missing function " + id + "()";
+		callValue(v, args, onResult, vthis);
 	}
 
 	function async( rest : Dynamic -> Void, args : Array<Dynamic> ) {
