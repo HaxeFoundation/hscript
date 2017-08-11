@@ -34,9 +34,9 @@ class Async {
 		Convert a script into asynchronous one.
 		- calls such as foo(a,b,c) are translated to a_foo(function(r) ...rest, a,b,c) where r is the result value
 		- object access such obj.bar(a,b,c) are translated to obj.a_bar(function(r) ...rest, a, b, c)
-		- @split { e1; e2; e3; } is transformed to split(function(_) ...rest, [e1, e2, e3]) which
+		- @async expr will execute the expression but continue without waiting for it to finish
+		- @split [ e1, e2, e3 ] is transformed to split(function(_) ...rest, [e1, e2, e3]) which
 		  should execute asynchronously all expressions - until they return - before continuing the execution
-		- @async { e1; e2; e3; } is similar to @split but execution will continue immediately without wait
 		- for(i in v) block; loops are translated to the following:
 			var _i = makeIterator(v);
 			function _loop() {
@@ -61,7 +61,7 @@ class Async {
 		if( topLevelSync ) {
 			return buildSync(e);
 		} else {
-			var nothing = EFunction([{ name : "_", t : null }], EBlock([]));
+			var nothing = ignore();
 			return new Async().toCps(e, nothing, nothing);
 		}
 	}
@@ -89,8 +89,8 @@ class Async {
 		varNames = [];
 	}
 
-	function ignore(e) {
-		return EFunction([{ name : "_", t : null }], EBlock([e]));
+	function ignore(?e) {
+		return EFunction([{ name : "_", t : null }], EBlock(e == null ? [] : [e]));
 	}
 
 	function retNull(e) {
@@ -178,10 +178,13 @@ class Async {
 			return EParent(toCps(e, rest, exit));
 		case EMeta("sync", _, e):
 			return buildSync(e);
-		case EMeta(name = "split" | "async", _, e):
-			var args = switch( e ) { case EBlock(el): el; default: [e]; };
+		case EMeta("async", _, e):
+			var nothing = ignore();
+			return EBlock([toCps(e,nothing,nothing),retNull(rest)]);
+		case EMeta("split", _, e):
+			var args = switch( e ) { case EArrayDecl(el): el; default: throw "@split expression should be an array"; };
 			var args = [for( a in args ) EFunction([ { name : "_rest", t : null } ], toCps(EBlock([a]), EIdent("_rest"), exit))];
-			return ECall(EIdent(name), [rest, EArrayDecl(args)]);
+			return ECall(EIdent("split"), [rest, EArrayDecl(args)]);
 		case ECall(EIdent(i), args):
 			return makeCall( EIdent( varNames.indexOf(i) < 0 ? "a_" + i : i) , args, rest, exit);
 		case ECall(EField(e, f), args):
@@ -349,7 +352,6 @@ class AsyncInterp extends hscript.Interp {
 				funs.push({ v : v, obj : null });
 
 		variables.set("split", split);
-		variables.set("async", async);
 		variables.set("makeIterator", makeIterator);
 
 		var c = Type.getClass(api);
@@ -395,12 +397,6 @@ class AsyncInterp extends hscript.Interp {
 		if( v == null )
 			throw "Missing function " + id + "()";
 		callValue(v, args, onResult, vthis);
-	}
-
-	function async( rest : Dynamic -> Void, args : Array<Dynamic> ) {
-		for( a in args )
-			a(function(_) {});
-		rest(null);
 	}
 
 	function split( rest : Dynamic -> Void, args : Array<Dynamic> ) {
