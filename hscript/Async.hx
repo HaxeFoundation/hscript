@@ -151,7 +151,7 @@ class Async {
 			// local recursion
 			for( e in el )
 				switch( e ) {
-				case EFunction(_, _, name): varNames.push(name);
+				case EFunction(_, _, name, null): varNames.push(name);
 				default:
 				}
 			while( el.length > 0 ) {
