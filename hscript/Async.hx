@@ -80,6 +80,8 @@ class Async {
 			var e = EBlock([for(e in el) buildSync(e)]);
 			restoreVars(v);
 			return e;
+		case EMeta("async", _, e):
+			return toCps(e, ignore(), ignore());
 		default:
 			return hscript.Tools.map(e, buildSync);
 		}
@@ -128,6 +130,8 @@ class Async {
 		case EReturn(_):
 			// require specific handling to pass it to exit expr
 			syncFlag = false;
+		case EMeta("sync" | "async", _, _):
+			// isolated from the sync part
 		default:
 			Tools.iter(e, checkSync);
 		}
@@ -143,7 +147,7 @@ class Async {
 
 	public function toCps( e : hscript.Expr, rest : hscript.Expr, exit : hscript.Expr ) {
 		if( isSync(e) )
-			return ECall(rest, [e]);
+			return ECall(rest, [buildSync(e)]);
 		switch( e ) {
 		case EBlock(el):
 			var el = el.copy();
@@ -177,7 +181,7 @@ class Async {
 		case EParent(e):
 			return EParent(toCps(e, rest, exit));
 		case EMeta("sync", _, e):
-			return buildSync(e);
+			return ECall(rest,[buildSync(e)]);
 		case EMeta("async", _, e):
 			var nothing = ignore();
 			return EBlock([toCps(e,nothing,nothing),retNull(rest)]);
@@ -422,6 +426,20 @@ class AsyncInterp extends hscript.Interp {
 					var onEnd = args.shift();
 					onEnd(call(o, m, args));
 					return null;
+				}
+				// fallback on generic script
+				m = Reflect.field(o, "scriptCall");
+				if( m != null ) {
+					call(o, m, [args.shift(), f.substr(2), args]);
+					return null;
+				}
+			} else {
+				// fallback on generic script
+				m = Reflect.field(o, "scriptCall");
+				if( m != null ) {
+					var result : Dynamic = null;
+					call(o, m, [function(r) result = r, f, args]);
+					return result;
 				}
 			}
 			throw o + " has no method " + f;
