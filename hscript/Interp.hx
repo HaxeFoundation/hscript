@@ -29,11 +29,29 @@ private enum Stop {
 	SReturn( v : Dynamic );
 }
 
+@:structInit
+private class Declared {
+	public var n : String;
+	public var old : Hashed;
+	public function new(n,old){
+		this.n = n;
+		this.old = old;
+	}
+}
+
+@:structInit
+private class Hashed {
+	public var r : Dynamic;
+	public function new(r){
+		this.r = r;
+	}
+}
+
 class Interp {
 
 	#if haxe3
 	public var variables : Map<String,Dynamic>;
-	var locals : Map<String,{ r : Dynamic }>;
+	var locals : Map<String, Hashed>;
 	var binops : Map<String, Expr -> Expr -> Dynamic >;
 	#else
 	public var variables : Hash<Dynamic>;
@@ -43,7 +61,7 @@ class Interp {
 
 	var depth : Int;
 	var inTry : Bool;
-	var declared : Array<{ n : String, old : { r : Dynamic } }>;
+	var declared : Array<Declared>;
 
 	#if hscriptPos
 	var curExpr : Expr;
@@ -446,7 +464,7 @@ class Interp {
 				} else {
 					// function-in-function is a local function
 					declared.push( { n : name, old : locals.get(name) } );
-					var ref = { r : f };
+					var ref : Hashed = { r : f };
 					locals.set(name, ref);
 					capturedLocals.set(name, ref); // allow self-recursion
 				}
