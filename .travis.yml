@@ -20,8 +20,6 @@ addons:
       - g++-multilib
       # Python
       - python3
-      # PHP
-      - php5-cli
       # C#
       - mono-devel
       - mono-mcs
@@ -34,10 +32,12 @@ install:
   - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
       export DISPLAY=:99.0;
       export AUDIODEV=null;
+      phpenv global 7.0
     elif [ "${TRAVIS_OS_NAME}" = "osx" ]; then
       brew update;
       brew install mono;
       brew install python3;
+      brew install php71
     fi
   # Download and setup a standalone flash player debugger
   - haxe flash/install.hxml
