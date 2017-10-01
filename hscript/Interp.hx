@@ -402,7 +402,7 @@ class Interp {
 		case EReturn(e):
 			throw SReturn((e == null)?null:expr(e));
 		case EFunction(params,fexpr,name,_):
-			var capturedLocals = duplicate(locals);
+			var capturedLocals : Map<String,Hashed> = duplicate(locals);
 			var me = this;
 			var hasOpt = false, minParams = 0;
 			for( p in params )
