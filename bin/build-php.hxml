@@ -1,2 +1,5 @@
 bin/build-each.hxml
--php bin
+-lib jstack
+-D JSTACK_FORCE
+-D JSTACK_HAXE_DEV
+-php bin/php
