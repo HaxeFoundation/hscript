@@ -99,6 +99,11 @@ class Test extends TestCase {
 		assertScript("var a:Array<Dynamic>=[1,2,4]; a[2]", 4, null, true);
 		assertScript("/**/0", 0);
 		assertScript("x=1;x*=-2", -2);
+		assertScript("'$$'", "$");
+		assertScript("'$x'", 10, { x:10 });
+		assertScript("'${x + 5}'", 15, { x:10 });
+		assertScript("'h$s'", "hscript", { s:"script" });
+		assertScript("'${function(x) {return x * x;}(3)}'", 9);
 	}
 
 	function testMap():Void {

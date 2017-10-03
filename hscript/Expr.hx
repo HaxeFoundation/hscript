@@ -24,7 +24,7 @@ package hscript;
 enum Const {
 	CInt( v : Int );
 	CFloat( f : Float );
-	CString( s : String );
+	CString( s : String, ?interpolated:Bool );
 	#if !haxe3
 	CInt32( v : haxe.Int32 );
 	#end
