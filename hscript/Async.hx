@@ -82,6 +82,18 @@ class Async {
 			return e;
 		case EMeta("async", _, e):
 			return toCps(e, ignore(), ignore());
+		case EBreak if( currentBreak != null ):
+			return currentBreak;
+		case EContinue if( currentLoop != null ):
+			return EBlock([ECall(currentLoop, [EIdent("null")]), EReturn()]);
+		case EFor(_), EWhile(_):
+			var oldLoop = currentLoop, oldBreak = currentBreak;
+			currentLoop = null;
+			currentBreak = null;
+			e = hscript.Tools.map(e, buildSync);
+			currentLoop = oldLoop;
+			currentBreak = oldBreak;
+			return e;
 		default:
 			return hscript.Tools.map(e, buildSync);
 		}
