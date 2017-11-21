@@ -77,7 +77,7 @@ class Macro {
 			case OpArrow: "=>";
 			#end
 			#if (haxe_ver >= 4)
-			case OpIn: "...";
+			case OpIn: "in";
 			#end
 			};
 			binops.set(str, op);
