@@ -1388,7 +1388,7 @@ class Parser {
 		return preprocesorValues.get(id);
 	}
 
-	var preprocStack : Array<Bool>;
+	var preprocStack : Array<{ r : Bool }>;
 
 	function parsePreproCond() {
 		var tk = token();
@@ -1427,19 +1427,19 @@ class Parser {
 		case "if":
 			var e = parsePreproCond();
 			if( evalPreproCond(e) ) {
-				preprocStack.push(true);
+				preprocStack.push({ r : true });
 				return token();
 			}
-			preprocStack.push(false);
+			preprocStack.push({ r : false });
 			skipTokens();
 			return token();
 		case "else", "elseif" if( preprocStack.length > 0 ):
-			if( preprocStack[preprocStack.length - 1] ) {
-				preprocStack[preprocStack.length - 1] = false;
+			if( preprocStack[preprocStack.length - 1].r ) {
+				preprocStack[preprocStack.length - 1].r = false;
 				skipTokens();
 				return token();
 			} else if( id == "else" ) {
-				preprocStack[preprocStack.length - 1] = true;
+				preprocStack[preprocStack.length - 1].r = true;
 				return token();
 			} else {
 				// elseif
@@ -1455,13 +1455,14 @@ class Parser {
 	}
 
 	function skipTokens() {
-		var size = preprocStack.length;
+		var spos = preprocStack.length - 1;
+		var obj = preprocStack[spos];
 		var pos = readPos;
 		while( true ) {
 			var tk = token();
 			if( tk == TEof )
 				error(EInvalidPreprocessor("Unclosed"), pos, pos);
-			if( preprocStack.length < size ) {
+			if( preprocStack[spos] != obj ) {
 				push(tk);
 				break;
 			}
