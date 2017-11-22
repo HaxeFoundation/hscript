@@ -70,7 +70,7 @@ enum Expr {
 	EMeta( name : String, args : Array<Expr>, e : Expr );
 }
 
-typedef Argument = { name : String, ?t : CType, ?opt : Bool };
+typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
 
 typedef Metadata = Array<{ name : String, params : Array<Expr> }>;
 
@@ -107,8 +107,57 @@ enum Error {
 	EUnexpected( s : String );
 	EUnterminatedString;
 	EUnterminatedComment;
+	EInvalidPreprocessor( msg : String );
 	EUnknownVariable( v : String );
 	EInvalidIterator( v : String );
 	EInvalidOp( op : String );
 	EInvalidAccess( f : String );
+}
+
+
+enum ModuleDecl {
+	DPackage( path : Array<String> );
+	DImport( path : Array<String>, ?everything : Bool );
+	DClass( c : ClassDecl );
+}
+
+typedef ClassDecl = {
+	var name : String;
+	var params : {}; // TODO : not yet parsed
+	var extend : Null<CType>;
+	var implement : Array<CType>;
+	var fields : Array<FieldDecl>;
+	var meta : Metadata;
+}
+
+typedef FieldDecl = {
+	var name : String;
+	var meta : Metadata;
+	var kind : FieldKind;
+	var access : Array<FieldAccess>;
+}
+
+enum FieldAccess {
+	APublic;
+	APrivate;
+	AInline;
+	AOverride;
+}
+
+enum FieldKind {
+	KFunction( f : FunctionDecl );
+	KVar( v : VarDecl );
+}
+
+typedef FunctionDecl = {
+	var args : Array<Argument>;
+	var expr : Expr;
+	var ret : Null<CType>;
+}
+
+typedef VarDecl = {
+	var get : Null<String>;
+	var set : Null<String>;
+	var expr : Null<Expr>;
+	var type : Null<CType>;
 }
