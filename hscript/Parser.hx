@@ -154,7 +154,7 @@ class Parser {
 	}
 
 	function initParser( origin ) {
-		line = 1;
+		// line=1 - don't reset line : it might be set manualy
 		preprocStack = [];
 		#if hscriptPos
 		this.origin = origin;
@@ -1439,7 +1439,8 @@ class Parser {
 				skipTokens();
 				return token();
 			} else if( id == "else" ) {
-				preprocStack[preprocStack.length - 1].r = true;
+				preprocStack.pop();
+				preprocStack.push({ r : true });
 				return token();
 			} else {
 				// elseif
