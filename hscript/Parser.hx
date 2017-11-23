@@ -1444,7 +1444,7 @@ class Parser {
 			return evalPreproCond(e1) || evalPreproCond(e2);
 		default:
 			error(EInvalidPreprocessor("Can't eval " + expr(e).getName()), readPos, readPos);
-			return null;
+			return false;
 		}
 	}
 
