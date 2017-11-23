@@ -400,8 +400,19 @@ class Parser {
 			}
 			return mk(EBlock(a),p1);
 		case TOp(op):
-			if( unops.exists(op) )
-				return makeUnop(op,parseExpr());
+			if( unops.exists(op) ) {
+				var start = tokenMin;
+				var e = parseExpr();
+				if( op == "-" )
+					switch( expr(e) ) {
+					case EConst(CInt(i)):
+						return mk(EConst(CInt(-i)), start, pmax(e));
+					case EConst(CFloat(f)):
+						return mk(EConst(CFloat(-f)), start, pmax(e));
+					default:
+					}
+				return makeUnop(op,e);
+			}
 			return unexpected(tk);
 		case TBkOpen:
 			var a = new Array();
