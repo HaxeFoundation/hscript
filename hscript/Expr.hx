@@ -142,6 +142,8 @@ enum FieldAccess {
 	APrivate;
 	AInline;
 	AOverride;
+	AStatic;
+	AMacro;
 }
 
 enum FieldKind {

@@ -271,7 +271,7 @@ class Parser {
 		return switch( expr(e) ) {
 		case EBlock(_), EObject(_), ESwitch(_): true;
 		case EFunction(_,e,_,_): isBlock(e);
-		case EVar(_,_,e): e != null && isBlock(e);
+		case EVar(_, t, e): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
 		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);
 		case EBinop(_,_,e): isBlock(e);
 		case EUnop(_,prefix,e): !prefix && isBlock(e);
@@ -1031,6 +1031,10 @@ class Parser {
 				access.push(APrivate);
 			case "inline":
 				access.push(AInline);
+			case "static":
+				access.push(AStatic);
+			case "macro":
+				access.push(AMacro);
 			case "function":
 				var name = getIdent();
 				var inf = parseFunctionDecl();
@@ -1055,7 +1059,17 @@ class Parser {
 				}
 				var type = maybe(TDoubleDot) ? parseType() : null;
 				var expr = maybe(TOp("=")) ? parseExpr() : null;
-				ensure(TSemicolon);
+
+				if( expr != null ) {
+					if( isBlock(expr) )
+						maybe(TSemicolon);
+					else
+						ensure(TSemicolon);
+				} else if( type != null && type.match(CTAnon(_)) ) {
+					maybe(TSemicolon);
+				} else
+					ensure(TSemicolon);
+
 				return {
 					name : name,
 					meta : meta,
