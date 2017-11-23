@@ -61,7 +61,12 @@ class Interp {
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
-		variables.set("trace",function(e) haxe.Log.trace(Std.string(e), posInfos()));
+		variables.set("trace", Reflect.makeVarArgs(function(el) {
+			var inf = posInfos();
+			var v = el.shift();
+			if( el.length > 0 ) inf.customParams = el;
+			haxe.Log.trace(Std.string(v), inf);
+		}));
 		initOps();
 	}
 
