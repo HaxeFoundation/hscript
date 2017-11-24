@@ -26,7 +26,7 @@ import hscript.Expr;
 private enum Stop {
 	SBreak;
 	SContinue;
-	SReturn( v : Dynamic );
+	SReturn;
 }
 
 class Interp {
@@ -44,6 +44,7 @@ class Interp {
 	var depth : Int;
 	var inTry : Bool;
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
+	var returnValue : Dynamic;
 
 	#if hscriptPos
 	var curExpr : Expr;
@@ -252,7 +253,10 @@ class Interp {
 			switch( e ) {
 			case SBreak: throw "Invalid break";
 			case SContinue: throw "Invalid continue";
-			case SReturn(v): return v;
+			case SReturn:
+				var v = returnValue;
+				returnValue = null;
+				return v;
 			}
 		}
 		return null;
@@ -387,7 +391,8 @@ class Interp {
 		case EContinue:
 			throw SContinue;
 		case EReturn(e):
-			throw SReturn((e == null)?null:expr(e));
+			returnValue = e == null ? null : expr(e);
+			throw SReturn;
 		case EFunction(params,fexpr,name,_):
 			var capturedLocals = duplicate(locals);
 			var me = this;
@@ -577,7 +582,7 @@ class Interp {
 				switch(err) {
 				case SContinue:
 				case SBreak: break;
-				case SReturn(_): throw err;
+				case SReturn: throw err;
 				}
 			}
 		}
@@ -594,7 +599,7 @@ class Interp {
 				switch(err) {
 				case SContinue:
 				case SBreak: break;
-				case SReturn(_): throw err;
+				case SReturn: throw err;
 				}
 			}
 		}
@@ -623,7 +628,7 @@ class Interp {
 				switch( err ) {
 				case SContinue:
 				case SBreak: break;
-				case SReturn(_): throw err;
+				case SReturn: throw err;
 				}
 			}
 		}
