@@ -979,9 +979,8 @@ class Parser {
 		case "class":
 			var name = getIdent();
 			var params = {};
-			if( maybe(TOp("<")) ) {
-				throw "Unsupported class type parameters";
-			}
+			if( maybe(TOp("<")) )
+				error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
 			var extend = null;
 			var implement = [];
 
