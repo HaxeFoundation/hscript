@@ -37,6 +37,13 @@ class Printer {
 		return buf.toString();
 	}
 
+	public function typeToString( t : CType ) {
+		buf = new StringBuf();
+		tabs = "";
+		type(t);
+		return buf.toString();
+	}
+
 	inline function add<T>(s:T) buf.add(s);
 
 	function type( t : CType ) {
