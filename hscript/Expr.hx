@@ -119,15 +119,25 @@ enum ModuleDecl {
 	DPackage( path : Array<String> );
 	DImport( path : Array<String>, ?everything : Bool );
 	DClass( c : ClassDecl );
+	DTypedef( c : TypeDecl );
 }
 
-typedef ClassDecl = {
+typedef ModuleType = {
 	var name : String;
 	var params : {}; // TODO : not yet parsed
+	var meta : Metadata;
+	var isPrivate : Bool;
+}
+
+typedef ClassDecl = {> ModuleType,
 	var extend : Null<CType>;
 	var implement : Array<CType>;
 	var fields : Array<FieldDecl>;
-	var meta : Metadata;
+	var isExtern : Bool;
+}
+
+typedef TypeDecl = {> ModuleType,
+	var t : CType;
 }
 
 typedef FieldDecl = {

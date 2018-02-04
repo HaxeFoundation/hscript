@@ -214,6 +214,11 @@ class Parser {
 		if( t != tk ) unexpected(t);
 	}
 
+	inline function ensureToken(tk) {
+		var t = token();
+		if( !Type.enumEq(t,tk) ) unexpected(t);
+	}
+
 	function maybe(tk) {
 		var t = token();
 		if( Type.enumEq(t, tk) )
@@ -569,8 +574,7 @@ class Parser {
 		case "for":
 			ensure(TPOpen);
 			var vname = getIdent();
-			var tk = token();
-			if( !Type.enumEq(tk,TId("in")) ) unexpected(tk);
+			ensureToken(TId("in"));
 			var eiter = parseExpr();
 			ensure(TPClose);
 			var e = parseExpr();
@@ -617,18 +621,15 @@ class Parser {
 			mk(EThrow(e),p1,pmax(e));
 		case "try":
 			var e = parseExpr();
-			var tk = token();
-			if( !Type.enumEq(tk, TId("catch")) ) unexpected(tk);
+			ensureToken(TId("catch"));
 			ensure(TPOpen);
 			var vname = getIdent();
 			ensure(TDoubleDot);
 			var t = null;
 			if( allowTypes )
 				t = parseType();
-			else {
-				tk = token();
-				if( !Type.enumEq(tk, TId("Dynamic")) ) unexpected(tk);
-			}
+			else
+				ensureToken(TId("Dynamic"));
 			ensure(TPClose);
 			var ec = parseExpr();
 			mk(ETry(e, vname, t, ec), p1, pmax(ec));
@@ -947,9 +948,27 @@ class Parser {
 		return meta;
 	}
 
+	function parseParams() {
+		if( maybe(TOp("<")) )
+			error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
+		return {};
+	}
+
 	function parseModuleDecl() : ModuleDecl {
 		var meta = parseMetadata();
 		var ident = getIdent();
+		var isPrivate = false, isExtern = false;
+		while( true ) {
+			switch( ident ) {
+			case "private":
+				isPrivate = true;
+			case "extern":
+				isExtern = true;
+			default:
+				break;
+			}
+			ident = getIdent();
+		}
 		switch( ident ) {
 		case "package":
 			var path = parsePath();
@@ -978,9 +997,7 @@ class Parser {
 			return DImport(path, star);
 		case "class":
 			var name = getIdent();
-			var params = {};
-			if( maybe(TOp("<")) )
-				error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
+			var params = parseParams();
 			var extend = null;
 			var implement = [];
 
@@ -1009,6 +1026,20 @@ class Parser {
 				extend : extend,
 				implement : implement,
 				fields : fields,
+				isPrivate : isPrivate,
+				isExtern : isExtern,
+			});
+		case "typedef":
+			var name = getIdent();
+			var params = parseParams();
+			ensureToken(TOp("="));
+			var t = parseType();
+			return DTypedef({
+				name : name,
+				meta : meta,
+				params : params,
+				isPrivate : isPrivate,
+				t : t,
 			});
 		default:
 			unexpected(TId(ident));
