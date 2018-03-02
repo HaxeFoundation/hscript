@@ -288,13 +288,18 @@ class Interp {
 		#end
 	}
 
-	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) : Dynamic {
-		#if hscriptPos
-		throw new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line);
+	inline function error(e : #if hscriptPos ErrorDef #else Error #end, rethrow=false ) : Dynamic {
+		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
+		if( rethrow ) this.rethrow(e) else throw e;
+		return null;
+	}
+
+	inline function rethrow( e : Dynamic ) {
+		#if hl
+		hl.Api.rethrow(e);
 		#else
 		throw e;
 		#end
-		return null;
 	}
 
 	function resolve( id : String ) : Dynamic {
