@@ -112,6 +112,7 @@ enum Error {
 	EInvalidIterator( v : String );
 	EInvalidOp( op : String );
 	EInvalidAccess( f : String );
+	ECustom( msg : String );
 }
 
 

@@ -317,7 +317,8 @@ class Printer {
 			case EUnknownVariable(v): "Unknown variable: "+v;
 			case EInvalidIterator(v): "Invalid iterator: "+v;
 			case EInvalidOp(op): "Invalid operator: "+op;
-			case EInvalidAccess(f): "Invalid access to field "+f;
+			case EInvalidAccess(f): "Invalid access to field " + f;
+			case ECustom(msg): msg;
 		};
 		#if hscriptPos
 		return e.origin + ":" + e.line + ": " + message;
