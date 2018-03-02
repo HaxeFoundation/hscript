@@ -25,7 +25,7 @@ import hscript.Expr;
 class Tools {
 
 	public static function iter( e : Expr, f : Expr -> Void ) {
-		switch( e ) {
+		switch( #if hscriptPos e.e #else e #end ) {
 		case EConst(_), EIdent(_):
 		case EVar(_, _, e): if( e != null ) f(e);
 		case EParent(e): f(e);
@@ -60,8 +60,12 @@ class Tools {
 	}
 
 	public static function map( e : Expr, f : Expr -> Expr ) {
+		#if hscriptPos
+		var edef = switch( e.e ) {
+		#else
 		return switch( e ) {
-		case EConst(_), EIdent(_): e;
+		#end
+		case EConst(_), EIdent(_), EBreak, EContinue: #if hscriptPos e.e #else e #end;
 		case EVar(n, t, e): EVar(n, t, if( e != null ) f(e) else null);
 		case EParent(e): EParent(f(e));
 		case EBlock(el): EBlock([for( e in el ) f(e)]);
@@ -73,7 +77,6 @@ class Tools {
 		case EWhile(c, e): EWhile(f(c),f(e));
 		case EDoWhile(c, e): EDoWhile(f(c),f(e));
 		case EFor(v, it, e): EFor(v, f(it), f(e));
-		case EBreak, EContinue: e;
 		case EFunction(args, e, name, t): EFunction(args, f(e), name, t);
 		case EReturn(e): EReturn(if( e != null ) f(e) else null);
 		case EArray(e, i): EArray(f(e),f(i));
@@ -86,6 +89,9 @@ class Tools {
 		case ESwitch(e, cases, def): ESwitch(f(e), [for( c in cases ) { values : [for( v in c.values ) f(v)], expr : f(c.expr) } ], def == null ? null : f(def));
 		case EMeta(name, args, e): EMeta(name, args == null ? null : [for( a in args ) f(a)], f(e));
 		}
+		#if hscriptPos
+		return { e : edef, pmin : e.pmin, pmax : e.pmax, origin : e.origin, line : e.line };
+		#end
 	}
 
 }

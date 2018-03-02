@@ -26,9 +26,20 @@ class Async {
 
 	var varNames : Array<String>;
 	var currentFun : String;
-	var currentLoop : hscript.Expr;
-	var currentBreak : hscript.Expr;
+	var currentLoop : Expr;
+	var currentBreak : Expr -> Expr;
 	var uid = 0;
+
+	static var nullExpr : Expr = #if hscriptPos { e : null, pmin : 0, pmax : 0, origin : "<null>", line : 0 } #else null #end;
+	static var nullId = mk(EIdent("null"), nullExpr);
+
+	inline static function expr( e : Expr ) {
+		return #if hscriptPos e.e #else e #end;
+	}
+
+	inline static function mk( e, inf : Expr ) : Expr {
+		return #if hscriptPos { e : e, pmin : inf.pmin, pmax : inf.pmax, origin : inf.origin, line : inf.line } #else e #end;
+	}
 
 	/**
 		Convert a script into asynchronous one.
@@ -66,38 +77,38 @@ class Async {
 		}
 	}
 
-	function buildSync( e : Expr, exit : Expr ) {
-		switch( e ) {
+	function buildSync( e : Expr, exit : Expr ) : Expr {
+		switch( expr(e) ) {
 		case EFunction(_):
 			return toCps(e, null, null);
 		case EBlock(el):
 			var v = saveVars();
 			for( e in el )
-				switch( e ) {
+				switch( expr(e) ) {
 				case EFunction(_, _, name, _) if( name != null ): varNames.push(name);
 				default:
 				}
-			var e = EBlock([for(e in el) buildSync(e,exit)]);
+			var e = block([for(e in el) buildSync(e,exit)], e);
 			restoreVars(v);
 			return e;
 		case EMeta("async", _, e):
 			return toCps(e, ignore(), ignore());
 		case EBreak if( currentBreak != null ):
-			return currentBreak;
+			return currentBreak(e);
 		case EContinue if( currentLoop != null ):
-			return EBlock([ECall(currentLoop, [EIdent("null")]), EReturn()]);
+			return block([call(currentLoop, [nullId], e), mk(EReturn(),e)],e);
 		case EFor(_), EWhile(_):
 			var oldLoop = currentLoop, oldBreak = currentBreak;
 			currentLoop = null;
 			currentBreak = null;
-			e = hscript.Tools.map(e, buildSync.bind(_, exit));
+			e = Tools.map(e, buildSync.bind(_, exit));
 			currentLoop = oldLoop;
 			currentBreak = oldBreak;
 			return e;
-		case EReturn(e) if( exit != null ):
-			return EBlock([ECall(exit,[e == null ? EIdent("null") : e]), EReturn()]);
+		case EReturn(eret) if( exit != null ):
+			return block([call(exit,[eret == null ? nullId : eret], e), mk(EReturn(),e)], e);
 		default:
-			return hscript.Tools.map(e, buildSync.bind(_, exit));
+			return Tools.map(e, buildSync.bind(_, exit));
 		}
 	}
 
@@ -105,23 +116,52 @@ class Async {
 		varNames = [];
 	}
 
-	function ignore(?e) {
-		return EFunction([{ name : "_", t : null }], EBlock(e == null ? [] : [e]));
+	function ignore(?e) : Expr {
+		var inf = e == null ? nullExpr : e;
+		return fun("_", block(e == null ? [] : [e],inf));
 	}
 
-	function retNull(e) {
-		return ECall(e, [EIdent("null")]);
+	inline function ident(str, e) {
+		return mk(EIdent(str), e);
 	}
 
-	function makeCall( ecall, args : Array<hscript.Expr>, rest : hscript.Expr, exit, sync = false ) {
+	inline function fun(arg:String, e, ?name) {
+		return mk(EFunction([{ name : arg, t : null }], e, name), e);
+	}
+
+	inline function funs(arg:Array<String>, e, ?name) {
+		return mk(EFunction([for( a in arg ) { name : a, t : null }], e, name), e);
+	}
+
+	inline function block(arr, e) {
+		return mk(EBlock(arr), e);
+	}
+
+	inline function field(e, f, inf) {
+		return mk(EField(e, f), inf);
+	}
+
+	inline function binop(op, e1, e2, inf) {
+		return mk(EBinop(op, e1, e2), inf);
+	}
+
+	inline function call(e, args, inf) {
+		return mk(ECall(e, args), inf);
+	}
+
+	function retNull(e) : Expr {
+		return call(e, [nullId],e);
+	}
+
+	function makeCall( ecall, args : Array<Expr>, rest : Expr, exit, sync = false ) {
 		var names = [for( i in 0...args.length ) "_a"+uid++];
-		var rargs = [for( i in 0...args.length ) EIdent(names[i])];
+		var rargs = [for( i in 0...args.length ) ident(names[i],ecall)];
 		if( !sync )
 			rargs.unshift(rest);
-		var rest = sync ? ECall(rest,[ECall(ecall, rargs)]) : ECall(ecall, rargs);
+		var rest = mk(sync ? ECall(rest,[call(ecall, rargs,ecall)]) : ECall(ecall, rargs), ecall);
 		var i = args.length - 1;
 		while( i >= 0 ) {
-			rest = toCps(args[i], EFunction([ { name : names[i], t : null } ], rest), exit);
+			rest = toCps(args[i], fun(names[i], rest), exit);
 			i--;
 		}
 		return rest;
@@ -138,7 +178,7 @@ class Async {
 	function checkSync( e : Expr ) {
 		if( !syncFlag )
 			return;
-		switch( e ) {
+		switch( expr(e) ) {
 		case ECall(_), EFunction(_):
 			syncFlag = false;
 		case EMeta("sync" | "async", _, _):
@@ -156,16 +196,16 @@ class Async {
 		while( varNames.length > k ) varNames.pop();
 	}
 
-	public function toCps( e : hscript.Expr, rest : hscript.Expr, exit : hscript.Expr ) {
+	public function toCps( e : Expr, rest : Expr, exit : Expr ) : Expr {
 		if( isSync(e) )
-			return ECall(rest, [buildSync(e, exit)]);
-		switch( e ) {
+			return call(rest, [buildSync(e, exit)],e);
+		switch( expr(e) ) {
 		case EBlock(el):
 			var el = el.copy();
 			var vold = saveVars();
 			// local recursion
 			for( e in el )
-				switch( e ) {
+				switch( expr(e) ) {
 				case EFunction(_, _, name, null): varNames.push(name);
 				default:
 				}
@@ -182,172 +222,165 @@ class Async {
 			for( a in args )
 				varNames.push(a.name);
 			args.unshift( { name : "_onEnd", t : null } );
-			var frest = EIdent("_onEnd");
+			var frest = ident("_onEnd",e);
 			var oldFun = currentFun;
 			currentFun = name;
 			var body = toCps(body, frest, frest);
-			var f = EFunction(args, body, name, t);
+			var f = mk(EFunction(args, body, name, t),e);
 			restoreVars(vold);
-			return rest == null ? f : ECall(rest, [f]);
+			return rest == null ? f : call(rest, [f],e);
 		case EParent(e):
-			return EParent(toCps(e, rest, exit));
+			return mk(EParent(toCps(e, rest, exit)),e);
 		case EMeta("sync", _, e):
-			return ECall(rest,[buildSync(e,exit)]);
+			return call(rest,[buildSync(e,exit)],e);
 		case EMeta("async", _, e):
 			var nothing = ignore();
-			return EBlock([toCps(e,nothing,nothing),retNull(rest)]);
+			return block([toCps(e,nothing,nothing),retNull(rest)],e);
 		case EMeta("split", _, e):
-			var args = switch( e ) { case EArrayDecl(el): el; default: throw "@split expression should be an array"; };
-			var args = [for( a in args ) EFunction([ { name : "_rest", t : null } ], toCps(EBlock([a]), EIdent("_rest"), exit))];
-			return ECall(EIdent("split"), [rest, EArrayDecl(args)]);
-		case ECall(EIdent(i), args):
-			return makeCall( EIdent( varNames.indexOf(i) < 0 ? "a_" + i : i) , args, rest, exit);
-		case ECall(EField(e, f), args):
-			return makeCall(EField(e,"a_"+f), args, rest, exit);
-		case EFor(v, eit, e):
+			var args = switch( expr(e) ) { case EArrayDecl(el): el; default: throw "@split expression should be an array"; };
+			var args = [for( a in args ) fun("_rest", toCps(block([a],a), ident("_rest",a), exit))];
+			return call(ident("split",e), [rest, mk(EArrayDecl(args),e)],e);
+		case ECall(expr(_) => EIdent(i), args):
+			return makeCall( ident( varNames.indexOf(i) < 0 ? "a_" + i : i,e) , args, rest, exit);
+		case ECall(expr(_) => EField(e, f), args):
+			return makeCall(field(e,"a_"+f,e), args, rest, exit);
+		case EFor(v, eit, eloop):
 			var id = ++uid;
-			var it = EIdent("_i" + id);
+			var it = ident("_i" + id,e);
 			var oldLoop = currentLoop, oldBreak = currentBreak;
-			var loop = EIdent("_loop" + id);
+			var loop = ident("_loop" + id,e);
 			currentLoop = loop;
-			currentBreak = EBlock([ECall(rest, [EIdent("null")]), EReturn()]);
-			var e = EBlock([
-				EVar("_i" + id, ECall(EIdent("makeIterator"),[eit])),
-				EFunction([{ name : "_", t : null }], EBlock([
-					EIf(EUnop("!", true, ECall(EField(it, "hasNext"), [])), currentBreak),
-					EVar(v, ECall(EField(it, "next"), [])),
-					toCps(e, loop, exit),
-				]),"_loop" + id),
-				ECall(loop, [EIdent("null")]),
-			]);
+			currentBreak = function(inf) return block([call(rest, [nullId], inf), mk(EReturn(),inf)], inf);
+			var efor = block([
+				mk(EVar("_i" + id, call(ident("makeIterator",eit),[eit],eit)),eit),
+				fun("_", block([
+					mk(EIf(mk(EUnop("!", true, call( field(it, "hasNext", it), [], it)),it), currentBreak(it)),it),
+					mk(EVar(v, call(field(it, "next",it), [], it)), it),
+					toCps(eloop, loop, exit),
+				], it),"_loop" + id),
+				call(loop, [nullId], e),
+			], e);
 			currentLoop = oldLoop;
 			currentBreak = oldBreak;
-			return e;
-		case EUnop(op = "!", prefix, e):
-			return toCps(e, EFunction([ { name:"_r", t:null } ], ECall(rest, [EUnop(op, prefix, EIdent("_r"))])), exit);
+			return efor;
+		case EUnop(op = "!", prefix, eop):
+			return toCps(eop, fun("_r",call(rest, [mk(EUnop(op, prefix, ident("_r",e)),e)], e)), exit);
 		case EBinop(op, e1, e2):
 			switch( op ) {
 			case "=", "+=", "-=", "/=", "*=", "%=", "&=", "|=", "^=":
-				switch( e1 ) {
+				switch( expr(e1) ) {
 				case EIdent(_):
 					var id = "_r" + uid++;
-					return toCps(e2, EFunction([ { name:id, t:null } ], ECall(rest, [EBinop(op, e1, EIdent(id))])), exit);
-				case EField(e1, f):
+					return toCps(e2, fun(id, call(rest, [binop(op, e1, ident(id,e1),e1)], e1)), exit);
+				case EField(ef1, f):
 					var id1 = "_r" + uid++;
 					var id2 = "_r" + uid++;
-					return toCps(e1, EFunction([ { name:id1, t:null } ], toCps(e2, EFunction([ { name : id2, t : null } ], ECall(rest, [EBinop(op, EField(EIdent(id1),f), EIdent(id2))])), exit)), exit);
+					return toCps(ef1, fun(id1, toCps(e2, fun(id2, call(rest, [binop(op, field(ident(id1, e1), f, ef1), ident(id2, e2), e)], e)), exit)), exit);
 				case EArray(earr, eindex):
 					var idArr = "_r" + uid++;
 					var idIndex = "_r" + uid++;
 					var idVal = "_r" + uid++;
-					return toCps(earr,
-						EFunction([ { name:idArr, t:null } ], toCps(eindex,
-							EFunction([ { name : idIndex, t : null } ], toCps(e2,
-								EFunction([ { name : idVal, t : null } ],
-									ECall(rest, [EBinop(op, EArray(EIdent(idArr), EIdent(idIndex)), EIdent(idVal))])
-								), exit)
-							), exit)
-						),exit);
+					return toCps(earr,fun(idArr, toCps(eindex, fun(idIndex, toCps(e2,
+						fun(idVal, call(rest, [binop(op, mk(EArray(ident(idArr,earr), ident(idIndex,eindex)),e1), ident(idVal,e1), e)], e))
+					, exit)), exit)),exit);
 				default:
 					throw "assert " + e1;
 				}
 			case "||":
 				var id1 = "_r" + uid++;
 				var id2 = "_r" + uid++;
-				return toCps(e1, EFunction([ { name:id1, t:null } ], EIf(EBinop("==", EIdent(id1), EIdent("true")),ECall(rest,[EIdent("true")]),toCps(e2, rest, exit))), exit);
+				return toCps(e1, fun(id1, mk(EIf(binop("==", ident(id1,e1), ident("true",e1), e1),call(rest,[ident("true",e1)],e1),toCps(e2, rest, exit)),e)), exit);
 			case "&&":
 				var id1 = "_r" + uid++;
 				var id2 = "_r" + uid++;
-				return toCps(e1, EFunction([ { name:id1, t:null } ], EIf(EBinop("!=", EIdent(id1), EIdent("true")),ECall(rest,[EIdent("false")]),toCps(e2, rest, exit))), exit);
+				return toCps(e1, fun(id1, mk(EIf(binop("!=", ident(id1,e1), ident("true",e1), e1),call(rest,[ident("false",e1)],e1),toCps(e2, rest, exit)),e)), exit);
 			default:
 				var id1 = "_r" + uid++;
 				var id2 = "_r" + uid++;
-				return toCps(e1, EFunction([ { name:id1, t:null } ], toCps(e2, EFunction([ { name : id2, t : null } ], ECall(rest, [EBinop(op, EIdent(id1), EIdent(id2))])), exit)), exit);
+				return toCps(e1, fun(id1, toCps(e2, fun(id2, call(rest, [binop(op, ident(id1,e1), ident(id2,e2), e)], e)), exit)), exit);
 			}
 		case EIf(cond, e1, e2), ETernary(cond, e1, e2):
-			return toCps(cond, EFunction([ { name : "_c", t : null } ], EIf(EIdent("_c"), toCps(e1, rest, exit), e2 == null ? retNull(rest) : toCps(e2, rest, exit))), exit);
-		case EWhile(cond, e):
+			return toCps(cond, fun("_c", mk(EIf(ident("_c",cond), toCps(e1, rest, exit), e2 == null ? retNull(rest) : toCps(e2, rest, exit)),e)), exit);
+		case EWhile(cond, ewh):
 			var id = ++uid;
-			var loop = EIdent("_loop" + id);
+			var loop = ident("_loop" + id, cond);
 			var oldLoop = currentLoop, oldBreak = currentBreak;
 			currentLoop = loop;
-			currentBreak = EBlock([ECall(rest, [EIdent("null")]), EReturn()]);
-			var ewhile = EBlock([
-				EFunction([{ name : "_r", t : null }],
-					toCps(cond, EFunction([ { name : "_c", t : null } ], EIf(EIdent("_c"), toCps(e, loop, exit), ECall(rest,[EIdent("null")]))), exit)
+			currentBreak = function(e) return block([call(rest, [nullId], e), mk(EReturn(),e)],e);
+			var ewhile = block([
+				fun("_r",
+					toCps(cond, fun("_c", mk(EIf(ident("_c", cond), toCps(ewh, loop, exit), call(rest, [nullId], cond)),cond)), exit)
 				, "_loop"+id),
-				ECall(loop, [EIdent("null")]),
-			]);
+				call(loop, [nullId], cond),
+			],e);
 			currentLoop = oldLoop;
 			currentBreak = oldBreak;
 			return ewhile;
-		case EReturn(e):
-			return e == null ? ECall(exit, [EIdent("null")]) : toCps(e, exit, exit);
+		case EReturn(eret):
+			return eret == null ? call(exit, [nullId], e) : toCps(eret, exit, exit);
 		case EObject(fields):
 			var id = "_o" + uid++;
-			var rest = ECall(rest, [EIdent(id)]);
+			var rest = call(rest, [ident(id,e)], e);
 			fields.reverse();
 			for( f in fields )
-				rest = toCps(f.e, EFunction([ { name : "_r", t : null } ], EBlock([
-					EBinop("=", EField(EIdent(id), f.name), EIdent("_r")),
+				rest = toCps(f.e, fun("_r", block([
+					binop("=", mk(EField(ident(id,f.e), f.name),f.e), ident("_r",f.e), f.e),
 					rest,
-				])),exit);
-			return EBlock([
-				EVar(id, EObject([])),
+				],f.e)),exit);
+			return block([
+				mk(EVar(id, mk(EObject([]),e)),e),
 				rest,
-			]);
+			],e);
 		case EArrayDecl(el):
 			var id = "_a" + uid++;
-			var rest = ECall(rest, [EIdent(id)]);
+			var rest = call(rest, [ident(id,e)], e);
 			var i = el.length - 1;
 			while( i >= 0 ) {
-				rest = toCps(el[i], EFunction([ { name : "_r", t : null } ], EBlock([
-					EBinop("=", EArray(EIdent(id), EConst(CInt(i))), EIdent("_r")),
+				var e = el[i];
+				rest = toCps(e, fun("_r", block([
+					binop("=", mk(EArray(ident(id,e), mk(EConst(CInt(i)),e)),e), ident("_r",e), e),
 					rest,
-				])), exit);
+				],e)), exit);
 				i--;
 			}
-			return EBlock([
-				EVar(id, EArrayDecl([])),
+			return block([
+				mk(EVar(id, mk(EArrayDecl([]),e)),e),
 				rest,
-			]);
-		case EArray(e, eindex):
+			],e);
+		case EArray(earr, eindex):
 			var id1 = "_r" + uid++;
 			var id2 = "_r" + uid++;
-			return toCps(e, EFunction([ { name:id1, t:null } ], toCps(eindex, EFunction([ { name : id2, t : null } ], ECall(rest, [EArray(EIdent(id1), EIdent(id2))])), exit)), exit);
+			return toCps(earr, fun(id1, toCps(eindex, fun(id2, call(rest, [mk(EArray(ident(id1,e), ident(id2,e)),e)], e)), exit)), exit);
 		case EVar(v, t, ev):
 			if( ev == null )
-				return EBlock([e, ECall(rest, [EIdent("null")])]);
-			return EBlock([
-				EVar(v, t),
-				toCps(ev, EFunction([ { name : "_r", t : null } ], EBlock([
-					EBinop("=", EIdent(v), EIdent("_r")),
-					ECall(rest,[EIdent("null")]),
-				])), exit),
-			]);
+				return block([e, call(rest, [nullId],e)], e);
+			return block([
+				mk(EVar(v, t),e),
+				toCps(ev, fun("_r", block([binop("=", ident(v,e), ident("_r",e), e), call(rest,[nullId],e)], e)), exit),
+			],e);
 		case EConst(_), EIdent(_), EUnop(_), EField(_):
-			return ECall(rest, [e]);
+			return call(rest, [e], e);
 		case ENew(cl, args):
 			var names = [for( i in 0...args.length ) "_a"+uid++];
-			var rargs = [for( i in 0...args.length ) EIdent(names[i])];
-			var rest = ECall(rest,[ENew(cl, rargs)]);
+			var rargs = [for( i in 0...args.length ) ident(names[i], args[i])];
+			var rest = call(rest,[mk(ENew(cl, rargs),e)],e);
 			var i = args.length - 1;
 			while( i >= 0 ) {
-				rest = toCps(args[i], EFunction([ { name : names[i], t : null } ], rest), exit);
+				rest = toCps(args[i], fun(names[i], rest), exit);
 				i--;
 			}
 			return rest;
 		case EBreak:
 			if( currentBreak == null ) throw "Break outside loop";
-			return currentBreak;
+			return currentBreak(e);
 		case EContinue:
 			if( currentLoop == null ) throw "Continue outside loop";
-			return EBlock([ECall(currentLoop, [EIdent("null")]), EReturn()]);
+			return block([call(currentLoop, [nullId], e), mk(EReturn(),e)], e);
 		case ESwitch(v, cases, def):
 			var cases = [for( c in cases ) { values : c.values, expr : toCps(c.expr, rest, exit) } ];
-			return toCps(v, EFunction([ { name : "_c", t : null } ], ESwitch(EIdent("_c"), cases, def == null ? retNull(rest) : toCps(def, rest, exit))), exit );
+			return toCps(v, mk(EFunction([ { name : "_c", t : null } ], mk(ESwitch(ident("_c",v), cases, def == null ? retNull(rest) : toCps(def, rest, exit)),e)),e), exit );
 		case EThrow(v):
-			return toCps(v, EFunction([ { name : "_v", t : null } ], EThrow(v)), exit);
+			return toCps(v, mk(EFunction([ { name : "_v", t : null } ], mk(EThrow(v),v)), v), exit);
 		//case EDoWhile(_), ETry(_), ECall(_):
 		default:
 			throw "Unsupported async expression " + Printer.toString(e);
@@ -357,7 +390,7 @@ class Async {
 }
 
 
-class AsyncInterp extends hscript.Interp {
+class AsyncInterp extends Interp {
 
 	public function setContext( api : Dynamic ) {
 
@@ -453,7 +486,7 @@ class AsyncInterp extends hscript.Interp {
 					return result;
 				}
 			}
-			throw o + " has no method " + f;
+			error(ECustom(o + " has no method " + f));
 		}
 		return call(o, m, args);
 	}
