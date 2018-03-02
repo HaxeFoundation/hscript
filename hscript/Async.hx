@@ -59,14 +59,14 @@ class Async {
 
 	public function build( e : Expr, topLevelSync = false ) {
 		if( topLevelSync ) {
-			return buildSync(e);
+			return buildSync(e,null);
 		} else {
 			var nothing = ignore();
 			return new Async().toCps(e, nothing, nothing);
 		}
 	}
 
-	function buildSync( e : Expr ) {
+	function buildSync( e : Expr, exit : Expr ) {
 		switch( e ) {
 		case EFunction(_):
 			return toCps(e, null, null);
@@ -77,7 +77,7 @@ class Async {
 				case EFunction(_, _, name, _) if( name != null ): varNames.push(name);
 				default:
 				}
-			var e = EBlock([for(e in el) buildSync(e)]);
+			var e = EBlock([for(e in el) buildSync(e,exit)]);
 			restoreVars(v);
 			return e;
 		case EMeta("async", _, e):
@@ -90,12 +90,14 @@ class Async {
 			var oldLoop = currentLoop, oldBreak = currentBreak;
 			currentLoop = null;
 			currentBreak = null;
-			e = hscript.Tools.map(e, buildSync);
+			e = hscript.Tools.map(e, buildSync.bind(_, exit));
 			currentLoop = oldLoop;
 			currentBreak = oldBreak;
 			return e;
+		case EReturn(e) if( exit != null ):
+			return EBlock([ECall(exit,[e == null ? EIdent("null") : e]), EReturn()]);
 		default:
-			return hscript.Tools.map(e, buildSync);
+			return hscript.Tools.map(e, buildSync.bind(_, exit));
 		}
 	}
 
@@ -139,9 +141,6 @@ class Async {
 		switch( e ) {
 		case ECall(_), EFunction(_):
 			syncFlag = false;
-		case EReturn(_):
-			// require specific handling to pass it to exit expr
-			syncFlag = false;
 		case EMeta("sync" | "async", _, _):
 			// isolated from the sync part
 		default:
@@ -159,7 +158,7 @@ class Async {
 
 	public function toCps( e : hscript.Expr, rest : hscript.Expr, exit : hscript.Expr ) {
 		if( isSync(e) )
-			return ECall(rest, [buildSync(e)]);
+			return ECall(rest, [buildSync(e, exit)]);
 		switch( e ) {
 		case EBlock(el):
 			var el = el.copy();
@@ -193,7 +192,7 @@ class Async {
 		case EParent(e):
 			return EParent(toCps(e, rest, exit));
 		case EMeta("sync", _, e):
-			return ECall(rest,[buildSync(e)]);
+			return ECall(rest,[buildSync(e,exit)]);
 		case EMeta("async", _, e):
 			var nothing = ignore();
 			return EBlock([toCps(e,nothing,nothing),retNull(rest)]);
