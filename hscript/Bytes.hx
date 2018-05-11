@@ -72,10 +72,7 @@ class Bytes {
 	}
 
 	function doEncodeInt(v: Int) {
-		bout.addByte(v & 0xFF);
-		bout.addByte((v >> 8) & 0xFF);
-		bout.addByte((v >> 16) & 0xFF);
-		bout.addByte(v >>> 24);
+		bout.addInt32(v);
 	}
 
 	function doEncodeConst( c : Const ) {
@@ -107,7 +104,7 @@ class Bytes {
 	}
 
 	function doDecodeInt() {
-		var i = bin.get(pin) | (bin.get(pin+1) << 8) | (bin.get(pin+2) << 16) | (bin.get(pin+3) << 24);
+		var i = bin.getInt32(pin);
 		pin += 4;
 		return i;
 	}
