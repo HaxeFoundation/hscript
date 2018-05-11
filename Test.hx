@@ -152,9 +152,16 @@ class Test extends TestCase {
 	}
 
 	static function main() {
+		#if ((haxe_ver < 4) && php)
+		// uncaught exception: The each() function is deprecated. This message will be suppressed on further calls (errno: 8192)
+		// in file: /Users/travis/build/andyli/hscript/bin/lib/Type.class.php line 178
+		untyped __php__("error_reporting(E_ALL ^ E_DEPRECATED);");
+		#end
+
 		var runner = new TestRunner();
 		runner.add(new Test());
 		var succeed = runner.run();
+
 		#if sys
 			Sys.exit(succeed ? 0 : 1);
 		#elseif flash
