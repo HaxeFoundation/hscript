@@ -44,12 +44,14 @@ install:
   # Install haxelibs
   - if [ "${TRAVIS_HAXE_VERSION}" = "development" ]; then
       haxelib git hxcpp https://github.com/HaxeFoundation/hxcpp.git;
+    else
+      haxelib install hxcpp;
+    fi
+  - if [ "${TRAVIS_HAXE_VERSION}" = "development" ] || [ "${TRAVIS_HAXE_VERSION}" = "3.2.1" ]; then
       pushd $(haxelib path hxcpp | head -1);
         pushd tools/hxcpp; haxe compile.hxml; popd;
         pushd project; neko build.n; popd;
       popd;
-    else
-      haxelib install hxcpp;
     fi
   - haxelib install hxjava
   - haxelib install hxcs
