@@ -7,7 +7,7 @@ import hscript.Printer;
 import haxe.unit.*;
 
 class Test extends TestCase {
-	function assertScript(x,v:Dynamic,?vars : Dynamic,allowTypes=false) {
+	function assertScript(x,v:Dynamic,?vars : Dynamic, allowTypes=false, ?pos:haxe.PosInfos) {
 		var p = new hscript.Parser();
 		p.allowTypes = allowTypes;
 		var program = p.parseString(x);
@@ -18,7 +18,7 @@ class Test extends TestCase {
 			for( v in Reflect.fields(vars) )
 				interp.variables.set(v,Reflect.field(vars,v));
 		var ret : Dynamic = interp.execute(program);
-		assertEquals(v, ret);
+		assertEquals(v, ret, pos);
 	}
 
 	function test():Void {
