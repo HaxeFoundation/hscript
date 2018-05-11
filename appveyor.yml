@@ -5,6 +5,8 @@ environment:
     HAXELIB_ROOT: C:\projects\haxelib
 
 install:
+  # http://help.appveyor.com/discussions/problems/5616-not-able-to-build-due-to-problem-in-chocolateyinstallps1
+  - ps: Set-Service wuauserv -StartupType Manual
   # Install the haxe chocolatey package (https://chocolatey.org/packages/haxe)
   - cinst haxe -version 3.4.7 -y
   - RefreshEnv
