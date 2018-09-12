@@ -150,7 +150,7 @@ class Parser {
 	}
 
 	public function invalidChar(c) {
-		error(EInvalidChar(c), readPos, readPos);
+		error(EInvalidChar(c), readPos-1, readPos-1);
 	}
 
 	function initParser( origin ) {
