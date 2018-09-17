@@ -61,6 +61,7 @@ class Checker {
 	var t_string : TType;
 	var localParams : Map<String,TType>;
 	public var allowAsync : Bool;
+	public var allowReturn : Null<TType>;
 
 	public function new() {
 		types = new Map();
@@ -215,10 +216,8 @@ class Checker {
 			if( t != null ) return t;
 		}
 		var t = resolveType(name,args);
-		if( t == null ) {
-			trace(name);
-			return TUnresolved(name);
-		}
+		if( t == null )
+			return TUnresolved(name); // most likely private class
 		return t;
 	}
 
@@ -226,9 +225,13 @@ class Checker {
 		globals.set(name, type);
 	}
 
-	public function check( expr : Expr ) {
+	public function getGlobals() {
+		return globals;
+	}
+
+	public function check( expr : Expr, isValue = false ) {
 		locals = new Map();
-		return typeExpr(expr);
+		return typeExpr(expr,isValue);
 	}
 
 	inline function edef( e : Expr ) {
@@ -280,10 +283,15 @@ class Checker {
 		}
 	}
 
-	function unify( t1 : TType, t2 : TType, e : Expr ) {
+	function tryUnify( t1 : TType, t2 : TType ) {
 		if( t1 == t2 )
-			return;
-		error(typeStr(t1)+" should be "+typeStr(t2),e);
+			return true;
+		return false;
+	}
+
+	function unify( t1 : TType, t2 : TType, e : Expr ) {
+		if( !tryUnify(t1,t2) )
+			error(typeStr(t1)+" should be "+typeStr(t2),e);
 	}
 
 	function apply( t : TType, params : Array<TType>, args : Array<TType> ) {
@@ -292,7 +300,7 @@ class Checker {
 		return t;
 	}
 
-	function follow( t : TType ) {
+	public function follow( t : TType ) {
 		return switch( t ) {
 		case TType(t,args): apply(t.t, t.params, args);
 		case TNull(t): follow(t);
@@ -325,7 +333,7 @@ class Checker {
 		}
 	}
 
-	function unasync( t : TType ) : TType {
+	public function unasync( t : TType ) : TType {
 		switch( follow(t) ) {
 		case TFun(args, ret) if( args.length > 0 ):
 			var rargs = args.copy();
@@ -338,7 +346,7 @@ class Checker {
 		return null;
 	}
 
-	function typeExpr( expr : Expr ) : TType {
+	function typeExpr( expr : Expr, isValue : Bool = true ) : TType {
 		switch( edef(expr) ) {
 		case EConst(c):
 			return switch (c) {
@@ -361,7 +369,7 @@ class Checker {
 			var t = TVoid;
 			var locals = saveLocals();
 			for( e in el )
-				t = typeExpr(e);
+				t = typeExpr(e, isValue && e == el[el.length-1]);
 			this.locals = locals;
 			return t;
 		case EVar(n, t, init):
@@ -373,7 +381,7 @@ class Checker {
 			locals.set(n, vt);
 			return TVoid;
 		case EParent(e):
-			return typeExpr(e);
+			return typeExpr(e,isValue);
 		case ECall(e, eparams):
 			var ft = typeExpr(e);
 			var params = [for( e in eparams ) typeExpr(e)];
@@ -399,25 +407,63 @@ class Checker {
 			if( ft == null )
 				error(typeStr(ot)+" has no field "+f, expr);
 			return ft;
-		case EBinop(op, e1, e2):
-		case EUnop(op, prefix, e):
-		case EIf(cond, e1, e2):
-		case EWhile(cond, e):
-		case EFor(v, it, e):
+		case EMeta(_, _, e):
+			return typeExpr(e, isValue);
+		case EIf(cond, e1, e2), ETernary(cond, e1, e2):
+			unify(typeExpr(cond), TBool, cond);
+			var t1 = typeExpr(e1);
+			if( e2 == null )
+				return t1;
+			var t2 = typeExpr(e2);
+			if( !isValue )
+				return TVoid;
+			if( tryUnify(t2,t1) )
+				return t1;
+			if( tryUnify(t1,t2) )
+				return t2;
+			unify(t2,t1,e2); // error
+		case EWhile(cond, e), EDoWhile(cond, e):
+			unify(typeExpr(cond), TBool, cond);
+			typeExpr(e);
+			return TVoid;
+		case EObject(fl):
+			return TAnon([for( f in fl ) { t : typeExpr(f.e), opt : false, name : f.name }]);
 		case EBreak, EContinue:
 			return TVoid;
-		case EFunction(args, e, name, ret):
-		case EReturn(e):
-		case EArray(e, index):
-		case EArrayDecl(e):
-		case ENew(cl, params):
+		case EReturn(v):
+			var et = v == null ? TVoid : typeExpr(v);
+			if( allowReturn == null )
+				error("Return not allowed here", expr);
+			else
+				unify(et, allowReturn, v == null ? expr : v);
+			return TDynamic;
+		case EArrayDecl(el):
+			var et = null;
+			for( v in el ) {
+				var t = typeExpr(v);
+				if( et == null ) et = t else if( !tryUnify(t,et) ) {
+					if( tryUnify(et,t) ) et = t else unify(t,et,v);
+				}
+			}
+			if( et == null ) et = TDynamic;
+			return getType("Array",[et]);
+		case EArray(a, index):
+			unify(typeExpr(index), TInt, index);
+			var at = typeExpr(a);
+			switch( follow(at) ) {
+			case TInst({ name : "Array"},[et]): return et;
+			default: error(typeStr(at)+" is not an Array", a);
+			}
 		case EThrow(e):
+			typeExpr(e);
+			return TDynamic;
+		case EBinop(op, e1, e2):
+		case EUnop(op, prefix, e):
+		case EFor(v, it, e):
+		case EFunction(args, e, name, ret):
+		case ENew(cl, params):
 		case ETry(e, v, t, ecatch):
-		case EObject(fl):
-		case ETernary(cond, e1, e2):
 		case ESwitch(e, cases, defaultExpr):
-		case EDoWhile(cond, e):
-		case EMeta(name, args, e):
 		}
 		error("TODO "+edef(expr).getName(), expr);
 	}
