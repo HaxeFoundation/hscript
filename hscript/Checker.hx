@@ -53,15 +53,12 @@ typedef CTypedef = {
 	var t : TType;
 }
 
-class Checker {
+@:allow(hscript.Checker)
+class CheckerTypes {
 
 	var types : Map<String,CTypedecl> = new Map();
-	var locals : Map<String,TType>;
-	var globals : Map<String,TType> = new Map();
 	var t_string : TType;
 	var localParams : Map<String,TType>;
-	public var allowAsync : Bool;
-	public var allowReturn : Null<TType>;
 
 	public function new() {
 		types = new Map();
@@ -98,28 +95,28 @@ class Checker {
 			for( p in c.params )
 				cl.params.push(TParam(p));
 			todo.push(function() {
-				localParams = [for( t in cl.params ) c.path+"."+typeStr(t) => t];
+				localParams = [for( t in cl.params ) c.path+"."+Checker.typeStr(t) => t];
 				if( c.superClass != null )
 					cl.superClass = getType(c.superClass.path, [for( t in c.superClass.params ) makeXmlType(t)]);
 				var pkeys = [];
-				for( f in c.fields )
-					if( !f.isOverride ) {
-						var fl : CField = { isPublic : f.isPublic, params : [], name : f.name, t : null };
-						for( p in f.params ) {
-							var pt = TParam(p);
-							var key = f.name+"."+p;
-							pkeys.push(key);
-							fl.params.push(pt);
-							localParams.set(key, pt);
-						}
-						fl.t = makeXmlType(f.type);
-						while( pkeys.length > 0 )
-							localParams.remove(pkeys.pop());
-						if( fl.name == "new" )
-							cl.constructor = fl;
-						else
-							cl.fields.set(f.name, fl);
+				for( f in c.fields ) {
+					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) continue;
+					var fl : CField = { isPublic : f.isPublic, params : [], name : f.name, t : null };
+					for( p in f.params ) {
+						var pt = TParam(p);
+						var key = f.name+"."+p;
+						pkeys.push(key);
+						fl.params.push(pt);
+						localParams.set(key, pt);
 					}
+					fl.t = makeXmlType(f.type);
+					while( pkeys.length > 0 )
+						localParams.remove(pkeys.pop());
+					if( fl.name == "new" )
+						cl.constructor = fl;
+					else
+						cl.fields.set(f.name, fl);
+				}
 				localParams = null;
 			});
 			types.set(cl.name, CTClass(cl));
@@ -133,7 +130,7 @@ class Checker {
 			for( p in e.params )
 				en.params.push(TParam(p));
 			todo.push(function() {
-				localParams = [for( t in en.params ) e.path+"."+typeStr(t) => t];
+				localParams = [for( t in en.params ) e.path+"."+Checker.typeStr(t) => t];
 				localParams = null;
 			});
 			types.set(en.name, CTEnum(en));
@@ -147,7 +144,7 @@ class Checker {
 			for( p in t.params )
 				td.params.push(TParam(p));
 			todo.push(function() {
-				localParams = [for( pt in td.params ) t.path+"."+typeStr(pt) => pt];
+				localParams = [for( pt in td.params ) t.path+"."+Checker.typeStr(pt) => pt];
 				td.t = makeXmlType(t.type);
 				localParams = null;
 			});
@@ -162,7 +159,7 @@ class Checker {
 			for( p in a.params )
 				td.params.push(TParam(p));
 			todo.push(function() {
-				localParams = [for( t in td.params ) a.path+"."+typeStr(t) => t];
+				localParams = [for( t in td.params ) a.path+"."+Checker.typeStr(t) => t];
 				td.t = makeXmlType(a.athis);
 				localParams = null;
 			});
@@ -194,7 +191,18 @@ class Checker {
 		}
 	}
 
-	public function resolveType( name : String, ?args : Array<TType> ) : TType {
+	function getType( name : String, ?args : Array<TType> ) : TType {
+		if( localParams != null ) {
+			var t = localParams.get(name);
+			if( t != null ) return t;
+		}
+		var t = resolve(name,args);
+		if( t == null )
+			return TUnresolved(name); // most likely private class
+		return t;
+	}
+
+	public function resolve( name : String, ?args : Array<TType> ) : TType {
 		if( name == "Null" ) {
 			if( args == null || args.length != 1 ) throw "Missing Null<T> parameter";
 			return TNull(args[0]);
@@ -210,15 +218,19 @@ class Checker {
 		}
 	}
 
-	function getType( name : String, ?args : Array<TType> ) : TType {
-		if( localParams != null ) {
-			var t = localParams.get(name);
-			if( t != null ) return t;
-		}
-		var t = resolveType(name,args);
-		if( t == null )
-			return TUnresolved(name); // most likely private class
-		return t;
+}
+
+class Checker {
+
+	public var types : CheckerTypes;
+	var locals : Map<String,TType>;
+	var globals : Map<String,TType> = new Map();
+	public var allowAsync : Bool;
+	public var allowReturn : Null<TType>;
+
+	public function new( ?types ) {
+		if( types == null ) types = new CheckerTypes();
+		this.types = types;
 	}
 
 	public function setGlobal( name : String, type : TType ) {
@@ -255,7 +267,7 @@ class Checker {
 	function makeType( t : CType, e : Expr ) : TType {
 		return switch (t) {
 		case CTPath(path, params):
-			var ct = resolveType(path.join("."),[for( p in params ) makeType(t,e)]);
+			var ct = types.resolve(path.join("."),[for( p in params ) makeType(t,e)]);
 			if( ct == null ) error("Unknown type "+path, e);
 			return ct;
 		case CTFun(args, ret):
@@ -268,7 +280,7 @@ class Checker {
 		}
 	}
 
-	public function typeStr( t : TType ) {
+	public static function typeStr( t : TType ) {
 		inline function makeArgs(args:Array<TType>) return args.length==0 ? "" : "<"+[for( a in args ) typeStr(t)].join(",")+">";
 		return switch (t) {
 		case TInst(c, args): c.name + makeArgs(args);
@@ -283,9 +295,35 @@ class Checker {
 		}
 	}
 
+	function typeEq( t1 : TType, t2 : TType ) {
+		if( t1 == t2 )
+			return true;
+		switch( [t1,t2] ) {
+		case [TInst(cl1,pl1), TInst(cl2,pl2)] if( cl1 == cl2 ):
+			for( i in 0...pl1.length )
+				if( !typeEq(pl1[i],pl2[i]) )
+					return false;
+			return true;
+		default:
+		}
+		return false;
+	}
+
 	function tryUnify( t1 : TType, t2 : TType ) {
 		if( t1 == t2 )
 			return true;
+		switch( [t1,t2] ) {
+		case [TInst(cl1,pl1), TInst(cl2,pl2)] if( cl1 == cl2 ):
+			for( i in 0...pl1.length )
+				if( !typeEq(pl1[i],pl2[i]) )
+					return false;
+			return true;
+		case [TType(t1,pl1), _]:
+			return tryUnify(apply(t1.t, t1.params, pl1), t2);
+		case [_,TType(t2,pl2)]:
+			return tryUnify(t1, apply(t2.t, t2.params, pl2));
+		default:
+		}
 		return false;
 	}
 
@@ -352,7 +390,7 @@ class Checker {
 			return switch (c) {
 			case CInt(_): TInt;
 			case CFloat(_): TFloat;
-			case CString(_): t_string;
+			case CString(_): types.t_string;
 			}
 		case EIdent(v):
 			var l = locals.get(v);
@@ -446,7 +484,7 @@ class Checker {
 				}
 			}
 			if( et == null ) et = TDynamic;
-			return getType("Array",[et]);
+			return types.getType("Array",[et]);
 		case EArray(a, index):
 			unify(typeExpr(index), TInt, index);
 			var at = typeExpr(a);
