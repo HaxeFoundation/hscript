@@ -300,6 +300,12 @@ class Printer {
 			}
 			add(" ");
 			expr(e);
+		case ECheckType(e, t):
+			add("(");
+			expr(e);
+			add(" : ");
+			addType(t);
+			add(")");
 		}
 	}
 

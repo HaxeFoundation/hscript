@@ -359,8 +359,31 @@ class Parser {
 			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
 			var e = parseExpr();
-			ensure(TPClose);
-			return parseExprNext(mk(EParent(e),p1,tokenMax));
+			tk = token();
+			switch( tk ) {
+			case TPClose:
+				return parseExprNext(mk(EParent(e),p1,tokenMax));
+			case TDoubleDot:
+				var t = parseType();
+				tk = token();
+				switch( tk ) {
+				case TPClose:
+					return parseExprNext(mk(ECheckType(e,t),p1,tokenMax));
+				case TComma:
+					switch( expr(e) ) {
+					case EIdent(v): return parseLambda([{ name : v, t : t }], pmin(e));
+					default:
+					}
+				default:
+				}
+			case TComma:
+				switch( expr(e) ) {
+				case EIdent(v): return parseLambda([{name:v}], pmin(e));
+				default:
+				}
+			default:
+			}
+			return unexpected(tk);
 		case TBrOpen:
 			tk = token();
 			switch( tk ) {
@@ -448,6 +471,25 @@ class Parser {
 		default:
 			return unexpected(tk);
 		}
+	}
+
+	function parseLambda( args : Array<Argument>, pmin ) {
+		while( true ) {
+			var id = getIdent();
+			var t = maybe(TDoubleDot) ? parseType() : null;
+			args.push({ name : id, t : t });
+			var tk = token();
+			switch( tk ) {
+			case TComma:
+			case TPClose:
+				break;
+			default:
+				unexpected(tk);
+			}
+		}
+		ensureToken(TOp("->"));
+		var eret = parseExpr();
+		return mk(EFunction(args, mk(EReturn(eret),pmin)), pmin);
 	}
 
 	function parseMetaArgs() {
@@ -709,6 +751,21 @@ class Parser {
 		var tk = token();
 		switch( tk ) {
 		case TOp(op):
+
+			if( op == "->" ) {
+				// single arg reinterpretation of `f -> e` , `(f) -> e` and `(f:T) -> e`
+				switch( expr(e1) ) {
+				case EIdent(i), EParent(expr(_) => EIdent(i)):
+					var eret = parseExpr();
+					return mk(EFunction([{ name : i }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+				case ECheckType(expr(_) => EIdent(i), t):
+					var eret = parseExpr();
+					return mk(EFunction([{ name : i, t : t }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+				default:
+				}
+				unexpected(tk);
+			}
+
 			if( unops.get(op) ) {
 				if( isBlock(e1) || switch(expr(e1)) { case EParent(_): true; default: false; } ) {
 					push(tk);

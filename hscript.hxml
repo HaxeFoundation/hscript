@@ -1,1 +1,2 @@
-bin/build-flash.hxml
+bin/build-each.hxml
+-hl bin/Test.hl

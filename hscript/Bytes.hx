@@ -246,6 +246,8 @@ class Bytes {
 			bout.addByte(args == null ? 0 : args.length + 1);
 			if( args != null ) for( e in args ) doEncode(e);
 			doEncode(e);
+		case ECheckType(e,_):
+			doEncode(e);
 		}
 	}
 
@@ -374,6 +376,8 @@ class Bytes {
 			var count = bin.get(pin++);
 			var args = count == 0 ? null : [for( i in 0...count - 1 ) doDecode()];
 			EMeta(name, args, doDecode());
+		case 26:
+			ECheckType(doDecode(), CTPath(["Void"]));
 		case 255:
 			null;
 		default:
