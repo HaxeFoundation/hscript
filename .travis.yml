@@ -8,7 +8,6 @@ sudo: false
 dist: trusty
 
 haxe:
-  - "3.2.1"
   - "3.4.7"
   - development
 
