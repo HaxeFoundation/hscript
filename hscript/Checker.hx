@@ -107,6 +107,13 @@ class CheckerTypes {
 				var pkeys = [];
 				for( f in c.fields ) {
 					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) continue;
+					var skip = false;
+					for( m in f.meta )
+						if( m.name == ":noScript" ) {
+							skip = true;
+							break;
+						}
+					if( skip ) continue;
 					var fl : CField = { isPublic : f.isPublic, params : [], name : f.name, t : null };
 					for( p in f.params ) {
 						var pt = TParam(p);
@@ -403,6 +410,10 @@ class Checker {
 				if( !tryUnify(a2.t, a1.t) ) return false;
 			}
 			return tryUnify(r1,r2);
+		case [_, TDynamic]:
+			return true;
+		case [TDynamic, _]:
+			return true;
 		default:
 		}
 		return false;
@@ -445,9 +456,16 @@ class Checker {
 				if( ft != null ) ft = apply(ft, c.params, args);
 				return ft;
 			}
+			if( !cf.isPublic )
+				error("Can't access private field "+f+" on "+c.name, e);
 			return apply(cf.t, c.params, args);
 		case TDynamic:
-			return TDynamic;
+			return makeMono();
+		case TAnon(fields):
+			for( af in fields )
+				if( af.name == f )
+					return af.t;
+			return null;
 		default:
 			return null;
 		}
@@ -620,14 +638,24 @@ class Checker {
 			if( name != null )
 				locals.set(name, ft);
 			return ft;
+		case EUnop(op, _, e):
+			var et = typeExpr(e, Value);
+			switch( op ) {
+			case "++", "--":
+				unify(et,TInt,e);
+				return et;
+			case "!":
+				unify(et,TBool,e);
+				return et;
+			default:
+			}
 		case EBinop(op, e1, e2):
-		case EUnop(op, prefix, e):
 		case EFor(v, it, e):
 		case ENew(cl, params):
 		case ETry(e, v, t, ecatch):
 		case ESwitch(e, cases, defaultExpr):
 		}
-		error("TODO "+edef(expr).getName(), expr);
+		error("Don't know how to type "+edef(expr).getName(), expr);
 	}
 
 }
