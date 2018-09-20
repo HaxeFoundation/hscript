@@ -164,19 +164,19 @@ class CheckerTypes {
 			types.set(t.path, CTTypedef(td));
 		case TAbstractdecl(a):
 			if( types.exists(a.path) ) return;
-			var td : CTypedef = {
+			var td : CEnum = {
 				name : a.path,
 				params : [],
-				t : null,
+				constructors : new Map(),
 			};
 			for( p in a.params )
 				td.params.push(TParam(p));
 			todo.push(function() {
 				localParams = [for( t in td.params ) a.path+"."+Checker.typeStr(t) => t];
-				td.t = makeXmlType(a.athis);
+				//td.t = makeXmlType(a.athis);
 				localParams = null;
 			});
-			types.set(a.path, CTTypedef(td));
+			types.set(a.path, CTEnum(td));
 		}
 	}
 
@@ -238,6 +238,7 @@ class Checker {
 	public var types : CheckerTypes;
 	var locals : Map<String,TType>;
 	var globals : Map<String,TType> = new Map();
+	var events : Map<String,TType> = new Map();
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 
@@ -248,6 +249,10 @@ class Checker {
 
 	public function setGlobal( name : String, type : TType ) {
 		globals.set(name, type);
+	}
+
+	public function setEvent( name : String, type : TType ) {
+		events.set(name, type);
 	}
 
 	public function getGlobals() {
@@ -295,7 +300,7 @@ class Checker {
 	}
 
 	public static function typeStr( t : TType ) {
-		inline function makeArgs(args:Array<TType>) return args.length==0 ? "" : "<"+[for( a in args ) typeStr(t)].join(",")+">";
+		inline function makeArgs(args:Array<TType>) return args.length==0 ? "" : "<"+[for( t in args ) typeStr(t)].join(",")+">";
 		return switch (t) {
 		case TMono(r): r.r == null ? "Unknown" : typeStr(r.r);
 		case TInst(c, args): c.name + makeArgs(args);
@@ -310,18 +315,61 @@ class Checker {
 		}
 	}
 
+	function linkLoop( a : TType, t : TType ) {
+		if( t == a ) return true;
+		switch( t ) {
+		case TMono(r):
+			if( r.r == null ) return false;
+			return linkLoop(a,r.r);
+		case TEnum(_,tl), TInst(_,tl), TType(_,tl):
+			for( t in tl )
+				if( linkLoop(a,t) )
+					return true;
+			return false;
+		case TFun(args,ret):
+			for( arg in args )
+				if( linkLoop(a,arg.t) )
+					return true;
+			return linkLoop(a,ret);
+		case TDynamic:
+			if( t == TDynamic )
+				return false;
+			return linkLoop(a,TDynamic);
+		case TAnon(fl):
+			for( f in fl )
+				if( linkLoop(a, f.t) )
+					return true;
+			return false;
+		default:
+			return false;
+		}
+	}
+
+	function link( a : TType, b : TType, r : { r : TType } ) {
+		if( linkLoop(a,b) )
+			return follow(b) == a;
+		if( b == TDynamic )
+			return true;
+		r.r = b;
+		return true;
+	}
+
 	function typeEq( t1 : TType, t2 : TType ) {
 		if( t1 == t2 )
 			return true;
 		switch( [t1,t2] ) {
 		case [TMono(r), _]:
 			if( r.r == null ) {
+				if( !link(t1,t2,r) )
+					return false;
 				r.r = t2;
 				return true;
 			}
 			return typeEq(r.r, t2);
 		case [_, TMono(r)]:
 			if( r.r == null ) {
+				if( !link(t2,t1,r) )
+					return false;
 				r.r = t1;
 				return true;
 			}
@@ -374,12 +422,16 @@ class Checker {
 		switch( [t1,t2] ) {
 		case [TMono(r), _]:
 			if( r.r == null ) {
+				if( !link(t1,t2,r) )
+					return false;
 				r.r = t2;
 				return true;
 			}
 			return tryUnify(r.r, t2);
 		case [_, TMono(r)]:
 			if( r.r == null ) {
+				if( !link(t2,t1,r) )
+					return false;
 				r.r = t1;
 				return true;
 			}
@@ -414,6 +466,19 @@ class Checker {
 			return true;
 		case [TDynamic, _]:
 			return true;
+		case [TAnon(a1),TAnon(a2)]:
+			var m = new Map();
+			for( f in a1 )
+				m.set(f.name, f);
+			for( f2 in a2 ) {
+				var f1 = m.get(f2.name);
+				if( f1 == null ) return false;
+				if( !typeEq(f1.t,f2.t) )
+					return false;
+			}
+			return true;
+		case [TInt, TFloat]:
+			return true;
 		default:
 		}
 		return false;
@@ -437,6 +502,27 @@ class Checker {
 		case TNull(t): follow(t);
 		default: t;
 		}
+	}
+
+	public function getFields( t : TType ) {
+		var fields = [];
+		while( t != null ) {
+			t = follow(t);
+			switch( t ) {
+			case TInst(c, args):
+				for( fname in c.fields.keys() ) {
+					var f = c.fields.get(fname);
+					fields.push({ name : f.name, t : f.t });
+				}
+				t = c.superClass;
+			case TAnon(fl):
+				for( f in fl )
+					fields.push({ name : f.name, t : f.t });
+				break;
+			default:
+			}
+		}
+		return fields;
 	}
 
 	function getField( t : TType, f : String, e : Expr ) {
@@ -492,6 +578,23 @@ class Checker {
 
 	function makeMono() {
 		return TMono({r:null});
+	}
+
+	function makeIterator(t) : TType {
+		return TAnon([{ name : "next", opt : false, t : TFun([],t) }, { name : "hasNext", opt : false, t : TFun([],TBool) }]);
+	}
+
+	function mk(e,p) : Expr {
+		#if hscriptPos
+		return { e : e, pmin : p.pmin, pmax : p.pmax, origin : p.origin, line : p.line };
+		#else
+		return e;
+		#end
+	}
+
+	function isString( t : TType ) {
+		t = follow(t);
+		return t.match(TInst({name:"String"},_));
 	}
 
 	function typeExpr( expr : Expr, withType : WithType ) : TType {
@@ -619,8 +722,12 @@ class Checker {
 			var oldRet = allowReturn;
 			allowReturn = tret;
 			var withArgs = null;
+			if( name != null && !withType.match(WithType(follow(_) => TFun(_))) ) {
+				var ev = events.get(name);
+				if( ev != null ) withType = WithType(ev);
+			}
 			switch( withType ) {
-			case WithType(TFun(args, ret)): withArgs = args; unify(tret,ret,expr);
+			case WithType(follow(_) => TFun(args,ret)): withArgs = args; unify(tret,ret,expr);
 			default:
 			}
 			var targs = [for( i in 0...args.length ) {
@@ -631,6 +738,7 @@ class Checker {
 				this.locals.set(a.name, at);
 				{ name : a.name, opt : a.opt, t : at };
 			}];
+
 			typeExpr(body,NoValue);
 			allowReturn = oldRet;
 			this.locals = locals;
@@ -649,8 +757,96 @@ class Checker {
 				return et;
 			default:
 			}
-		case EBinop(op, e1, e2):
 		case EFor(v, it, e):
+			var locals = saveLocals();
+			var itt = typeExpr(it, Value);
+			var vt = switch( follow(itt) ) {
+			case TInst({name:"Array"},[t]):
+				t;
+			default:
+				var t = makeMono();
+				var iter = makeIterator(t);
+				unify(itt,iter,it);
+				t;
+			}
+			this.locals.set(v, vt);
+			typeExpr(e, Value);
+			this.locals = locals;
+			return TVoid;
+		case EBinop(op, e1, e2):
+			switch( op ) {
+			case "&", "|", "^", ">>", ">>>", "<<":
+				typeExprWith(e1,TInt);
+				typeExprWith(e2,TInt);
+				return TInt;
+			case "=":
+				var vt = typeExpr(e1, Value);
+				typeExprWith(e2,vt);
+				return vt;
+			case "+":
+				var t1 = typeExpr(e1,WithType(TInt));
+				var t2 = typeExpr(e2,WithType(t1));
+				tryUnify(t1,t2);
+				switch( [follow(t1), follow(t2)]) {
+				case [TInt, TInt]:
+					return TInt;
+				case [TFloat, TInt], [TInt, TFloat], [TFloat, TFloat]:
+					return TFloat;
+				case [TDynamic, _], [_, TDynamic]:
+					return TDynamic;
+				case [t1,t2]:
+					if( isString(t1) || isString(t2) )
+						return types.t_string;
+					unify(t1, TFloat, e1);
+					unify(t2, TFloat, e2);
+				}
+			case "-", "*", "/":
+				var t1 = typeExpr(e1,WithType(TInt));
+				var t2 = typeExpr(e2,WithType(t1));
+				if( !tryUnify(t1,t2) )
+					unify(t2,t1,e2);
+				switch( [follow(t1), follow(t2)]) {
+				case [TInt, TInt]:
+					if( op == "/" ) return TFloat;
+					return TInt;
+				case [TFloat|TDynamic, TInt|TDynamic], [TInt|TDynamic, TFloat|TDynamic], [TFloat, TFloat]:
+					return TFloat;
+				default:
+					unify(t1, TFloat, e1);
+					unify(t2, TFloat, e2);
+				}
+			case "&&", "||":
+				typeExprWith(e1,TBool);
+				typeExprWith(e2,TBool);
+				return TBool;
+			case "...":
+				typeExprWith(e1,TInt);
+				typeExprWith(e2,TInt);
+				return makeIterator(TInt);
+			case "==", "!=":
+				var t1 = typeExpr(e1,Value);
+				var t2 = typeExpr(e2,WithType(t1));
+				if( !tryUnify(t1,t2) )
+					unify(t2,t1,e2);
+				return TBool;
+			case ">", "<", ">=", "<=":
+				var t1 = typeExpr(e1,Value);
+				var t2 = typeExpr(e2,WithType(t1));
+				if( !tryUnify(t1,t2) )
+					unify(t2,t1,e2);
+				switch( follow(t1) ) {
+				case TInt, TFloat, TBool, TInst({name:"String"},_):
+				default:
+					error("Cannot compare "+typeStr(t1), expr);
+				}
+				return TBool;
+			default:
+				if( op.charCodeAt(op.length-1) == "=".code ) {
+					var t = typeExpr(mk(EBinop(op.substr(0,op.length-1),e1,e2),expr),withType);
+					return typeExpr(mk(EBinop("=",e1,e2),expr), withType);
+				}
+				error("Unsupported operation "+op, expr);
+			}
 		case ENew(cl, params):
 		case ETry(e, v, t, ecatch):
 		case ESwitch(e, cases, defaultExpr):
