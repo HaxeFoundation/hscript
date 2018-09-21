@@ -122,7 +122,7 @@ class Interp {
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
-		switch( edef(e1) ) {
+		switch( Tools.expr(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			if( l == null )
@@ -154,7 +154,7 @@ class Interp {
 
 	function evalAssignOp(op,fop,e1,e2) : Dynamic {
 		var v;
-		switch( edef(e1) ) {
+		switch( Tools.expr(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			v = fop(expr(e1),expr(e2));
@@ -280,14 +280,6 @@ class Interp {
 		}
 	}
 
-	inline function edef( e : Expr ) {
-		#if hscriptPos
-		return e.e;
-		#else
-		return e;
-		#end
-	}
-
 	inline function error(e : #if hscriptPos ErrorDef #else Error #end, rethrow=false ) : Dynamic {
 		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
 		if( rethrow ) this.rethrow(e) else throw e;
@@ -372,7 +364,7 @@ class Interp {
 			for( p in params )
 				args.push(expr(p));
 
-			switch( edef(e) ) {
+			switch( Tools.expr(e) ) {
 			case EField(e,f):
 				var obj = expr(e);
 				if( obj == null ) error(EInvalidAccess(f));
@@ -468,7 +460,7 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			if (arr.length > 0 && edef(arr[0]).match(EBinop("=>", _))) {
+			if (arr.length > 0 && Tools.expr(arr[0]).match(EBinop("=>", _))) {
 				var isAllString:Bool = true;
 				var isAllInt:Bool = true;
 				var isAllObject:Bool = true;
@@ -476,7 +468,7 @@ class Interp {
 				var keys:Array<Dynamic> = [];
 				var values:Array<Dynamic> = [];
 				for (e in arr) {
-					switch(edef(e)) {
+					switch(Tools.expr(e)) {
 						case EBinop("=>", eKey, eValue): {
 							var key:Dynamic = expr(eKey);
 							var value:Dynamic = expr(eValue);

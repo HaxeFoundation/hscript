@@ -40,6 +40,7 @@ typedef Expr = {
 }
 enum ExprDef {
 #else
+typedef ExprDef = Expr;
 enum Expr {
 #end
 	EConst( c : Const );
