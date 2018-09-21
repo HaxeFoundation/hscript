@@ -14,6 +14,7 @@ enum TType {
 	TInst( c : CClass, args : Array<TType> );
 	TEnum( e : CEnum, args : Array<TType> );
 	TType( t : CTypedef, args : Array<TType> );
+	TAbstract( t : CAbstract, args : Array<TType> );
 	TFun( args : Array<{ name : String, opt : Bool, t : TType }>, ret : TType );
 	TAnon( fields : Array<{ name : String, opt : Bool, t : TType }> );
 }
@@ -29,11 +30,15 @@ enum CTypedecl {
 	CTEnum( e : CEnum );
 	CTTypedef( t : CTypedef );
 	CTAlias( t : TType );
+	CTAbstract( a : CAbstract );
 }
 
-typedef CClass = {
+typedef CNamedType = {
 	var name : String;
 	var params : Array<TType>;
+}
+
+typedef CClass = {> CNamedType,
 	@:optional var superClass : TType;
 	@:optional var constructor : CField;
 	var fields : Map<String,CField>;
@@ -47,16 +52,15 @@ typedef CField = {
 	var t : TType;
 }
 
-typedef CEnum = {
-	var name : String;
-	var params : Array<TType>;
+typedef CEnum = {> CNamedType,
 	var constructors : Map<String,TType>;
 }
 
-typedef CTypedef = {
-	var name : String;
-	var params : Array<TType>;
+typedef CTypedef = {> CNamedType,
 	var t : TType;
+}
+
+typedef CAbstract = {> CNamedType,
 }
 
 @:allow(hscript.Checker)
@@ -164,19 +168,17 @@ class CheckerTypes {
 			types.set(t.path, CTTypedef(td));
 		case TAbstractdecl(a):
 			if( types.exists(a.path) ) return;
-			var td : CEnum = {
+			var ta : CAbstract = {
 				name : a.path,
 				params : [],
-				constructors : new Map(),
 			};
 			for( p in a.params )
-				td.params.push(TParam(p));
+				ta.params.push(TParam(p));
 			todo.push(function() {
-				localParams = [for( t in td.params ) a.path+"."+Checker.typeStr(t) => t];
-				//td.t = makeXmlType(a.athis);
+				localParams = [for( t in ta.params ) a.path+"."+Checker.typeStr(t) => t];
 				localParams = null;
 			});
-			types.set(a.path, CTEnum(td));
+			types.set(a.path, CTAbstract(ta));
 		}
 	}
 
@@ -227,6 +229,7 @@ class CheckerTypes {
 		case CTClass(c): TInst(c,args);
 		case CTEnum(e): TEnum(e,args);
 		case CTTypedef(t): TType(t,args);
+		case CTAbstract(a): TAbstract(a, args);
 		case CTAlias(t): t;
 		}
 	}
@@ -306,6 +309,7 @@ class Checker {
 		case TInst(c, args): c.name + makeArgs(args);
 		case TEnum(e, args): e.name + makeArgs(args);
 		case TType(t, args): t.name + makeArgs(args);
+		case TAbstract(a, args): a.name + makeArgs(args);
 		case TFun(args, ret): "(" + [for( a in args ) (a.opt?"?":"")+(a.name == "" ? "" : a.name+":")+typeStr(a.t)].join(", ")+") -> "+typeStr(ret);
 		case TAnon(fields): "{" + [for( f in fields ) (f.opt?"?":"")+f.name+":"+typeStr(f.t)].join(", ")+"}";
 		case TParam(name): name;
@@ -321,7 +325,7 @@ class Checker {
 		case TMono(r):
 			if( r.r == null ) return false;
 			return linkLoop(a,r.r);
-		case TEnum(_,tl), TInst(_,tl), TType(_,tl):
+		case TEnum(_,tl), TInst(_,tl), TType(_,tl), TAbstract(_,tl):
 			for( t in tl )
 				if( linkLoop(a,t) )
 					return true;
@@ -393,6 +397,11 @@ class Checker {
 				if( !typeEq(pl1[i],pl2[i]) )
 					return false;
 			return true;
+		case [TAbstract(a1,pl1), TAbstract(a2,pl2)] if( a1 == a2 ):
+			for( i in 0...pl1.length )
+				if( !typeEq(pl1[i],pl2[i]) )
+					return false;
+			return true;
 		case [TNull(t1), TNull(t2)]:
 			return typeEq(t1,t2);
 		case [TFun(args1,r1), TFun(args2,r2)] if( args1.length == args2.length ):
@@ -440,16 +449,6 @@ class Checker {
 			return tryUnify(apply(t1.t, t1.params, pl1), t2);
 		case [_,TType(t2,pl2)]:
 			return tryUnify(t1, apply(t2.t, t2.params, pl2));
-		case [TInst(cl1,pl1), TInst(cl2,pl2)] if( cl1 == cl2 ):
-			for( i in 0...pl1.length )
-				if( !typeEq(pl1[i],pl2[i]) )
-					return false;
-			return true;
-		case [TEnum(e1,pl1), TEnum(e2,pl2)] if( e1 == e2 ):
-			for( i in 0...pl1.length )
-				if( !typeEq(pl1[i],pl2[i]) )
-					return false;
-			return true;
 		case [TNull(t1), _]:
 			return tryUnify(t1,t2);
 		case [_, TNull(t2)]:
@@ -479,9 +478,11 @@ class Checker {
 			return true;
 		case [TInt, TFloat]:
 			return true;
+		case [TFun(_), TAbstract({ name : "haxe.Function" },_)]:
+			return true;
 		default:
 		}
-		return false;
+		return typeEq(t1,t2);
 	}
 
 	function unify( t1 : TType, t2 : TType, e : Expr ) {
