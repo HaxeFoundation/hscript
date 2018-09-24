@@ -61,7 +61,7 @@ class Tools {
 	}
 
 	public static function map( e : Expr, f : Expr -> Expr ) {
-		var edef = switch( e.e ) {
+		var edef = switch( expr(e) ) {
 		case EConst(_), EIdent(_), EBreak, EContinue: expr(e);
 		case EVar(n, t, e): EVar(n, t, if( e != null ) f(e) else null);
 		case EParent(e): EParent(f(e));
