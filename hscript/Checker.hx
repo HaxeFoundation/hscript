@@ -476,6 +476,20 @@ class Checker {
 					return false;
 			}
 			return true;
+		case [TInst(cl1,pl1), TInst(cl2,pl2)]:
+			while( cl1 != cl2 ) {
+				switch( cl1.superClass ) {
+				case null: return false;
+				case TInst(c, args):
+					pl1 = [for( a in args ) apply(a,cl1.params,pl1)];
+					cl1 = c;
+				default: throw "assert";
+				}
+			}
+			for( i in 0...pl1.length )
+				if( !typeEq(pl1[i],pl2[i]) )
+					return false;
+			return true;
 		case [TInt, TFloat]:
 			return true;
 		case [TFun(_), TAbstract({ name : "haxe.Function" },_)]:
@@ -533,7 +547,8 @@ class Checker {
 			if( cf == null && allowAsync ) {
 				cf = c.fields.get("a_"+f);
 				if( cf != null ) {
-					cf = { isPublic : cf.isPublic, params : cf.params, name : cf.name, t : unasync(cf.t) };
+					var isPublic = true; // consider a_ prefixed as script specific
+					cf = { isPublic : isPublic, params : cf.params, name : cf.name, t : unasync(cf.t) };
 					if( cf.t == null ) cf = null;
 				}
 			}
@@ -616,9 +631,16 @@ class Checker {
 				if( g != null ) g = unasync(g);
 				if( g != null ) return g;
 			}
-			if( v == "null" )
+			switch( v ) {
+			case "null":
 				return makeMono();
-			error("Unknown identifier "+v, expr);
+			case "true", "false":
+				return TBool;
+			case "trace":
+				return TDynamic;
+			default:
+				error("Unknown identifier "+v, expr);
+			}
 		case EBlock(el):
 			var t = TVoid;
 			var locals = saveLocals();
