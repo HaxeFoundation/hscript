@@ -1,6 +1,12 @@
 package hscript;
 import hscript.Expr;
 
+/**
+	This is a special type that can be used in API.
+	It will be type-checked as `Script` but will compile/execute as `Real`
+**/
+typedef TypeCheck<Real,Script> = Real;
+
 enum TType {
 	TMono( r : { r : TType } );
 	TVoid;
@@ -160,6 +166,8 @@ class CheckerTypes {
 			};
 			for( p in t.params )
 				td.params.push(TParam(p));
+			if( t.path == "hscript.TypeCheck" )
+				td.params.reverse();
 			todo.push(function() {
 				localParams = [for( pt in td.params ) t.path+"."+Checker.typeStr(pt) => pt];
 				td.t = makeXmlType(t.type);
@@ -404,6 +412,10 @@ class Checker {
 			return true;
 		case [TNull(t1), TNull(t2)]:
 			return typeEq(t1,t2);
+		case [TNull(t1), _]:
+			return typeEq(t1,t2);
+		case [_, TNull(t2)]:
+			return typeEq(t1,t2);
 		case [TFun(args1,r1), TFun(args2,r2)] if( args1.length == args2.length ):
 			for( i in 0...args1.length )
 				if( !typeEq(args1[i].t, args2[i].t) )
@@ -471,7 +483,10 @@ class Checker {
 				m.set(f.name, f);
 			for( f2 in a2 ) {
 				var f1 = m.get(f2.name);
-				if( f1 == null ) return false;
+				if( f1 == null ) {
+					if( f2.opt ) continue;
+					return false;
+				}
 				if( !typeEq(f1.t,f2.t) )
 					return false;
 			}
@@ -744,7 +759,17 @@ class Checker {
 			typeExpr(e, NoValue);
 			return TVoid;
 		case EObject(fl):
-			return TAnon([for( f in fl ) { t : typeExpr(f.e, Value), opt : false, name : f.name }]);
+			switch( withType ) {
+			case WithType(follow(_) => TAnon(tfields)):
+				var map = [for( f in tfields ) f.name => f];
+				return TAnon([for( f in fl ) {
+					var ft = map.get(f.name);
+					if( ft == null ) error("Extra field "+f.name, f.e);
+					{ t : typeExprWith(f.e, ft.t), opt : false, name : f.name }
+				}]);
+			default:
+				return TAnon([for( f in fl ) { t : typeExpr(f.e, Value), opt : false, name : f.name }]);
+			}
 		case EBreak, EContinue:
 			return TVoid;
 		case EReturn(v):
@@ -858,7 +883,7 @@ class Checker {
 					unify(t1, TFloat, e1);
 					unify(t2, TFloat, e2);
 				}
-			case "-", "*", "/":
+			case "-", "*", "/", "%":
 				var t1 = typeExpr(e1,WithType(TInt));
 				var t2 = typeExpr(e2,WithType(t1));
 				if( !tryUnify(t1,t2) )
