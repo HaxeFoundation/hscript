@@ -2,7 +2,7 @@ package hscript;
 import hscript.Expr;
 
 enum TType {
-	TMono( t : { r : TType } );
+	TMono( r : { r : TType } );
 	TVoid;
 	TInt;
 	TFloat;
@@ -14,7 +14,7 @@ enum TType {
 	TInst( c : CClass, args : Array<TType> );
 	TEnum( e : CEnum, args : Array<TType> );
 	TType( t : CTypedef, args : Array<TType> );
-	TAbstract( t : CAbstract, args : Array<TType> );
+	TAbstract( a : CAbstract, args : Array<TType> );
 	TFun( args : Array<{ name : String, opt : Bool, t : TType }>, ret : TType );
 	TAnon( fields : Array<{ name : String, opt : Bool, t : TType }> );
 }
@@ -506,8 +506,43 @@ class Checker {
 
 	function apply( t : TType, params : Array<TType>, args : Array<TType> ) {
 		if( args.length != params.length ) throw "Invalid number of type parameters";
-		if( args.length != 0 ) throw "TODO";
-		return t;
+		if( args.length == 0 )
+			return t;
+		var subst = new Map();
+		for( i in 0...params.length )
+			subst.set(params[i], args[i]);
+		function map(t:TType) {
+			var st = subst.get(t);
+			if( st != null ) return st;
+			return mapType(t,map);
+		}
+		return map(t);
+	}
+
+	public function mapType( t : TType, f : TType -> TType ) {
+		switch (t) {
+		case TMono(r):
+			if( r.r == null ) return t;
+			return f(t);
+		case TVoid, TInt, TFloat,TBool,TDynamic,TParam(_), TUnresolved(_):
+			return t;
+		case TEnum(_,[]), TInst(_,[]), TAbstract(_,[]), TType(_,[]):
+			return t;
+		case TNull(t):
+			return TNull(f(t));
+		case TInst(c, args):
+			return TInst(c, [for( t in args ) f(t)]);
+		case TEnum(e, args):
+			return TEnum(e, [for( t in args ) f(t)]);
+		case TType(t, args):
+			return TType(t, [for( t in args ) f(t)]);
+		case TAbstract(a, args):
+			return TAbstract(a, [for( t in args ) f(t)]);
+		case TFun(args, ret):
+			return TFun([for( a in args ) { name : a.name, opt : a.opt, t : f(a.t) }], f(ret));
+		case TAnon(fields):
+			return TAnon([for( af in fields ) { name : af.name, opt : af.opt, t : f(af.t) }]);
+		}
 	}
 
 	public function follow( t : TType ) {
