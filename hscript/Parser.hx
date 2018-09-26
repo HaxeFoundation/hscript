@@ -904,7 +904,16 @@ class Parser {
 			
 			push(b); 
 			push(a);
-			
+
+			function withReturn(args) {
+				switch token() { // I think it wouldn't hurt if ensure used enumEq
+					case TOp('->'): 
+					case t: unexpected(t);
+				}
+
+				return CTFun(args, parseType());
+			}
+
 			switch [a, b] {
 				case [TPClose, _] | [TId(_), TDoubleDot]:
 					
@@ -918,18 +927,24 @@ class Parser {
 						CTNamed(arg.name, if (arg.opt) CTOpt(arg.t) else arg.t);
 					}];
 
-					switch token() { // I think it wouldn't hurt if ensure used enumEq
-						case TOp('->'): 
-						case t: unexpected(t);
-					}
-
-					return CTFun(args, parseType());
-
+					return withReturn(args);
 				default:
 					
 					var t = parseType();
-					ensure(TPClose);
-					return parseTypeNext(CTParent(t));
+					return switch token() {
+						case TComma:
+							var args = [t];
+							
+							while (true) {
+								args.push(parseType());
+								if (!maybe(TComma)) break;
+							}
+							ensure(TPClose);
+							withReturn(args);
+						case TPClose:
+							parseTypeNext(CTParent(t));
+						case t: unexpected(t);
+					}
 			}
 		case TBrOpen:
 			var fields = [];
