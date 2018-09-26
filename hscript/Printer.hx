@@ -62,7 +62,6 @@ class Printer {
 				}
 				add(">");
 			}
-		#if (haxe_ver >= 4)
 		case CTNamed(name, t):
 			add(name);
 			add(':');
@@ -76,7 +75,6 @@ class Printer {
 				}
 			add(')->');
 			type(ret);
-		#end
 		case CTFun(args, ret):
 			if( args.length == 0 )
 				add("Void -> ");
