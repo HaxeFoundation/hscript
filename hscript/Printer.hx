@@ -48,6 +48,9 @@ class Printer {
 
 	function type( t : CType ) {
 		switch( t ) {
+		case CTOpt(t): 
+			add('?');
+			type(t);
 		case CTPath(path, params):
 			add(path.join("."));
 			if( params != null ) {
@@ -59,6 +62,21 @@ class Printer {
 				}
 				add(">");
 			}
+		#if (haxe_ver >= 4)
+		case CTNamed(name, t):
+			add(name);
+			add(':');
+			type(t);
+		case CTFun(args, ret) if (Lambda.exists(args, function (a) return a.match(CTNamed(_, _)))):
+			add('(');
+			for (a in args)
+				switch a {
+					case CTNamed(_, _): type(a);
+					default: type(CTNamed('_', a));
+				}
+			add(')->');
+			type(ret);
+		#end
 		case CTFun(args, ret):
 			if( args.length == 0 )
 				add("Void -> ");

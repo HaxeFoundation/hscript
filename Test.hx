@@ -105,6 +105,9 @@ class Test extends TestCase {
 		assertScript("var f = (x,y) -> x + y; f(3,1)", 4);
 		assertScript("var f = (x,y:Int) -> x + y; f(3,1)", 4);
 		assertScript("var f = (x:Int,y:Int) -> x + y; f(3,1)", 4);
+		assertScript("var f:Int->Int->Int = (x:Int,y:Int) -> x + y; f(3,1)", 4, null, true);
+		assertScript("var f:(x:Int, y:Int)->Int = (x:Int,y:Int) -> x + y; f(3,1)", 4, null, true);
+		assertScript("var f:(x:Int)->(y:Int, z:Int)->Int = (x:Int) -> (y:Int, z:Int) -> x + y + z; f(3)(1, 2)", 6, null, true);
 	}
 
 	function testMap():Void {

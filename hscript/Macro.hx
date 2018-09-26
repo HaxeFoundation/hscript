@@ -113,6 +113,7 @@ class Macro {
 
 	function convertType( t : Expr.CType ) : ComplexType {
 		return switch( t ) {
+		case CTOpt(t): TOptional(convertType(t));
 		case CTPath(pack, args):
 			var params = [];
 			if( args != null )
@@ -127,6 +128,10 @@ class Macro {
 		case CTParent(t): TParent(convertType(t));
 		case CTFun(args, ret):
 			TFunction(map(args,convertType), convertType(ret));
+		#if (haxe_ver >= 4)
+		case CTNamed(name, ct):
+			TNamed(name, convertType(ct));
+		#end
 		case CTAnon(fields):
 			var tf = [];
 			for( f in fields ) {
