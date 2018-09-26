@@ -128,10 +128,12 @@ class Macro {
 		case CTParent(t): TParent(convertType(t));
 		case CTFun(args, ret):
 			TFunction(map(args,convertType), convertType(ret));
-		#if (haxe_ver >= 4)
-		case CTNamed(name, ct):
-			TNamed(name, convertType(ct));
-		#end
+		case CTNamed(name, convertType(_) => ct):
+			#if (haxe_ver >= 4)
+				TNamed(name, ct);
+			#else
+				ct;
+			#end
 		case CTAnon(fields):
 			var tf = [];
 			for( f in fields ) {
