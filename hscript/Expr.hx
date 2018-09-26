@@ -81,6 +81,8 @@ enum CType {
 	CTFun( args : Array<CType>, ret : CType );
 	CTAnon( fields : Array<{ name : String, t : CType, ?meta : Metadata }> );
 	CTParent( t : CType );
+	CTOpt( t : CType );
+	CTNamed( n : String, t : CType );
 }
 
 #if hscriptPos

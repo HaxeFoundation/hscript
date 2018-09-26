@@ -794,8 +794,7 @@ class Parser {
 		}
 	}
 
-	function parseFunctionDecl() {
-		ensure(TPOpen);
+	function parseFunctionArgs() {
 		var args = new Array();
 		var tk = token();
 		if( tk != TPClose ) {
@@ -831,10 +830,16 @@ class Parser {
 					unexpected(tk);
 				}
 			}
-		}
+		}	
+		return args;	
+	}
+
+	function parseFunctionDecl() {
+		ensure(TPOpen);
+		var args = parseFunctionArgs();
 		var ret = null;
 		if( allowTypes ) {
-			tk = token();
+			var tk = token();
 			if( tk != TDoubleDot )
 				push(tk);
 			else
@@ -894,9 +899,53 @@ class Parser {
 			}
 			return parseTypeNext(CTPath(path, params));
 		case TPOpen:
-			var t = parseType();
-			ensure(TPClose);
-			return parseTypeNext(CTParent(t));
+			var a = token(),
+					b = token();
+			
+			push(b); 
+			push(a);
+
+			function withReturn(args) {
+				switch token() { // I think it wouldn't hurt if ensure used enumEq
+					case TOp('->'): 
+					case t: unexpected(t);
+				}
+
+				return CTFun(args, parseType());
+			}
+
+			switch [a, b] {
+				case [TPClose, _] | [TId(_), TDoubleDot]:
+					
+					var args = [for (arg in parseFunctionArgs()) {
+						switch arg.value {
+							case null:
+							case v:
+								error(ECustom('Default values not allowed in function types'), #if hscriptPos v.pmin, v.pmax #else 0, 0 #end);
+						}
+
+						CTNamed(arg.name, if (arg.opt) CTOpt(arg.t) else arg.t);
+					}];
+
+					return withReturn(args);
+				default:
+					
+					var t = parseType();
+					return switch token() {
+						case TComma:
+							var args = [t];
+							
+							while (true) {
+								args.push(parseType());
+								if (!maybe(TComma)) break;
+							}
+							ensure(TPClose);
+							withReturn(args);
+						case TPClose:
+							parseTypeNext(CTParent(t));
+						case t: unexpected(t);
+					}
+			}
 		case TBrOpen:
 			var fields = [];
 			var meta = null;
