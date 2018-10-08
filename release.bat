@@ -1,4 +1,5 @@
 @echo off
+set PATH="C:\Program Files\7-Zip";%PATH%
 rm -rf release
 mkdir release
 cp haxelib.json README.md extraParams.hxml release
