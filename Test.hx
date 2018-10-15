@@ -4,6 +4,7 @@ import hscript.Macro;
 import hscript.Tools;
 import hscript.Async;
 import hscript.Printer;
+import hscript.Checker;
 import haxe.unit.*;
 
 class Test extends TestCase {
