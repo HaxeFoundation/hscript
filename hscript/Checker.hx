@@ -307,6 +307,12 @@ class Checker {
 			return TAnon([for( f in fields ) { name : f.name, opt : false, t : makeType(f.t,e) }]);
 		case CTParent(t):
 			return makeType(t,e);
+		#if (haxe_ver >= 4)
+		case CTNamed(n, t):
+			return makeType(t,e);
+		case CTOpt(t):
+			return makeType(t,e);
+		#end
 		}
 	}
 
@@ -724,7 +730,7 @@ class Checker {
 				return ret;
 			case TDynamic:
 				for( p in params ) typeExpr(p,Value);
-				return TDynamic;
+				return makeMono();
 			default:
 				error(typeStr(ft)+" cannot be called", e);
 			}
@@ -778,7 +784,7 @@ class Checker {
 				error("Return not allowed here", expr);
 			else
 				unify(et, allowReturn, v == null ? expr : v);
-			return TDynamic;
+			return makeMono();
 		case EArrayDecl(el):
 			var et = null;
 			for( v in el ) {
@@ -798,7 +804,7 @@ class Checker {
 			}
 		case EThrow(e):
 			typeExpr(e, Value);
-			return TDynamic;
+			return makeMono();
 		case EFunction(args, body, name, ret):
 			var tret = ret == null ? makeMono() : makeType(ret, expr);
 			var locals = saveLocals();
@@ -930,9 +936,45 @@ class Checker {
 				}
 				error("Unsupported operation "+op, expr);
 			}
+		case ETry(etry, v, et, ecatch):
+			var vt = typeExpr(etry, withType);
+
+			var old = locals.get(v);
+			locals.set(v, makeType(et, ecatch));
+			var ct = typeExpr(ecatch, withType);
+			if( old != null ) locals.set(v,old) else locals.remove(v);
+
+			if( withType == NoValue )
+				return TVoid;
+			if( tryUnify(vt,ct) )
+				return ct;
+			unify(ct,vt,ecatch);
+			return vt;
+		case ESwitch(value, cases, defaultExpr):
+			var tmin = null;
+			var vt = typeExpr(value, Value);
+			inline function mergeType(t,p) {
+				if( withType != NoValue ) {
+					if( tmin == null )
+						tmin = t;
+					else if( !tryUnify(t,tmin) ) {
+						unify(tmin,t, p);
+						tmin = t;
+					}
+				}
+			}
+			for( c in cases ) {
+				for( v in c.values ) {
+					var ct = typeExpr(v, WithType(vt));
+					unify(vt, ct, v);
+				}
+				var et = typeExpr(c.expr, withType);
+				mergeType(et, c.expr);
+			}
+			if( defaultExpr != null )
+				mergeType( typeExpr(defaultExpr, withType), defaultExpr);
+			return withType == NoValue ? TVoid : tmin == null ? makeMono() : tmin;
 		case ENew(cl, params):
-		case ETry(e, v, t, ecatch):
-		case ESwitch(e, cases, defaultExpr):
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 	}
