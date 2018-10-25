@@ -307,12 +307,10 @@ class Checker {
 			return TAnon([for( f in fields ) { name : f.name, opt : false, t : makeType(f.t,e) }]);
 		case CTParent(t):
 			return makeType(t,e);
-		#if (haxe_ver >= 4)
 		case CTNamed(n, t):
 			return makeType(t,e);
 		case CTOpt(t):
 			return makeType(t,e);
-		#end
 		}
 	}
 
