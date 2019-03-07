@@ -98,9 +98,13 @@ class Interp {
 		#else
 		binops = new Hash();
 		#end
+		
+		/**
+		 * BEWARE ON CPP TARGET INLINE VARIABLES ARE CULLED AND HAVE NO COUNTERPARTS
+		 */
 		binops.set("+",function(e1,e2) return me.expr(e1) + me.expr(e2));
 		binops.set("-",function(e1,e2) return me.expr(e1) - me.expr(e2));
-		binops.set("*",function(e1,e2) return me.expr(e1) * me.expr(e2));
+		binops.set("*", function(e1, e2) { return me.expr(e1) * me.expr(e2);});
 		binops.set("/",function(e1,e2) return me.expr(e1) / me.expr(e2));
 		binops.set("%",function(e1,e2) return me.expr(e1) % me.expr(e2));
 		binops.set("&",function(e1,e2) return me.expr(e1) & me.expr(e2));
@@ -129,7 +133,8 @@ class Interp {
 		assignOp("^=",function(v1,v2) return v1 ^ v2);
 		assignOp("<<=",function(v1,v2) return v1 << v2);
 		assignOp(">>=",function(v1,v2) return v1 >> v2);
-		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
+		assignOp(">>>=", function(v1, v2) return v1 >>> v2);
+		
 	}
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
