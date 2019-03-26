@@ -23,7 +23,7 @@ package hscript;
 import haxe.PosInfos;
 import hscript.Expr;
 
-private enum Stop {
+enum Stop {
 	SBreak;
 	SContinue;
 	SReturn;
