@@ -17,5 +17,5 @@ Step through the script however you wish. An OpenFL example would be:
 //Each frame, run the interpreter for 100 steps or until the script returns (whichever comes first) 
 addEventListener(Event.ENTER_FRAME, function(e){
 	myInterp.step(100);
-}
+});
 ```
