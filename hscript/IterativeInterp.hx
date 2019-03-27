@@ -48,7 +48,9 @@ class IterativeInterp extends Interp
 		var me = this;
 		variables.set("__intern_reset_pc", function(){
 			me.current_frame.pc = 0;
+			#if hs_verbose
 			trace("Resetting block: " + me.current_frame);
+			#end
 		});
 		frame_stack = [];
 		script_complete = false;
@@ -110,11 +112,13 @@ class IterativeInterp extends Interp
 			
 			current_frame.call_count = 0;
 			
+			#if hs_verbose
 			for(b in frame_stack){
 				trace(b);
 			}
 			trace(current_frame);
 			trace(e);
+			#end
 			try{
 				expr(e);
 			}
@@ -186,7 +190,9 @@ class IterativeInterp extends Interp
 						exiting = true;
 				}
 				if (exiting){
+					#if hs_verbose
 					trace("Exiting block... ");
+					#end
 					if (frame_stack.length != 0){
 						popFrame();
 					}
@@ -204,7 +210,9 @@ class IterativeInterp extends Interp
 	}
 
 	override public function expr( e : Expr ) : Dynamic {
+		#if hs_verbose
 		trace(e);
+		#end
 		var entry_frame:StackFrame = current_frame;
 		var entry_pc:Int = current_frame.pc;
 		switch(e){
@@ -338,14 +346,18 @@ class IterativeInterp extends Interp
 				var f = function(args:Array<Dynamic>){
 					if (current_frame.call_results[current_frame.call_count] != null){
 						if (current_frame.call_results[current_frame.call_count].complete){
+							#if hs_verbose
 							trace("Call " + current_frame.call_count + " already resolved (" + current_frame.call_results[current_frame.call_count].result + ")");
+							#end
 							current_frame.call_count++;
 							return current_frame.call_results[current_frame.call_count-1].result;
 						}
 					}
+					#if hs_verbose
 					else{
 						trace("Making new call sub...");
 					}
+					#end
 					
 					var block:Array<Expr> = switch(fexpr){
 						case EBlock(a):
@@ -356,7 +368,7 @@ class IterativeInterp extends Interp
 					var frame:StackFrame = new StackFrame(block, CSCall);
 					
 					if( args.length != params.length ) {
-						if( args.length < minParams ) {
+						if ( args.length < minParams ) {
 							var str = "Invalid number of parameters. Got " + args.length + ", required " + minParams;
 							if( name != null ) str += " for function '" + name+"'";
 							throw str;
