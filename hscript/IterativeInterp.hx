@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-package;
+package hscript;
 
 import hscript.Expr.*;
 import hscript.Tools;
