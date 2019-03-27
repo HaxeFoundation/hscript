@@ -528,3 +528,44 @@ enum ControlStructure{
 	CSDoWhile;
 	CSCall;
 }
+
+class StackFrame 
+{
+	private static var next_id:Int = 0;
+	public var id:Int;
+	public var pc:Int;
+	public var block:Array<Expr>;
+	public var control:ControlStructure;
+	public var condition:Expr;
+	public var old:Int;
+	public var locals:Map<String, {r: Dynamic}>;
+	public var call_results:Array<{result:Dynamic, complete:Bool}>;
+	public var call_count:Int = 0;
+	public var call_id:Int = -1;
+	public var called:Bool = false;
+	public var parent:StackFrame;
+	
+	public function new(block:Array<Expr>, control:ControlStructure, ?condition:Expr, ?old:Int) 
+	{
+		this.id = next_id;
+		next_id++;
+		this.pc = 0;
+		this.locals = new Map();
+		this.call_results = [];
+		this.block = block;
+		this.control = control;
+		this.condition = condition;
+		this.old = old;
+		switch(control){
+			case CSWhile:
+				this.block = block.concat([]);
+				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
+				pc = this.block.length-1;
+			case CSDoWhile:
+				this.block = block.concat([]);
+				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
+			default:
+		}
+	}
+	
+}
