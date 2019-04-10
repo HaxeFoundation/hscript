@@ -22,7 +22,8 @@
 
 package hscript;
 
-import hscript.Expr.*;
+import hscript.Expr.Expr;
+
 import hscript.Tools;
 import hscript.Expr;
 import hscript.Interp;
@@ -38,6 +39,7 @@ class IterativeInterp extends Interp
 	public var frame_stack:Array<StackFrame>;
 	public var current_frame:StackFrame;
 	public var script_complete:Bool;
+	var yield:Bool = false;
 	public function prepareScript(e:Expr, ?on_complete:Dynamic->Void):Void{
 		depth = 0;
 		locals = new Map();
@@ -50,6 +52,12 @@ class IterativeInterp extends Interp
 			me.current_frame.pc = 0;
 			#if hs_verbose
 			trace("Resetting block: " + me.current_frame);
+			#end
+		});
+		variables.set("__intern_yield", function(){
+			me.yield = true;
+			#if hs_verbose
+			trace("Yield called by user-space script in frame:" +me.current_frame);
 			#end
 		});
 		frame_stack = [];
@@ -98,10 +106,16 @@ class IterativeInterp extends Interp
 		locals = current_frame.locals;
 	}
 	
-	public function stepScript(steps:Int=1):Void{
-		while (!script_complete && steps > 0){
+	public function stepScript(steps:Int = 1):Void{
+		yield = false;
+		while (!yield && !script_complete && steps > 0){
 			steps--;
 			var e:Expr = current_frame.block[current_frame.pc];
+			if (e == null){
+				script_complete = true;
+				_on_complete("Script error: Null");
+				return;
+			}
 			current_frame.pc++;
 			if (current_frame.called){
 				current_frame.called = false;
