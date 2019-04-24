@@ -35,11 +35,17 @@ import hscript.Interp;
  */
 class IterativeInterp extends Interp
 {
-	public var _on_complete:Dynamic->Void;
-	public var frame_stack:Array<StackFrame>;
-	public var current_frame:StackFrame;
-	public var script_complete:Bool;
+	var _on_complete:Dynamic->Void;
+	var frame_stack:Array<StackFrame>;
+	var current_frame:StackFrame;
+	var script_complete:Bool;
 	var yield:Bool = false;
+	
+	/**
+	   Initialize this interp instance with a script to step through.
+	   @param	e - an Expr - ideally one containing at least one EBlock.
+	   @param	on_complete - a Dynamic->Void which will be called with the Expr's return value should the Expr return.
+	**/
 	public function prepareScript(e:Expr, ?on_complete:Dynamic->Void):Void{
 		depth = 0;
 		locals = new Map();
@@ -62,6 +68,10 @@ class IterativeInterp extends Interp
 		});
 		frame_stack = [];
 		script_complete = false;
+		#if hscriptPos
+		curExpr = e;
+		var e = e.e;
+		#end
 		switch(e){
 			case EBlock(a):
 				current_frame = new StackFrame(a, CSBlock);
@@ -106,6 +116,10 @@ class IterativeInterp extends Interp
 		locals = current_frame.locals;
 	}
 	
+	/**
+	   Iterate through the previously-supplied script. Will stop early if the script completes or a yield is called in user-space
+	   @param	steps	The number of instructions to step through
+	**/
 	public function stepScript(steps:Int = 1):Void{
 		yield = false;
 		while (!yield && !script_complete && steps > 0){
@@ -221,9 +235,18 @@ class IterativeInterp extends Interp
 			}
 			
 		}
+		if (script_complete){
+			if (_on_complete != null){
+				_on_complete(returnValue);
+			}
+		}
 	}
 
 	override public function expr( e : Expr ) : Dynamic {
+		#if hscriptPos
+		curExpr = e;
+		var e = e.e;
+		#end
 		#if hs_verbose
 		trace(e);
 		#end
@@ -473,19 +496,7 @@ class IterativeInterp extends Interp
 		#end
 		switch(e) {
 		case EIdent(id):
-			var i:Int = frame_stack.length;
-			var search_area:Map<String, Dynamic> = current_frame.locals;
-			var l:Dynamic = null;
-			while (i >= 0){
-				i--;
-				l = search_area.get(id);
-				if (l != null){
-					break;
-				}
-				if(i>=0){
-					search_area = frame_stack[i].locals;
-				}
-			}
+			var l = find_local(id);
 			
 			var v : Dynamic = (l == null) ? variables.get(id) : l.r;
 			if( prefix ) {
@@ -530,8 +541,63 @@ class IterativeInterp extends Interp
 			return error(EInvalidOp((delta > 0)?"++":"--"));
 		}
 	}
+	
+	override public function assign(e1:Expr, e2:Expr):Dynamic{
+		var v = expr(e2);
+		switch( Tools.expr(e1) ) {
+		case EIdent(id):
+			var l:Dynamic = find_local(id);
+			if( l == null ){
+				variables.set(id, v);
+			}
+			else{
+				l.r = v;
+			}
+		case EField(e,f):
+			v = set(expr(e),f,v);
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				setMapValue(arr, index, v);
+			}
+			else {
+				arr[index] = v;
+			}
 
-		
+		default:
+			error(EInvalidOp("="));
+		}
+		return v;
+	}
+	
+	/**
+	   Searches from the local scope outwards until it finds the variable or returns null
+	   @param	id	The name of the variable
+	   @return		The resolved variable, or null
+	**/
+	private inline function find_local(id:String):Dynamic{
+		var i:Int = frame_stack.length;
+		var search_area:Map<String, Dynamic> = current_frame.locals;
+		var l:Dynamic = null;
+		while (i >= 0){
+			i--;
+			l = search_area.get(id);
+			if (l != null){
+				break;
+			}
+			if(i>=0){
+				search_area = frame_stack[i].locals;
+			}
+		}
+		return l;
+	}
+
+	/**
+	   If we've changed frame in the middle of a non-sliceable expression, this inline detects that, 
+	   and rolls back the PC on the previous frame so as to retry that expression's evaluation once the 
+	   new frame (likely spawned by a user-space function call) has returned a value.
+	**/
 	private inline function retry_expr(old_pc:Int, old_frame:StackFrame):Bool{
 		if (current_frame != old_frame){
 			old_frame.pc = old_pc;
@@ -582,6 +648,8 @@ class StackFrame
 		this.control = control;
 		this.condition = condition;
 		this.old = old;
+		
+		//Loop structures are modified to just have an if-statement that resets the frame's program counter if necessary
 		switch(control){
 			case CSWhile:
 				this.block = block.concat([]);
