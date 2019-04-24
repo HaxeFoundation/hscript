@@ -22,9 +22,16 @@
 package hscript;
 import hscript.Expr;
 
+
+enum VarMode {
+	Defined;
+	ForceSync;
+}
+
 class Async {
 
-	var varNames : Array<String>;
+	var definedVars : Array<{ n : String, prev : Null<VarMode> }>;
+	var vars : Map<String,VarMode>;
 	var currentFun : String;
 	var currentLoop : Expr;
 	var currentBreak : Expr -> Expr;
@@ -73,8 +80,22 @@ class Async {
 			return buildSync(e,null);
 		} else {
 			var nothing = ignore();
-			return new Async().toCps(e, nothing, nothing);
+			return toCps(e, nothing, nothing);
 		}
+	}
+
+	function defineVar( v : String, mode ) {
+		definedVars.push({ n : v, prev : vars.get(v) });
+		vars.set(v, mode);
+	}
+
+	function lookupFunctions( el : Array<Expr> ) {
+		for( e in el )
+			switch( expr(e) ) {
+			case EFunction(_, _, name, _) if( name != null ): defineVar(name, Defined);
+			case EMeta("sync",_,expr(_) => EFunction(_,_,name,_)) if( name != null ): defineVar(name, ForceSync);
+			default:
+			}
 	}
 
 	function buildSync( e : Expr, exit : Expr ) : Expr {
@@ -85,16 +106,14 @@ class Async {
 			return e;
 		case EBlock(el):
 			var v = saveVars();
-			for( e in el )
-				switch( expr(e) ) {
-				case EFunction(_, _, name, _) if( name != null ): varNames.push(name);
-				default:
-				}
+			lookupFunctions(el);
 			var e = block([for(e in el) buildSync(e,exit)], e);
 			restoreVars(v);
 			return e;
 		case EMeta("async", _, e):
 			return toCps(e, ignore(), ignore());
+		case EMeta("sync", args, ef = expr(_) => EFunction(fargs, body, name, ret)):
+			return mk(EMeta("sync",args,mk(EFunction(fargs, buildSync(body,null), name, ret),ef)),e);
 		case EBreak if( currentBreak != null ):
 			return currentBreak(e);
 		case EContinue if( currentLoop != null ):
@@ -115,7 +134,8 @@ class Async {
 	}
 
 	public function new() {
-		varNames = [];
+		vars = new Map();
+		definedVars = [];
 	}
 
 	function ignore(?e) : Expr {
@@ -199,11 +219,14 @@ class Async {
 	}
 
 	function saveVars() {
-		return varNames.length;
+		return definedVars.length;
 	}
 
 	function restoreVars(k) {
-		while( varNames.length > k ) varNames.pop();
+		while( definedVars.length > k ) {
+			var v = definedVars.pop();
+			if( v.prev == null ) vars.remove(v.n) else vars.set(v.n, v.prev);
+		}
 	}
 
 	public function toCps( e : Expr, rest : Expr, exit : Expr ) : Expr {
@@ -213,12 +236,7 @@ class Async {
 		case EBlock(el):
 			var el = el.copy();
 			var vold = saveVars();
-			// local recursion
-			for( e in el )
-				switch( expr(e) ) {
-				case EFunction(_, _, name, null): if( name != null ) varNames.push(name);
-				default:
-				}
+			lookupFunctions(el);
 			while( el.length > 0 ) {
 				var e = toCps(el.pop(), rest, exit);
 				rest = ignore(e);
@@ -228,9 +246,9 @@ class Async {
 		case EFunction(args, body, name, t):
 			var vold = saveVars();
 			if( name != null )
-				varNames.push(name);
+				defineVar(name, Defined);
 			for( a in args )
-				varNames.push(a.name);
+				defineVar(a.name, Defined);
 			args.unshift( { name : "_onEnd", t : null } );
 			var frest = ident("_onEnd",e);
 			var oldFun = currentFun;
@@ -251,7 +269,8 @@ class Async {
 			var args = [for( a in args ) fun("_rest", toCps(block([a],a), ident("_rest",a), exit))];
 			return call(ident("split",e), [rest, mk(EArrayDecl(args),e)],e);
 		case ECall(expr(_) => EIdent(i), args):
-			return makeCall( ident( varNames.indexOf(i) < 0 ? "a_" + i : i,e) , args, rest, exit);
+			var mode = vars.get(i);
+			return makeCall( ident( mode != null ? i : "a_" + i,e) , args, rest, exit, mode == ForceSync);
 		case ECall(expr(_) => EField(e, f), args):
 			return makeCall(field(e,"a_"+f,e), args, rest, exit);
 		case EFor(v, eit, eloop):
