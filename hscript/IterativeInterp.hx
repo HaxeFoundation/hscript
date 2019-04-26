@@ -126,8 +126,9 @@ class IterativeInterp extends Interp
 			steps--;
 			var e:Expr = current_frame.block[current_frame.pc];
 			if (e == null){
+				
 				script_complete = true;
-				_on_complete("Script error: Null");
+				_on_complete("Script error: "+current_frame);
 				return;
 			}
 			current_frame.pc++;
@@ -207,29 +208,24 @@ class IterativeInterp extends Interp
 				}
 			}
 			
-			if (current_frame.pc >= current_frame.block.length){
-				var exiting = false;
+			while (current_frame.pc >= current_frame.block.length){
 				switch(current_frame.control){
 					case CSCall:
 						current_frame.parent.call_results[current_frame.call_id].complete = true;
 						current_frame.parent.call_results[current_frame.call_id].result = null; //If we just got to the end of the block without returning, the result is null
-						exiting = true;
 					default:
-						exiting = true;
 				}
-				if (exiting){
-					#if hs_verbose
-					trace("Exiting block... ");
-					#end
-					if (frame_stack.length != 0){
-						popFrame();
-					}
-					else{
-						if (_on_complete != null){
-							script_complete = true;
-							_on_complete(returnValue);
-							return;
-						}
+				#if hs_verbose
+				trace("Exiting block... ");
+				#end
+				if (frame_stack.length != 0){
+					popFrame();
+				}
+				else{
+					if (_on_complete != null){
+						script_complete = true;
+						_on_complete(returnValue);
+						return;
 					}
 				}
 			}
