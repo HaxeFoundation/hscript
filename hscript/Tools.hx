@@ -105,5 +105,22 @@ class Tools {
 		return e;
 		#end
 	}
-
+	
+	/**
+	   Used for generating contextless Exprs at runtime for hscriptPos compatibility
+	**/
+	public static inline function exprify(#if hscriptPos e:ExprDef #else e:Expr #end):Expr{
+		
+		#if hscriptPos
+		return {
+			e : e,
+			pmin : 0,
+			pmax : 0,
+			origin : "Internal",
+			line : 0
+		};
+		#else
+		return e;
+		#end
+	}
 }
