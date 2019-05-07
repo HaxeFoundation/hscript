@@ -75,36 +75,34 @@ class IterativeInterp extends Interp
 		switch(e){
 			case EBlock(a):
 				current_frame = new StackFrame(a, CSBlock);
-				locals = current_frame.locals;
 			case EWhile(econd, eb):
 				var a:Array<Expr>;
-				switch(eb){
+				switch(Tools.expr(eb)){
 					case EBlock(ea):
 						a = ea;
 					default:
 						a = [eb];
 				}
 				current_frame = new StackFrame(a, CSWhile, econd, declared.length);
-				locals = current_frame.locals;
 			case EDoWhile(econd, eb):
 				var a:Array<Expr>;
-				switch(eb){
+				switch(Tools.expr(eb)){
 					case EBlock(ea):
 						a = ea;
 					default:
 						a = [eb];
 				}
 				current_frame = new StackFrame(a, CSDoWhile, econd, declared.length);
-				locals = current_frame.locals;
 			default:
-				current_frame = new StackFrame([e], CSBlock);
-				locals = current_frame.locals;
+				current_frame = new StackFrame([Tools.exprify(e)], CSBlock);
 		}
+		locals = current_frame.locals;
 	}
 	
 	private function pushFrame(block:StackFrame){
 		frame_stack.push(current_frame);
 		current_frame = block;
+		locals = current_frame.locals;
 	}
 	
 	private function popFrame(){
@@ -320,7 +318,7 @@ class IterativeInterp extends Interp
 				return if( res == true ) expr(e1) else if( e2 == null ) null else expr(e2);
 			case EWhile(econd, eb):
 				var body:Array<Expr>;
-				switch(eb){
+				switch(Tools.expr(eb)){
 					case EBlock(a):
 						body = a;
 					default:
@@ -330,7 +328,7 @@ class IterativeInterp extends Interp
 				return null;
 			case EDoWhile(econd, eb):
 				var body:Array<Expr>;
-				switch(eb){
+				switch(Tools.expr(eb)){
 					case EBlock(a):
 						body = a;
 					default:
@@ -392,7 +390,7 @@ class IterativeInterp extends Interp
 					}
 					#end
 					
-					var block:Array<Expr> = switch(fexpr){
+					var block:Array<Expr> = switch(Tools.expr(fexpr)){
 						case EBlock(a):
 							a;
 						default:
@@ -453,7 +451,7 @@ class IterativeInterp extends Interp
 				locals.set(n,{ r : (e == null)?null:val });
 				return null;
 			default:
-				return super.expr(e);
+				return super.expr(#if hscriptPos curExpr #else e #end);
 		}
 		return null;
 	}
@@ -649,13 +647,22 @@ class StackFrame
 		switch(control){
 			case CSWhile:
 				this.block = block.concat([]);
+				#if hscriptPos
+				this.block.push(Tools.exprify(EIf(condition, Tools.exprify(ECall(Tools.exprify(EIdent('__intern_reset_pc')), [])))));
+				#else
 				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
+				#end
 				pc = this.block.length-1;
 			case CSDoWhile:
 				this.block = block.concat([]);
+				#if hscriptPos
+				this.block.push(Tools.exprify(EIf(condition, Tools.exprify(ECall(Tools.exprify(EIdent('__intern_reset_pc')), [])))));
+				#else
 				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
+				#end
 			default:
 		}
 	}
 	
+
 }
