@@ -92,6 +92,7 @@ class Parser {
 	var tokenMax : Int;
 	var oldTokenMin : Int;
 	var oldTokenMax : Int;
+	var minLookup:Map<Int, Int> = new Map();
 	var tokens : List<{ min : Int, max : Int, t : Token }>;
 	#else
 	static inline var p1 = 0;
@@ -143,7 +144,7 @@ class Parser {
 
 	public inline function error( err, pmin, pmax ) {
 		#if hscriptPos
-		throw new Error(err, pmin, pmax, origin, line);
+		throw new Error(err, pmin, pmax, origin, minLookup[pmin]);
 		#else
 		throw err;
 		#end
@@ -266,7 +267,7 @@ class Parser {
 		if( e == null ) return null;
 		if( pmin == null ) pmin = tokenMin;
 		if( pmax == null ) pmax = tokenMax;
-		return { e : e, pmin : pmin, pmax : pmax, origin : origin, line : line };
+		return { e : e, pmin : pmin, pmax : pmax, origin : origin, line : minLookup[pmin] };
 		#else
 		return e;
 		#end
@@ -312,6 +313,9 @@ class Parser {
 
 	function parseObject(p1) {
 		// parse object
+		#if hscriptPos
+		ifUnsetSet(p1, line);
+		#end
 		var fl = new Array();
 		while( true ) {
 			var tk = token();
@@ -341,6 +345,9 @@ class Parser {
 				unexpected(tk);
 			}
 		}
+		#if hscriptPos
+		ifUnsetSet(p1, line);
+		#end
 		return parseExprNext(mk(EObject(fl),p1));
 	}
 
@@ -348,6 +355,7 @@ class Parser {
 		var tk = token();
 		#if hscriptPos
 		var p1 = tokenMin;
+		ifUnsetSet(p1, line);
 		#end
 		switch( tk ) {
 		case TId(id):
@@ -564,6 +572,7 @@ class Parser {
 	function parseStructure(id) {
 		#if hscriptPos
 		var p1 = tokenMin;
+		ifUnsetSet(p1, line);
 		#end
 		return switch( id ) {
 		case "if":
@@ -1314,18 +1323,28 @@ class Parser {
 		}
 		return b.getBytes().toString();
 	}
+	
+	inline function ifUnsetSet(min:Int, line:Int):Void{
+		#if hscriptPos
+		if (!minLookup.exists(min)){
+			minLookup.set(min, line);
+		}
+		#end
+	}
 
 	function token() {
 		#if hscriptPos
 		var t = tokens.pop();
 		if( t != null ) {
 			tokenMin = t.min;
+			ifUnsetSet(tokenMin, line);
 			tokenMax = t.max;
 			return t.t;
 		}
 		oldTokenMin = tokenMin;
 		oldTokenMax = tokenMax;
 		tokenMin = (this.char < 0) ? readPos : readPos - 1;
+		ifUnsetSet(tokenMin, line);
 		var t = _token();
 		tokenMax = (this.char < 0) ? readPos - 1 : readPos - 2;
 		return t;
@@ -1349,10 +1368,12 @@ class Parser {
 			case 32,9,13: // space, tab, CR
 				#if hscriptPos
 				tokenMin++;
+				ifUnsetSet(tokenMin, line);
 				#end
 			case 10: line++; // LF
 				#if hscriptPos
 				tokenMin++;
+				ifUnsetSet(tokenMin, line);
 				#end
 			case 48,49,50,51,52,53,54,55,56,57: // 0...9
 				var n = (char - 48) * 1.0;
