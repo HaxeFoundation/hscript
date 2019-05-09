@@ -83,7 +83,7 @@ class IterativeInterp extends Interp
 					default:
 						a = [eb];
 				}
-				current_frame = new StackFrame(a, CSWhile, econd, declared.length);
+				current_frame = new StackFrame(a, CSWhile(econd));
 			case EDoWhile(econd, eb):
 				var a:Array<Expr>;
 				switch(Tools.expr(eb)){
@@ -92,11 +92,19 @@ class IterativeInterp extends Interp
 					default:
 						a = [eb];
 				}
-				current_frame = new StackFrame(a, CSDoWhile, econd, declared.length);
+				current_frame = new StackFrame(a, CSDoWhile(econd));
 			default:
-				current_frame = new StackFrame([Tools.exprify(e)], CSBlock);
+				current_frame = new StackFrame([curExprOr(e)], CSBlock);
 		}
 		locals = current_frame.locals;
+	}
+	
+	private inline function curExprOr(e:#if hscriptPos ExprDef #else Expr #end):Expr{
+		#if hscriptPos
+		return curExpr;
+		#else
+		return e;
+		#end
 	}
 	
 	private function pushFrame(block:StackFrame){
@@ -154,7 +162,9 @@ class IterativeInterp extends Interp
 					case SContinue:
 						while (true){
 							switch(current_frame.control){
-								case CSWhile, CSDoWhile:
+								case CSWhile(condition), CSDoWhile(condition):
+									break;
+								case CSFor(name, iter):
 									break;
 								default:
 									popFrame();
@@ -167,7 +177,17 @@ class IterativeInterp extends Interp
 					case SBreak:
 						while (true){
 							switch(current_frame.control){
-								case CSWhile, CSDoWhile:
+								case CSWhile(condition), CSDoWhile(condition):
+									if (frame_stack.length > 0){
+										popFrame();
+										break;
+									}
+									else{
+										script_complete = true;
+										_on_complete(returnValue);
+										return;
+									}
+								case CSFor(name, iter):
 									if (frame_stack.length > 0){
 										popFrame();
 										break;
@@ -211,6 +231,12 @@ class IterativeInterp extends Interp
 					case CSCall:
 						current_frame.parent.call_results[current_frame.call_id].complete = true;
 						current_frame.parent.call_results[current_frame.call_id].result = null; //If we just got to the end of the block without returning, the result is null
+					case CSFor(name, iterator):
+						if (iterator.hasNext()){
+							current_frame.locals.set(name, {r:iterator.next()});
+							current_frame.pc = 0;
+							break;
+						}
 					default:
 				}
 				#if hs_verbose
@@ -237,12 +263,12 @@ class IterativeInterp extends Interp
 	}
 
 	override public function expr( e : Expr ) : Dynamic {
+		#if hs_verbose
+		trace(e);
+		#end
 		#if hscriptPos
 		curExpr = e;
 		var e = e.e;
-		#end
-		#if hs_verbose
-		trace(e);
 		#end
 		var entry_frame:StackFrame = current_frame;
 		var entry_pc:Int = current_frame.pc;
@@ -324,7 +350,7 @@ class IterativeInterp extends Interp
 					default:
 						body = [eb];
 				}
-				pushFrame(new StackFrame(body, CSWhile, econd, declared.length));
+				pushFrame(new StackFrame(body, CSWhile(econd)));
 				return null;
 			case EDoWhile(econd, eb):
 				var body:Array<Expr>;
@@ -334,8 +360,23 @@ class IterativeInterp extends Interp
 					default:
 						body = [eb];
 				}
-				pushFrame(new StackFrame(body, CSDoWhile, econd, declared.length));
+				pushFrame(new StackFrame(body, CSDoWhile(econd)));
 				return null;
+			case EFor(v, it, e):
+				var resolved_it:Dynamic = expr(it);
+				if (retry_expr(entry_pc, entry_frame)) return null;
+				var iter:Iterator<Dynamic> = makeIterator(resolved_it);
+				if (iter == null || !iter.hasNext()){
+					return null;
+				}
+				var body:Array<Expr>;
+				switch(Tools.expr(e)){
+					case EBlock(a):
+						body = a;
+					default:
+						body = [e];
+				}
+				pushFrame(new StackFrame(body, CSFor(v, iter)));
 			case EBinop(op, e1, e2):
 				expr(e1);
 				if(retry_expr(entry_pc, entry_frame)) return null;
@@ -450,6 +491,51 @@ class IterativeInterp extends Interp
 				declared.push({ n : n, old : locals.get(n) });
 				locals.set(n,{ r : (e == null)?null:val });
 				return null;
+			case EArrayDecl(arr):
+				if (arr.length > 0 && Tools.expr(arr[0]).match(EBinop("=>", _))) {
+					var isAllString:Bool = true;
+					var isAllInt:Bool = true;
+					var isAllObject:Bool = true;
+					var isAllEnum:Bool = true;
+					var keys:Array<Dynamic> = [];
+					var values:Array<Dynamic> = [];
+					for (e in arr) {
+						switch(Tools.expr(e)) {
+							case EBinop("=>", eKey, eValue): {
+								var key:Dynamic = expr(eKey);
+								if (retry_expr(entry_pc, entry_frame)) return null;
+								var value:Dynamic = expr(eValue);
+								if (retry_expr(entry_pc, entry_frame)) return null;
+								isAllString = isAllString && Std.is(key, String);
+								isAllInt = isAllInt && Std.is(key, Int);
+								isAllObject = isAllObject && Reflect.isObject(key);
+								isAllEnum = isAllEnum && Reflect.isEnumValue(key);
+								keys.push(key);
+								values.push(value);
+							}
+							default: throw("=> expected");
+						}
+					}
+					var map:Dynamic = {
+						if (isAllInt) new haxe.ds.IntMap<Dynamic>();
+						else if (isAllString) new haxe.ds.StringMap<Dynamic>();
+						else if (isAllEnum) new haxe.ds.EnumValueMap<Dynamic, Dynamic>();
+						else if (isAllObject) new haxe.ds.ObjectMap<Dynamic, Dynamic>();
+						else throw 'Inconsistent key types';
+					}
+					for (n in 0...keys.length) {
+						setMapValue(map, keys[n], values[n]);
+					}
+					return map;
+				}
+				else {
+					var a = new Array();
+					for ( e in arr ) {
+						a.push(expr(e));
+						if (retry_expr(entry_pc, entry_frame)) return null;
+					}
+					return a;
+				}
 			default:
 				return super.expr(#if hscriptPos curExpr #else e #end);
 		}
@@ -610,8 +696,9 @@ class IterativeInterp extends Interp
 
 enum ControlStructure{
 	CSBlock;
-	CSWhile;
-	CSDoWhile;
+	CSFor(name:String, iterator:Iterator<Dynamic>);
+	CSWhile(condition:Expr);
+	CSDoWhile(condition:Expr);
 	CSCall;
 }
 
@@ -622,8 +709,6 @@ class StackFrame
 	public var pc:Int;
 	public var block:Array<Expr>;
 	public var control:ControlStructure;
-	public var condition:Expr;
-	public var old:Int;
 	public var locals:Map<String, {r: Dynamic}>;
 	public var call_results:Array<{result:Dynamic, complete:Bool}>;
 	public var call_count:Int = 0;
@@ -631,7 +716,7 @@ class StackFrame
 	public var called:Bool = false;
 	public var parent:StackFrame;
 	
-	public function new(block:Array<Expr>, control:ControlStructure, ?condition:Expr, ?old:Int) 
+	public function new(block:Array<Expr>, control:ControlStructure) 
 	{
 		this.id = next_id;
 		next_id++;
@@ -640,26 +725,27 @@ class StackFrame
 		this.call_results = [];
 		this.block = block;
 		this.control = control;
-		this.condition = condition;
-		this.old = old;
 		
 		//Loop structures are modified to just have an if-statement that resets the frame's program counter if necessary
 		switch(control){
-			case CSWhile:
+			case CSWhile(condition):
 				this.block = block.concat([]);
 				#if hscriptPos
-				this.block.push(Tools.exprify(EIf(condition, Tools.exprify(ECall(Tools.exprify(EIdent('__intern_reset_pc')), [])))));
+				this.block.push(Tools.mk(EIf(condition, Tools.mk(ECall(Tools.mk(EIdent('__intern_reset_pc'), condition), []), condition)), condition));
 				#else
 				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
 				#end
 				pc = this.block.length-1;
-			case CSDoWhile:
+			case CSDoWhile(condition):
 				this.block = block.concat([]);
 				#if hscriptPos
-				this.block.push(Tools.exprify(EIf(condition, Tools.exprify(ECall(Tools.exprify(EIdent('__intern_reset_pc')), [])))));
+				this.block.push(Tools.mk(EIf(condition, Tools.mk(ECall(Tools.mk(EIdent('__intern_reset_pc'), condition), []), condition)), condition));
 				#else
 				this.block.push(EIf(condition, ECall(EIdent('__intern_reset_pc'), [])));
 				#end
+			case CSFor(name, iterator):
+				//we can guarantee the iterator is valid and hasNext here, because expr(e) won't spawn one of these otherwise :>
+				locals.set(name, {r:iterator.next()});
 			default:
 		}
 	}
