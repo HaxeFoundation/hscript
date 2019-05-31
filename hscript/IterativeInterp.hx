@@ -122,6 +122,13 @@ class IterativeInterp extends Interp
 		locals = current_frame.locals;
 	}
 	
+	
+	#if hscriptPos
+	public function currentExpression():Expr{
+		return curExpr;
+	}
+	#end
+	
 	/**
 	   Iterate through the previously-supplied script. Will stop early if the script completes or a yield is called in user-space
 	   @param	steps	The number of instructions to step through
@@ -163,8 +170,10 @@ class IterativeInterp extends Interp
 						while (true){
 							switch(current_frame.control){
 								case CSWhile(condition), CSDoWhile(condition):
+									current_frame.pc = current_frame.block.length - 1;
 									break;
 								case CSFor(name, iter):
+									current_frame.pc = current_frame.block.length;
 									break;
 								default:
 									popFrame();
@@ -650,6 +659,7 @@ class IterativeInterp extends Interp
 		}
 		return v;
 	}
+	
 	
 	/**
 	   Searches from the local scope outwards until it finds the variable or returns null
