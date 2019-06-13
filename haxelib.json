@@ -5,5 +5,5 @@
   "description": "Haxe Script is a scripting engine for a subset of the Haxe language",
   "version": "2.3.0",
   "releasenote": "",
-  "contributors": ["ncannasse"]
+  "contributors": ["ncannasse", "HaxeFoundation"]
 }
