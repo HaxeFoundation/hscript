@@ -18,7 +18,7 @@ install:
   - cinst php -y
   - RefreshEnv
   # Download and setup a standalone flash player debugger
-  - haxe flash/install.hxml
+#  - haxe flash/install.hxml
   # Install project dependencies
   - haxelib install hxcpp     > log.txt || type log.txt && cmd /C exit 1
   - haxelib install hxjava    > log.txt || type log.txt && cmd /C exit 1
@@ -39,6 +39,6 @@ test_script:
   - haxe bin/build-java.hxml         && java -jar bin\Test.jar
   - haxe bin/build-cs.hxml           && bin\bin\Test.exe
   - haxe bin/build-cpp.hxml          && bin\Test.exe
-  - haxe bin/build-flash.hxml -D fdb && haxe flash\run.hxml bin\Test.swf
+#  - haxe bin/build-flash.hxml -D fdb && haxe flash\run.hxml bin\Test.swf
   - haxe bin/build-php.hxml          && php bin\index.php
   - haxe bin/build-python.hxml       && C:\Python34-x64\python.exe bin\Test.py

@@ -39,7 +39,7 @@ install:
       brew install php;
     fi
   # Download and setup a standalone flash player debugger
-  - haxe flash/install.hxml
+#  - haxe flash/install.hxml
   # Install haxelibs
   - if [ "${TRAVIS_HAXE_VERSION}" = "development" ]; then
       haxelib git hxcpp https://github.com/HaxeFoundation/hxcpp.git;
@@ -69,6 +69,6 @@ script:
   - haxe bin/build-java.hxml         && java -jar bin/Test.jar
 #  - haxe bin/build-cs.hxml           && mono bin/bin/Test.exe
   - haxe bin/build-cpp.hxml          && ./bin/Test
-  - haxe bin/build-flash.hxml -D fdb && haxe flash/run.hxml bin/Test.swf
+#  - haxe bin/build-flash.hxml -D fdb && haxe flash/run.hxml bin/Test.swf
   - haxe bin/build-php.hxml          && php bin/index.php
   - haxe bin/build-python.hxml       && python3 bin/Test.py
