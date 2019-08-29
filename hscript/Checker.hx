@@ -518,7 +518,7 @@ class Checker {
 		return typeEq(t1,t2);
 	}
 
-	function unify( t1 : TType, t2 : TType, e : Expr ) {
+	public function unify( t1 : TType, t2 : TType, e : Expr ) {
 		if( !tryUnify(t1,t2) )
 			error(typeStr(t1)+" should be "+typeStr(t2),e);
 	}
