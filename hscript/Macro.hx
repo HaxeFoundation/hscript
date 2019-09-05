@@ -214,7 +214,7 @@ class Macro {
 						opt : false,
 						value : null,
 					});
-				EFunction(name, {
+				EFunction(#if haxe4 FNamed(name,false) #else name #end, {
 					params : [],
 					args : targs,
 					expr : convert(e),
