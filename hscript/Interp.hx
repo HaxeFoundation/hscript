@@ -360,7 +360,7 @@ class Interp {
 					if( args.length < minParams ) {
 						var str = "Invalid number of parameters. Got " + args.length + ", required " + minParams;
 						if( name != null ) str += " for function '" + name+"'";
-						error(EUnexpected(str));
+						error(ECustom(str));
 					}
 					// make sure mandatory args are forced
 					var args2 = [];
