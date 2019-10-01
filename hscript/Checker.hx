@@ -258,6 +258,10 @@ class Checker {
 		this.types = types;
 	}
 
+	public function removeGlobal( name : String ) {
+		globals.remove(name);
+	}
+
 	public function setGlobal( name : String, type : TType ) {
 		globals.set(name, type);
 	}
