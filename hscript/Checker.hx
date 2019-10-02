@@ -250,6 +250,7 @@ class Checker {
 	var locals : Map<String,TType>;
 	var globals : Map<String,TType> = new Map();
 	var events : Map<String,TType> = new Map();
+	var currentFunType : TType;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 
@@ -274,9 +275,45 @@ class Checker {
 		return globals;
 	}
 
+	function typeArgs( args : Array<Argument>, pos : Expr ) {
+		return [for( i in 0...args.length ) {
+			var a = args[i];
+			var at = a.t == null ? makeMono() : makeType(a.t, pos);
+			{ name : a.name, opt : a.opt, t : at };
+		}];
+	}
+
 	public function check( expr : Expr, ?withType : WithType ) {
 		if( withType == null ) withType = NoValue;
 		locals = new Map();
+		switch( edef(expr) ) {
+		case EBlock(el):
+			var delayed = [];
+			var last = TVoid;
+			for( e in el )
+				switch( edef(e) ) {
+				case EFunction(args,_,name,ret) if( name != null ):
+					var tret = ret == null ? makeMono() : makeType(ret, e);
+					var ft = TFun(typeArgs(args,e),tret);
+					locals.set(name, ft);
+					delayed.push(function() {
+						currentFunType = ft;
+						typeExpr(e, NoValue);
+						return ft;
+					});
+				default:
+					for( f in delayed ) f();
+					delayed = [];
+					if( el[el.length-1] == e )
+						last = typeExpr(e, withType);
+					else
+						typeExpr(e, NoValue);
+				}
+			for( f in delayed )
+				last = f();
+			return last;
+		default:
+		}
 		return typeExpr(expr,withType);
 	}
 
@@ -324,7 +361,11 @@ class Checker {
 		case TMono(r): r.r == null ? "Unknown" : typeStr(r.r);
 		case TInst(c, args): c.name + makeArgs(args);
 		case TEnum(e, args): e.name + makeArgs(args);
-		case TType(t, args): t.name + makeArgs(args);
+		case TType(t, args):
+			if( t.name == "hscript.TypeCheck" )
+				typeStr(args[1]);
+			else
+				t.name + makeArgs(args);
 		case TAbstract(a, args): a.name + makeArgs(args);
 		case TFun(args, ret): "(" + [for( a in args ) (a.opt?"?":"")+(a.name == "" ? "" : a.name+":")+typeStr(a.t)].join(", ")+") -> "+typeStr(ret);
 		case TAnon(fields): "{" + [for( f in fields ) (f.opt?"?":"")+f.name+":"+typeStr(f.t)].join(", ")+"}";
@@ -808,7 +849,19 @@ class Checker {
 			typeExpr(e, Value);
 			return makeMono();
 		case EFunction(args, body, name, ret):
-			var tret = ret == null ? makeMono() : makeType(ret, expr);
+			var ft = null, tret = null, targs = null;
+			if( currentFunType != null ) {
+				switch( currentFunType ) {
+				case TFun(args,ret):
+					ft = currentFunType;
+					tret = ret; targs = args;
+				default:
+					throw "assert";
+				}
+				currentFunType = null;
+			} else {
+				tret = ret == null ? makeMono() : makeType(ret, expr);
+			}
 			var locals = saveLocals();
 			var oldRet = allowReturn;
 			allowReturn = tret;
@@ -821,21 +874,21 @@ class Checker {
 			case WithType(follow(_) => TFun(args,ret)): withArgs = args; unify(tret,ret,expr);
 			default:
 			}
-			var targs = [for( i in 0...args.length ) {
-				var a = args[i];
-				var at = a.t == null ? makeMono() : makeType(a.t, expr);
+			if( targs == null )
+				targs = typeArgs(args,expr);
+			for( i in 0...targs.length ) {
+				var a = targs[i];
 				if( withArgs != null && withArgs.length > i )
-					unify(withArgs[i].t, at, expr);
-				this.locals.set(a.name, at);
-				{ name : a.name, opt : a.opt, t : at };
-			}];
-
+					unify(withArgs[i].t, a.t, expr);
+				this.locals.set(a.name, a.t);
+			}
 			typeExpr(body,NoValue);
 			allowReturn = oldRet;
 			this.locals = locals;
-			var ft = TFun(targs,tret);
-			if( name != null )
+			if( ft == null ) {
+				ft = TFun(targs, tret);
 				locals.set(name, ft);
+			}
 			return ft;
 		case EUnop(op, _, e):
 			var et = typeExpr(e, Value);
