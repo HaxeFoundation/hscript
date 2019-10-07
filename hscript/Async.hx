@@ -75,12 +75,16 @@ class Async {
 		return a.build(e, topLevelSync);
 	}
 
+	public dynamic function getTopLevelEnd() {
+		return ignore();
+	}
+
 	public function build( e : Expr, topLevelSync = false ) {
 		if( topLevelSync ) {
 			return buildSync(e,null);
 		} else {
-			var nothing = ignore();
-			return toCps(e, nothing, nothing);
+			var end = getTopLevelEnd();
+			return toCps(e, end, end);
 		}
 	}
 
