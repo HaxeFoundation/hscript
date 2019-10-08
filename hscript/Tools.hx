@@ -1,10 +1,31 @@
+/*
+ * Copyright (C)2008-2017 Haxe Foundation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 package hscript;
 import hscript.Expr;
 
 class Tools {
 
 	public static function iter( e : Expr, f : Expr -> Void ) {
-		switch( e ) {
+		switch( expr(e) ) {
 		case EConst(_), EIdent(_):
 		case EVar(_, _, e): if( e != null ) f(e);
 		case EParent(e): f(e);
@@ -15,6 +36,7 @@ class Tools {
 		case ECall(e, args): f(e); for( a in args ) f(a);
 		case EIf(c, e1, e2): f(c); f(e1); if( e2 != null ) f(e2);
 		case EWhile(c, e): f(c); f(e);
+		case EDoWhile(c, e): f(c); f(e);
 		case EFor(_, it, e): f(it); f(e);
 		case EBreak,EContinue:
 		case EFunction(_, e, _, _): f(e);
@@ -33,12 +55,14 @@ class Tools {
 				f(c.expr);
 			}
 			if( def != null ) f(def);
+		case EMeta(name, args, e): if( args != null ) for( a in args ) f(a); f(e);
+		case ECheckType(e,_): f(e);
 		}
 	}
 
 	public static function map( e : Expr, f : Expr -> Expr ) {
-		return switch( e ) {
-		case EConst(_), EIdent(_): e;
+		var edef = switch( expr(e) ) {
+		case EConst(_), EIdent(_), EBreak, EContinue: expr(e);
 		case EVar(n, t, e): EVar(n, t, if( e != null ) f(e) else null);
 		case EParent(e): EParent(f(e));
 		case EBlock(el): EBlock([for( e in el ) f(e)]);
@@ -48,8 +72,8 @@ class Tools {
 		case ECall(e, args): ECall(f(e),[for( a in args ) f(a)]);
 		case EIf(c, e1, e2): EIf(f(c),f(e1),if( e2 != null ) f(e2) else null);
 		case EWhile(c, e): EWhile(f(c),f(e));
+		case EDoWhile(c, e): EDoWhile(f(c),f(e));
 		case EFor(v, it, e): EFor(v, f(it), f(e));
-		case EBreak, EContinue: e;
 		case EFunction(args, e, name, t): EFunction(args, f(e), name, t);
 		case EReturn(e): EReturn(if( e != null ) f(e) else null);
 		case EArray(e, i): EArray(f(e),f(i));
@@ -60,7 +84,26 @@ class Tools {
 		case EObject(fl): EObject([for( fi in fl ) { name : fi.name, e : f(fi.e) }]);
 		case ETernary(c, e1, e2): ETernary(f(c), f(e1), f(e2));
 		case ESwitch(e, cases, def): ESwitch(f(e), [for( c in cases ) { values : [for( v in c.values ) f(v)], expr : f(c.expr) } ], def == null ? null : f(def));
+		case EMeta(name, args, e): EMeta(name, args == null ? null : [for( a in args ) f(a)], f(e));
+		case ECheckType(e,t): ECheckType(f(e), t);
 		}
+		return mk(edef, e);
+	}
+
+	public static inline function expr( e : Expr ) : ExprDef {
+		#if hscriptPos
+		return e.e;
+		#else
+		return e;
+		#end
+	}
+
+	public static inline function mk( e : ExprDef, p : Expr ) {
+		#if hscriptPos
+		return { e : e, pmin : p.pmin, pmax : p.pmax, origin : p.origin, line : p.line };
+		#else
+		return e;
+		#end
 	}
 
 }

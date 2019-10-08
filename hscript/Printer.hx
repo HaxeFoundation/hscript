@@ -1,3 +1,24 @@
+/*
+ * Copyright (C)2008-2017 Haxe Foundation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 package hscript;
 import hscript.Expr;
 
@@ -16,10 +37,20 @@ class Printer {
 		return buf.toString();
 	}
 
+	public function typeToString( t : CType ) {
+		buf = new StringBuf();
+		tabs = "";
+		type(t);
+		return buf.toString();
+	}
+
 	inline function add<T>(s:T) buf.add(s);
 
 	function type( t : CType ) {
 		switch( t ) {
+		case CTOpt(t): 
+			add('?');
+			type(t);
 		case CTPath(path, params):
 			add(path.join("."));
 			if( params != null ) {
@@ -31,6 +62,19 @@ class Printer {
 				}
 				add(">");
 			}
+		case CTNamed(name, t):
+			add(name);
+			add(':');
+			type(t);
+		case CTFun(args, ret) if (Lambda.exists(args, function (a) return a.match(CTNamed(_, _)))):
+			add('(');
+			for (a in args)
+				switch a {
+					case CTNamed(_, _): type(a);
+					default: type(CTNamed('_', a));
+				}
+			add(')->');
+			type(ret);
 		case CTFun(args, ret):
 			if( args.length == 0 )
 				add("Void -> ");
@@ -148,6 +192,12 @@ class Printer {
 			expr(cond);
 			add(" ) ");
 			expr(e);
+		case EDoWhile(cond,e):
+			add("do ");
+			expr(e);
+			add(" while ( ");
+			expr(cond);
+			add(" )");
 		case EFor(v, it, e):
 			add("for( "+v+" in ");
 			expr(it);
@@ -252,11 +302,52 @@ class Printer {
 				add(";\n");
 			}
 			add("}");
+		case EMeta(name, args, e):
+			add("@");
+			add(name);
+			if( args != null && args.length > 0 ) {
+				add("(");
+				var first = true;
+				for( a in args ) {
+					if( first ) first = false else add(", ");
+					expr(e);
+				}
+				add(")");
+			}
+			add(" ");
+			expr(e);
+		case ECheckType(e, t):
+			add("(");
+			expr(e);
+			add(" : ");
+			addType(t);
+			add(")");
 		}
 	}
 
 	public static function toString( e : Expr ) {
 		return new Printer().exprToString(e);
 	}
+
+	public static function errorToString( e : Expr.Error ) {
+		var message = switch( #if hscriptPos e.e #else e #end ) {
+			case EInvalidChar(c): "Invalid character: '"+String.fromCharCode(c)+"' ("+c+")";
+			case EUnexpected(s): "Unexpected token: \""+s+"\"";
+			case EUnterminatedString: "Unterminated string";
+			case EUnterminatedComment: "Unterminated comment";
+			case EInvalidPreprocessor(str): "Invalid preprocessor (" + str + ")";
+			case EUnknownVariable(v): "Unknown variable: "+v;
+			case EInvalidIterator(v): "Invalid iterator: "+v;
+			case EInvalidOp(op): "Invalid operator: "+op;
+			case EInvalidAccess(f): "Invalid access to field " + f;
+			case ECustom(msg): msg;
+		};
+		#if hscriptPos
+		return e.origin + ":" + e.line + ": " + message;
+		#else
+		return message;
+		#end
+	}
+
 
 }

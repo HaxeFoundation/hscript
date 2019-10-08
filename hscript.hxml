@@ -1,6 +1,2 @@
--swf hscript.swf
--swf-header 800:600:30:FFFFFF
---flash-strict
--swf-version 9
--main Test
--dce no
+bin/build-each.hxml
+-hl bin/Test.hl

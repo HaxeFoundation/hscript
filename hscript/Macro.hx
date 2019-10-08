@@ -1,26 +1,23 @@
 /*
- * Copyright (c) 2011, Nicolas Cannasse
- * All rights reserved.
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Copyright (C)2008-2017 Haxe Foundation
  *
- *   - Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   - Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
  *
- * THIS SOFTWARE IS PROVIDED BY THE HAXE PROJECT CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE HAXE PROJECT CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  */
 package hscript;
 import hscript.Expr.Error;
@@ -79,6 +76,9 @@ class Macro {
 			#if haxe3
 			case OpArrow: "=>";
 			#end
+			#if (haxe_ver >= 4)
+			case OpIn: "in";
+			#end
 			};
 			binops.set(str, op);
 			if( assign )
@@ -113,6 +113,7 @@ class Macro {
 
 	function convertType( t : Expr.CType ) : ComplexType {
 		return switch( t ) {
+		case CTOpt(t): TOptional(convertType(t));
 		case CTPath(pack, args):
 			var params = [];
 			if( args != null )
@@ -127,10 +128,18 @@ class Macro {
 		case CTParent(t): TParent(convertType(t));
 		case CTFun(args, ret):
 			TFunction(map(args,convertType), convertType(ret));
+		case CTNamed(name, convertType(_) => ct):
+			#if (haxe_ver >= 4)
+				TNamed(name, ct);
+			#else
+				ct;
+			#end
 		case CTAnon(fields):
 			var tf = [];
-			for( f in fields )
-				tf.push( { name : f.name, meta : [], doc : null, access : [], kind : FVar(convertType(f.t),null), pos : p } );
+			for( f in fields ) {
+				var meta = f.meta == null ? [] : [for( m in f.meta ) { name : m.name, params : m.params == null ? [] : [for( e in m.params ) convert(e)], pos : p }];
+				tf.push( { name : f.name, meta : meta, doc : null, access : [], kind : FVar(convertType(f.t), null), pos : p } );
+			}
 			TAnonymous(tf);
 		};
 	}
@@ -180,14 +189,18 @@ class Macro {
 				EIf(convert(c), convert(e1), e2 == null ? null : convert(e2));
 			case EWhile(c, e):
 				EWhile(convert(c), convert(e), true);
-			#if (haxe_211 || haxe3)
+			case EDoWhile(c, e):
+				EWhile(convert(c), convert(e), false);
 			case EFor(v, it, efor):
-				var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
-				EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
-			#else
-			case EFor(v, it, e):
-				EFor(v, convert(it), convert(e));
-			#end
+				#if (haxe_ver >= 4)
+					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+				#elseif (haxe_211 || haxe3)
+					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+				#else
+					EFor(v, convert(it), convert(efor));
+				#end
 			case EBreak:
 				EBreak;
 			case EContinue:
@@ -201,7 +214,7 @@ class Macro {
 						opt : false,
 						value : null,
 					});
-				EFunction(name, {
+				EFunction(#if haxe4 FNamed(name,false) #else name #end, {
 					params : [],
 					args : targs,
 					expr : convert(e),
@@ -229,6 +242,11 @@ class Macro {
 				ETernary(convert(cond), convert(e1), convert(e2));
 			case ESwitch(e, cases, edef):
 				ESwitch(convert(e), [for( c in cases ) { values : [for( v in c.values ) convert(v)], expr : convert(c.expr) } ], edef == null ? null : convert(edef));
+			case EMeta(m, params, esub):
+				var mpos = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+				EMeta({ name : m, params : params == null ? [] : [for( p in params ) convert(p)], pos : mpos }, convert(esub));
+			case ECheckType(e, t):
+				ECheckType(convert(e), convertType(t));
 		}, pos : #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
 	}
 

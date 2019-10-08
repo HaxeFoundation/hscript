@@ -1,26 +1,23 @@
 /*
- * Copyright (c) 2008, Nicolas Cannasse
- * All rights reserved.
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Copyright (C)2008-2017 Haxe Foundation
  *
- *   - Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   - Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
  *
- * THIS SOFTWARE IS PROVIDED BY THE HAXE PROJECT CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE HAXE PROJECT CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  */
 package hscript;
 import hscript.Expr;
@@ -74,6 +71,10 @@ class Bytes {
 		return strings[id];
 	}
 
+	function doEncodeInt(v: Int) {
+		bout.addInt32(v);
+	}
+
 	function doEncodeConst( c : Const ) {
 		switch( c ) {
 		case CInt(v):
@@ -82,10 +83,7 @@ class Bytes {
 				bout.addByte(v);
 			} else {
 				bout.addByte(1);
-				bout.addByte(v & 0xFF);
-				bout.addByte((v >> 8) & 0xFF);
-				bout.addByte((v >> 16) & 0xFF);
-				bout.addByte(v >>> 24);
+				doEncodeInt(v);
 			}
 		#if !haxe3
 		case CInt32(v):
@@ -105,13 +103,18 @@ class Bytes {
 		}
 	}
 
+	function doDecodeInt() {
+		var i = bin.getInt32(pin);
+		pin += 4;
+		return i;
+	}
+
 	function doDecodeConst() {
 		return switch( bin.get(pin++) ) {
 		case 0:
 			CInt(bin.get(pin++));
 		case 1:
-			var i = bin.get(pin) | (bin.get(pin+1) << 8) | (bin.get(pin+2) << 16) | (bin.get(pin+3) << 24);
-			pin += 4;
+			var i = doDecodeInt();
 			CInt(i);
 		case 2:
 			CFloat( Std.parseFloat(doDecodeString()) );
@@ -130,6 +133,11 @@ class Bytes {
 	}
 
 	function doEncode( e : Expr ) {
+		#if hscriptPos
+		doEncodeString(e.origin);
+		doEncodeInt(e.line);
+		var e = e.e;
+		#end
 		bout.addByte(Type.enumIndex(e));
 		switch( e ) {
 		case EConst(c):
@@ -172,6 +180,9 @@ class Bytes {
 			else
 				doEncode(e2);
 		case EWhile(cond,e):
+			doEncode(cond);
+			doEncode(e);
+		case EDoWhile(cond,e):
 			doEncode(cond);
 			doEncode(e);
 		case EFor(v,it,e):
@@ -230,10 +241,28 @@ class Bytes {
 			}
 			bout.addByte(255);
 			if( def == null ) bout.addByte(255) else doEncode(def);
+		case EMeta(name,args,e):
+			doEncodeString(name);
+			bout.addByte(args == null ? 0 : args.length + 1);
+			if( args != null ) for( e in args ) doEncode(e);
+			doEncode(e);
+		case ECheckType(e,_):
+			doEncode(e);
 		}
 	}
 
 	function doDecode() : Expr {
+	#if hscriptPos
+		if (bin.get(pin) == 255) {
+			pin++;
+			return null;
+		}
+		var origin = doDecodeString();
+		var line = doDecodeInt();
+		return { e : _doDecode(), pmin : 0, pmax : 0, origin : origin, line : line };
+	}
+	function _doDecode() : ExprDef {
+	#end
 		return switch( bin.get(pin++) ) {
 		case 0:
 			EConst( doDecodeConst() );
@@ -339,6 +368,16 @@ class Bytes {
 			}
 			var def = doDecode();
 			ESwitch(e, cases, def);
+		case 24:
+			var cond = doDecode();
+			EDoWhile(cond,doDecode());
+		case 25:
+			var name = doDecodeString();
+			var count = bin.get(pin++);
+			var args = count == 0 ? null : [for( i in 0...count - 1 ) doDecode()];
+			EMeta(name, args, doDecode());
+		case 26:
+			ECheckType(doDecode(), CTPath(["Void"]));
 		case 255:
 			null;
 		default:

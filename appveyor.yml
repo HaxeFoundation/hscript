@@ -1,0 +1,44 @@
+version: "{build}"
+
+environment:
+  global:
+    HAXELIB_ROOT: C:\projects\haxelib
+
+install:
+  # http://help.appveyor.com/discussions/problems/5616-not-able-to-build-due-to-problem-in-chocolateyinstallps1
+  - ps: Set-Service wuauserv -StartupType Manual
+  # Install the haxe chocolatey package (https://chocolatey.org/packages/haxe)
+  - cinst haxe -version 3.4.7 -y
+  - RefreshEnv
+  # Setup haxelib
+  - mkdir "%HAXELIB_ROOT%"
+  - haxelib setup "%HAXELIB_ROOT%"
+  # Install test dependencies
+  - ps: Set-Service wuauserv -StartupType Manual
+  - cinst php -y
+  - RefreshEnv
+  # Download and setup a standalone flash player debugger
+#  - haxe flash/install.hxml
+  # Install project dependencies
+  - haxelib install hxcpp     > log.txt || type log.txt && cmd /C exit 1
+  - haxelib install hxjava    > log.txt || type log.txt && cmd /C exit 1
+  - haxelib install hxcs      > log.txt || type log.txt && cmd /C exit 1
+  - haxelib install hx3compat > log.txt || type log.txt && cmd /C exit 1
+  - haxelib dev hscript .
+  - haxelib list
+
+build: off
+
+test_script:
+  - pushd script &&
+    haxe build.hxml &&
+    popd
+  - haxe bin/build-interp.hxml
+  - haxe bin/build-neko.hxml         && neko bin\Test.n
+  - haxe bin/build-js.hxml           && node bin\Test.js
+  - haxe bin/build-java.hxml         && java -jar bin\Test.jar
+  - haxe bin/build-cs.hxml           && bin\bin\Test.exe
+  - haxe bin/build-cpp.hxml          && bin\Test.exe
+#  - haxe bin/build-flash.hxml -D fdb && haxe flash\run.hxml bin\Test.swf
+  - haxe bin/build-php.hxml          && php bin\index.php
+  - haxe bin/build-python.hxml       && C:\Python34-x64\python.exe bin\Test.py

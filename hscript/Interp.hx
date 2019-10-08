@@ -1,34 +1,32 @@
 /*
- * Copyright (c) 2008, Nicolas Cannasse
- * All rights reserved.
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ * Copyright (C)2008-2017 Haxe Foundation
  *
- *   - Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   - Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
  *
- * THIS SOFTWARE IS PROVIDED BY THE HAXE PROJECT CONTRIBUTORS "AS IS" AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE HAXE PROJECT CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
- * DAMAGE.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
  */
 package hscript;
+import haxe.PosInfos;
 import hscript.Expr;
 
 private enum Stop {
 	SBreak;
 	SContinue;
-	SReturn( v : Dynamic );
+	SReturn;
 }
 
 class Interp {
@@ -46,6 +44,7 @@ class Interp {
 	var depth : Int;
 	var inTry : Bool;
 	var declared : Array<{ n : String, old : { r : Dynamic } }>;
+	var returnValue : Dynamic;
 
 	#if hscriptPos
 	var curExpr : Expr;
@@ -59,11 +58,25 @@ class Interp {
 		variables = new Hash();
 		locals = new Hash();
 		#end
+		declared = new Array();
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
-		variables.set("trace",function(e) haxe.Log.trace(Std.string(e),cast { fileName : "hscript", lineNumber : 0 }));
+		variables.set("trace", Reflect.makeVarArgs(function(el) {
+			var inf = posInfos();
+			var v = el.shift();
+			if( el.length > 0 ) inf.customParams = el;
+			haxe.Log.trace(Std.string(v), inf);
+		}));
 		initOps();
+	}
+
+	public function posInfos(): PosInfos {
+		#if hscriptPos
+			if (curExpr != null)
+				return cast { fileName : curExpr.origin, lineNumber : curExpr.line };
+		#end
+		return cast { fileName : "hscript", lineNumber : 0 };
 	}
 
 	function initOps() {
@@ -109,7 +122,7 @@ class Interp {
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
-		switch( edef(e1) ) {
+		switch( Tools.expr(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			if( l == null )
@@ -118,8 +131,16 @@ class Interp {
 				l.r = v;
 		case EField(e,f):
 			v = set(expr(e),f,v);
-		case EArray(e,index):
-			expr(e)[expr(index)] = v;
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				setMapValue(arr, index, v);
+			}
+			else {
+				arr[index] = v;
+			}
+
 		default:
 			error(EInvalidOp("="));
 		}
@@ -133,7 +154,7 @@ class Interp {
 
 	function evalAssignOp(op,fop,e1,e2) : Dynamic {
 		var v;
-		switch( edef(e1) ) {
+		switch( Tools.expr(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			v = fop(expr(e1),expr(e2));
@@ -145,11 +166,17 @@ class Interp {
 			var obj = expr(e);
 			v = fop(get(obj,f),expr(e2));
 			v = set(obj,f,v);
-		case EArray(e,index):
-			var arr = expr(e);
-			var index = expr(index);
-			v = fop(arr[index],expr(e2));
-			arr[index] = v;
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				v = fop(getMapValue(arr, index), expr(e2));
+				setMapValue(arr, index, v);
+			}
+			else {
+				v = fop(arr[index],expr(e2));
+				arr[index] = v;
+			}
 		default:
 			return error(EInvalidOp(op));
 		}
@@ -180,16 +207,29 @@ class Interp {
 			} else
 				set(obj,f,v + delta);
 			return v;
-		case EArray(e,index):
-			var arr = expr(e);
-			var index = expr(index);
-			var v = arr[index];
-			if( prefix ) {
-				v += delta;
-				arr[index] = v;
-			} else
-				arr[index] = v + delta;
-			return v;
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				var v = getMapValue(arr, index);
+				if (prefix) {
+					v += delta;
+					setMapValue(arr, index, v);
+				}
+				else {
+					setMapValue(arr, index, v + delta);
+				}
+				return v;
+			}
+			else {
+				var v = arr[index];
+				if( prefix ) {
+					v += delta;
+					arr[index] = v;
+				} else
+					arr[index] = v + delta;
+				return v;
+			}
 		default:
 			return error(EInvalidOp((delta > 0)?"++":"--"));
 		}
@@ -213,7 +253,10 @@ class Interp {
 			switch( e ) {
 			case SBreak: throw "Invalid break";
 			case SContinue: throw "Invalid continue";
-			case SReturn(v): return v;
+			case SReturn:
+				var v = returnValue;
+				returnValue = null;
+				return v;
 			}
 		}
 		return null;
@@ -237,21 +280,18 @@ class Interp {
 		}
 	}
 
-	inline function edef( e : Expr ) {
-		#if hscriptPos
-		return e.e;
-		#else
-		return e;
-		#end
+	inline function error(e : #if hscriptPos ErrorDef #else Error #end, rethrow=false ) : Dynamic {
+		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
+		if( rethrow ) this.rethrow(e) else throw e;
+		return null;
 	}
 
-	inline function error(e : #if hscriptPos ErrorDef #else Error #end ) : Dynamic {
-		#if hscriptPos
-		throw new Error(e, curExpr.pmin, curExpr.pmax);
+	inline function rethrow( e : Dynamic ) {
+		#if hl
+		hl.Api.rethrow(e);
 		#else
 		throw e;
 		#end
-		return null;
 	}
 
 	function resolve( id : String ) : Dynamic {
@@ -324,7 +364,7 @@ class Interp {
 			for( p in params )
 				args.push(expr(p));
 
-			switch( edef(e) ) {
+			switch( Tools.expr(e) ) {
 			case EField(e,f):
 				var obj = expr(e);
 				if( obj == null ) error(EInvalidAccess(f));
@@ -337,6 +377,9 @@ class Interp {
 		case EWhile(econd,e):
 			whileLoop(econd,e);
 			return null;
+		case EDoWhile(econd,e):
+			doWhileLoop(econd,e);
+			return null;
 		case EFor(v,it,e):
 			forLoop(v,it,e);
 			return null;
@@ -345,7 +388,8 @@ class Interp {
 		case EContinue:
 			throw SContinue;
 		case EReturn(e):
-			throw SReturn((e == null)?null:expr(e));
+			returnValue = e == null ? null : expr(e);
+			throw SReturn;
 		case EFunction(params,fexpr,name,_):
 			var capturedLocals = duplicate(locals);
 			var me = this;
@@ -416,12 +460,56 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			var a = new Array();
-			for( e in arr )
-				a.push(expr(e));
-			return a;
-		case EArray(e,index):
-			return expr(e)[expr(index)];
+			if (arr.length > 0 && Tools.expr(arr[0]).match(EBinop("=>", _))) {
+				var isAllString:Bool = true;
+				var isAllInt:Bool = true;
+				var isAllObject:Bool = true;
+				var isAllEnum:Bool = true;
+				var keys:Array<Dynamic> = [];
+				var values:Array<Dynamic> = [];
+				for (e in arr) {
+					switch(Tools.expr(e)) {
+						case EBinop("=>", eKey, eValue): {
+							var key:Dynamic = expr(eKey);
+							var value:Dynamic = expr(eValue);
+							isAllString = isAllString && Std.is(key, String);
+							isAllInt = isAllInt && Std.is(key, Int);
+							isAllObject = isAllObject && Reflect.isObject(key);
+							isAllEnum = isAllEnum && Reflect.isEnumValue(key);
+							keys.push(key);
+							values.push(value);
+						}
+						default: throw("=> expected");
+					}
+				}
+				var map:Dynamic = {
+					if (isAllInt) new haxe.ds.IntMap<Dynamic>();
+					else if (isAllString) new haxe.ds.StringMap<Dynamic>();
+					else if (isAllEnum) new haxe.ds.EnumValueMap<Dynamic, Dynamic>();
+					else if (isAllObject) new haxe.ds.ObjectMap<Dynamic, Dynamic>();
+					else throw 'Inconsistent key types';
+				}
+				for (n in 0...keys.length) {
+					setMapValue(map, keys[n], values[n]);
+				}
+				return map;
+			}
+			else {
+				var a = new Array();
+				for ( e in arr ) {
+					a.push(expr(e));
+				}
+				return a;
+			}
+		case EArray(e, index):
+			var arr:Dynamic = expr(e);
+			var index:Dynamic = expr(index);
+			if (isMap(arr)) {
+				return getMapValue(arr, index);
+			}
+			else {
+				return arr[index];
+			}
 		case ENew(cl,params):
 			var a = new Array();
 			for( e in params )
@@ -476,8 +564,29 @@ class Interp {
 			if( !match )
 				val = def == null ? null : expr(def);
 			return val;
+		case EMeta(_, _, e):
+			return expr(e);
+		case ECheckType(e,_):
+			return expr(e);
 		}
 		return null;
+	}
+
+	function doWhileLoop(econd,e) {
+		var old = declared.length;
+		do {
+			try {
+				expr(e);
+			} catch( err : Stop ) {
+				switch(err) {
+				case SContinue:
+				case SBreak: break;
+				case SReturn: throw err;
+				}
+			}
+		}
+		while( expr(econd) == true );
+		restore(old);
 	}
 
 	function whileLoop(econd,e) {
@@ -489,7 +598,7 @@ class Interp {
 				switch(err) {
 				case SContinue:
 				case SBreak: break;
-				case SReturn(_): throw err;
+				case SReturn: throw err;
 				}
 			}
 		}
@@ -497,8 +606,8 @@ class Interp {
 	}
 
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
-		#if (flash && !flash9)
-		if( v.iterator != null ) v = v.iterator();
+		#if ((flash && !flash9) || (php && !php7 && haxe_ver < '4.0.0'))
+		if ( v.iterator != null ) v = v.iterator();
 		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
 		#end
@@ -518,26 +627,49 @@ class Interp {
 				switch( err ) {
 				case SContinue:
 				case SBreak: break;
-				case SReturn(_): throw err;
+				case SReturn: throw err;
 				}
 			}
 		}
 		restore(old);
 	}
 
+	inline function isMap(o:Dynamic):Bool {
+		return Std.is(o, haxe.Constraints.IMap);
+	}
+
+	inline function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
+		return cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).get(key);
+	}
+
+	inline function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
+		cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).set(key, value);
+	}
+
 	function get( o : Dynamic, f : String ) : Dynamic {
-		if( o == null ) error(EInvalidAccess(f));
-		return Reflect.field(o,f);
+		if ( o == null ) error(EInvalidAccess(f));
+		return {
+			#if php
+				// https://github.com/HaxeFoundation/haxe/issues/4915
+				try {
+					Reflect.getProperty(o, f);
+				} catch (e:Dynamic) {
+					Reflect.field(o, f);
+				}
+			#else
+				Reflect.getProperty(o, f);
+			#end
+		}
 	}
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
-		Reflect.setField(o,f,v);
+		Reflect.setProperty(o,f,v);
 		return v;
 	}
 
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
-		return call(o, Reflect.field(o, f), args);
+		return call(o, get(o, f), args);
 	}
 
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
