@@ -78,6 +78,11 @@ class Parser {
 	**/
 	public var allowMetadata : Bool;
 
+	/**
+		resume from parsing errors (when parsing incomplete code, during completion for example)
+	**/
+	public var resumeErrors : Bool;
+
 	// implementation
 	var input : haxe.io.Input;
 	var char : Int;
@@ -142,6 +147,7 @@ class Parser {
 	}
 
 	public inline function error( err, pmin, pmax ) {
+		if( !resumeErrors )
 		#if hscriptPos
 		throw new Error(err, pmin, pmax, origin, line);
 		#else
@@ -329,6 +335,7 @@ class Parser {
 				break;
 			default:
 				unexpected(tk);
+				break;
 			}
 			ensure(TDoubleDot);
 			fl.push({ name : id, e : parseExpr() });
@@ -422,7 +429,7 @@ class Parser {
 			while( true ) {
 				parseFullExpr(a);
 				tk = token();
-				if( tk == TBrClose )
+				if( tk == TBrClose || (resumeErrors && tk == TEof) )
 					break;
 				push(tk);
 			}
@@ -445,7 +452,7 @@ class Parser {
 		case TBkOpen:
 			var a = new Array();
 			tk = token();
-			while( tk != TBkClose ) {
+			while( tk != TBkClose && (!resumeErrors || tk != TEof) ) {
 				push(tk);
 				a.push(parseExpr());
 				tk = token();
@@ -485,6 +492,7 @@ class Parser {
 				break;
 			default:
 				unexpected(tk);
+				break;
 			}
 		}
 		ensureToken(TOp("->"));
@@ -537,6 +545,8 @@ class Parser {
 	}
 
 	function makeUnop( op, e ) {
+		if( e == null && resumeErrors )
+			return null;
 		return switch( expr(e) ) {
 		case EBinop(bop, e1, e2): mk(EBinop(bop, makeUnop(op, e1), e2), pmin(e1), pmax(e2));
 		case ETernary(e1, e2, e3): mk(ETernary(makeUnop(op, e1), e2, e3), pmin(e1), pmax(e3));
@@ -545,6 +555,8 @@ class Parser {
 	}
 
 	function makeBinop( op, e1, e ) {
+		if( e == null && resumeErrors )
+			return mk(EBinop(op,e1,e),pmin(e1),pmax(e1));
 		return switch( expr(e) ) {
 		case EBinop(op2,e2,e3):
 			if( opPriority.get(op) <= opPriority.get(op2) && !opRightAssoc.exists(op) )
@@ -644,16 +656,16 @@ class Parser {
 		case "new":
 			var a = new Array();
 			a.push(getIdent());
-			var next = true;
-			while( next ) {
+			while( true ) {
 				var tk = token();
 				switch( tk ) {
 				case TDot:
 					a.push(getIdent());
 				case TPOpen:
-					next = false;
+					break;
 				default:
 					unexpected(tk);
+					break;
 				}
 			}
 			var args = parseExprList(TPClose);
@@ -739,6 +751,7 @@ class Parser {
 					break;
 				default:
 					unexpected(tk);
+					break;
 				}
 			}
 			mk(ESwitch(e, cases, def), p1, tokenMax);
@@ -809,7 +822,9 @@ class Parser {
 				}
 				switch( tk ) {
 				case TId(id): name = id;
-				default: unexpected(tk);
+				default:
+					unexpected(tk);
+					break;
 				}
 				var arg : Argument = { name : name };
 				args.push(arg);
@@ -830,8 +845,8 @@ class Parser {
 					unexpected(tk);
 				}
 			}
-		}	
-		return args;	
+		}
+		return args;
 	}
 
 	function parseFunctionDecl() {
@@ -891,6 +906,7 @@ class Parser {
 						default:
 						}
 						unexpected(t);
+						break;
 					}
 				} else
 					push(t);
@@ -901,13 +917,13 @@ class Parser {
 		case TPOpen:
 			var a = token(),
 					b = token();
-			
-			push(b); 
+
+			push(b);
 			push(a);
 
 			function withReturn(args) {
 				switch token() { // I think it wouldn't hurt if ensure used enumEq
-					case TOp('->'): 
+					case TOp('->'):
 					case t: unexpected(t);
 				}
 
@@ -916,7 +932,7 @@ class Parser {
 
 			switch [a, b] {
 				case [TPClose, _] | [TId(_), TDoubleDot]:
-					
+
 					var args = [for (arg in parseFunctionArgs()) {
 						switch arg.value {
 							case null:
@@ -929,12 +945,12 @@ class Parser {
 
 					return withReturn(args);
 				default:
-					
+
 					var t = parseType();
 					return switch token() {
 						case TComma:
 							var args = [t];
-							
+
 							while (true) {
 								args.push(parseType());
 								if (!maybe(TComma)) break;
@@ -973,6 +989,7 @@ class Parser {
 					meta.push({ name : name, params : parseMetaArgs() });
 				default:
 					unexpected(t);
+					break;
 				}
 			}
 			return parseTypeNext(CTAnon(fields));
@@ -1017,6 +1034,7 @@ class Parser {
 			default:
 				if( tk == etk ) break;
 				unexpected(tk);
+				break;
 			}
 		}
 		return args;
@@ -1219,6 +1237,7 @@ class Parser {
 				};
 			default:
 				unexpected(TId(id));
+				break;
 			}
 		}
 		return null;
