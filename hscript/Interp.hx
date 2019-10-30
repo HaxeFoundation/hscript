@@ -52,13 +52,22 @@ class Interp {
 
 	public function new() {
 		#if haxe3
-		variables = new Map<String,Dynamic>();
 		locals = new Map();
 		#else
-		variables = new Hash();
 		locals = new Hash();
 		#end
 		declared = new Array();
+		resetVariables();
+		initOps();
+	}
+
+	private function resetVariables(){
+		#if haxe3
+		variables = new Map<String,Dynamic>();
+		#else
+		variables = new Hash();
+		#end
+		
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
@@ -68,7 +77,6 @@ class Interp {
 			if( el.length > 0 ) inf.customParams = el;
 			haxe.Log.trace(Std.string(v), inf);
 		}));
-		initOps();
 	}
 
 	public function posInfos(): PosInfos {
