@@ -253,7 +253,7 @@ class Parser {
 
 	inline function pmin(e:Expr) {
 		#if hscriptPos
-		return e.pmin;
+		return e == null ? 0 : e.pmin;
 		#else
 		return 0;
 		#end
@@ -261,7 +261,7 @@ class Parser {
 
 	inline function pmax(e:Expr) {
 		#if hscriptPos
-		return e.pmax;
+		return e == null ? 0 : e.pmax;
 		#else
 		return 0;
 		#end
