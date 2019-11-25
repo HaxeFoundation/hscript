@@ -279,6 +279,7 @@ class Parser {
 	}
 
 	function isBlock(e) {
+		if( e == null ) return false;
 		return switch( expr(e) ) {
 		case EBlock(_), EObject(_), ESwitch(_): true;
 		case EFunction(_,e,_,_): isBlock(e);
@@ -302,7 +303,7 @@ class Parser {
 
 		var tk = token();
 		// this is a hack to support var a,b,c; with a single EVar
-		while( tk == TComma && expr(e).match(EVar(_)) ) {
+		while( tk == TComma && e != null && expr(e).match(EVar(_)) ) {
 			e = parseStructure("var"); // next variable
 			exprs.push(e);
 			tk = token();
@@ -438,7 +439,7 @@ class Parser {
 			if( unops.exists(op) ) {
 				var start = tokenMin;
 				var e = parseExpr();
-				if( op == "-" )
+				if( op == "-" && e != null )
 					switch( expr(e) ) {
 					case EConst(CInt(i)):
 						return mk(EConst(CInt(-i)), start, pmax(e));
@@ -525,6 +526,7 @@ class Parser {
 	}
 
 	function mapCompr( tmp : String, e : Expr ) {
+		if( e == null ) return null;
 		var edef = switch( expr(e) ) {
 		case EFor(v, it, e2):
 			EFor(v, it, mapCompr(tmp, e2));
@@ -1272,6 +1274,7 @@ class Parser {
 			} catch( e : Dynamic ) {
 				line = old;
 				error(EUnterminatedString, p1, p1);
+				break;
 			}
 			if( esc ) {
 				esc = false;
