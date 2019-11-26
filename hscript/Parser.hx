@@ -101,7 +101,6 @@ class Parser {
 	var tokens : List<{ min : Int, max : Int, t : Token }>;
 	#else
 	static inline var p1 = 0;
-	static inline var readPos = 0;
 	static inline var tokenMin = 0;
 	static inline var tokenMax = 0;
 	#if haxe3
