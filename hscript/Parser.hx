@@ -84,7 +84,9 @@ class Parser {
 	public var resumeErrors : Bool;
 
 	// implementation
-	var input : haxe.io.Input;
+	var input : String;
+	var readPos : Int;
+
 	var char : Int;
 	var ops : Array<Bool>;
 	var idents : Array<Bool>;
@@ -92,7 +94,6 @@ class Parser {
 
 	#if hscriptPos
 	var origin : String;
-	var readPos : Int;
 	var tokenMin : Int;
 	var tokenMax : Int;
 	var oldTokenMin : Int;
@@ -184,12 +185,9 @@ class Parser {
 	}
 
 	public function parseString( s : String, ?origin : String = "hscript" ) {
-		return parse( new haxe.io.StringInput(s), origin );
-	}
-
-	public function parse( s : haxe.io.Input, ?origin : String = "hscript" ) {
 		initParser(origin);
 		input = s;
+		readPos = 0;
 		var a = new Array();
 		while( true ) {
 			var tk = token();
@@ -460,7 +458,7 @@ class Parser {
 				if( tk == TComma )
 					tk = token();
 			}
-			if( a.length == 1 )
+			if( a.length == 1 && a[0] != null )
 				switch( expr(a[0]) ) {
 				case EFor(_), EWhile(_), EDoWhile(_):
 					var tmp = "__a_" + (uid++);
@@ -710,6 +708,7 @@ class Parser {
 							break;
 						default:
 							unexpected(tk);
+							break;
 						}
 					}
 					var exprs = [];
@@ -718,6 +717,8 @@ class Parser {
 						push(tk);
 						switch( tk ) {
 						case TId("case"), TId("default"), TBrClose:
+							break;
+						case TEof if( resumeErrors ):
 							break;
 						default:
 							parseFullExpr(exprs);
@@ -738,6 +739,8 @@ class Parser {
 						push(tk);
 						switch( tk ) {
 						case TId("case"), TId("default"), TBrClose:
+							break;
+						case TEof if( resumeErrors ):
 							break;
 						default:
 							parseFullExpr(exprs);
@@ -1046,7 +1049,8 @@ class Parser {
 
 	public function parseModule( content : String, ?origin : String = "hscript" ) {
 		initParser(origin);
-		this.input = new haxe.io.StringInput(content);
+		input = content;
+		readPos = 0;
 		allowTypes = true;
 		allowMetadata = true;
 		var decls = [];
@@ -1247,15 +1251,8 @@ class Parser {
 
 	// ------------------------ lexing -------------------------------
 
-	inline function incPos() {
-		#if hscriptPos
-		readPos++;
-		#end
-	}
-
-	function readChar() {
-		incPos();
-		return try input.readByte() catch( e : Dynamic ) 0;
+	inline function readChar() {
+		return StringTools.fastCodeAt(input, readPos++);
 	}
 
 	function readString( until ) {
@@ -1268,10 +1265,8 @@ class Parser {
 		var p1 = readPos - 1;
 		#end
 		while( true ) {
-			try {
-				incPos();
-				c = s.readByte();
-			} catch( e : Dynamic ) {
+			var c = readChar();
+			if( StringTools.isEof(c) ) {
 				line = old;
 				error(EUnterminatedString, p1, p1);
 				break;
@@ -1286,21 +1281,10 @@ class Parser {
 				case '/'.code: if( allowJSON ) b.writeByte(c) else invalidChar(c);
 				case "u".code:
 					if( !allowJSON ) invalidChar(c);
-					var code = null;
-					try {
-						incPos();
-						incPos();
-						incPos();
-						incPos();
-						code = s.readString(4);
-					} catch( e : Dynamic ) {
-						line = old;
-						error(EUnterminatedString, p1, p1);
-					}
 					var k = 0;
 					for( i in 0...4 ) {
 						k <<= 4;
-						var char = code.charCodeAt(i);
+						var char = readChar();
 						switch( char ) {
 						case 48,49,50,51,52,53,54,55,56,57: // 0-9
 							k += char - 48;
@@ -1309,6 +1293,10 @@ class Parser {
 						case 97,98,99,100,101,102: // a-f
 							k += char - 87;
 						default:
+							if( StringTools.isEof(char) ) {
+								line = old;
+								error(EUnterminatedString, p1, p1);
+							}
 							invalidChar(char);
 						}
 					}
@@ -1366,8 +1354,11 @@ class Parser {
 			this.char = -1;
 		}
 		while( true ) {
+			if( StringTools.isEof(char) ) {
+				this.char = char;
+				return TEof;
+			}
 			switch( char ) {
-			case 0: return TEof;
 			case 32,9,13: // space, tab, CR
 				#if hscriptPos
 				tokenMin++;
@@ -1658,14 +1649,11 @@ class Parser {
 		var c = op.charCodeAt(1);
 		var s = input;
 		if( c == '/'.code ) { // comment
-			try {
-				while( char != '\r'.code && char != '\n'.code ) {
-					incPos();
-					char = s.readByte();
-				}
-				this.char = char;
-			} catch( e : Dynamic ) {
+			while( char != '\r'.code && char != '\n'.code ) {
+				char = readChar();
+				if( StringTools.isEof(char) ) break;
 			}
+			this.char = char;
 			return token();
 		}
 		if( c == '*'.code ) { /* comment */
@@ -1674,21 +1662,24 @@ class Parser {
 				this.char = char;
 				return token();
 			}
-			try {
-				while( true ) {
-					while( char != '*'.code ) {
-						if( char == '\n'.code ) line++;
-						incPos();
-						char = s.readByte();
-					}
-					incPos();
-					char = s.readByte();
-					if( char == '/'.code )
+			while( true ) {
+				while( char != '*'.code ) {
+					if( char == '\n'.code ) line++;
+					char = readChar();
+					if( StringTools.isEof(char) ) {
+						line = old;
+						error(EUnterminatedComment, tokenMin, tokenMin);
 						break;
+					}
 				}
-			} catch( e : Dynamic ) {
-				line = old;
-				error(EUnterminatedComment, tokenMin, tokenMin);
+				char = readChar();
+				if( StringTools.isEof(char) ) {
+					line = old;
+					error(EUnterminatedComment, tokenMin, tokenMin);
+					break;
+				}
+				if( char == '/'.code )
+					break;
 			}
 			return token();
 		}
