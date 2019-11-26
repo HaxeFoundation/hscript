@@ -23,6 +23,7 @@ enum TType {
 	TAbstract( a : CAbstract, args : Array<TType> );
 	TFun( args : Array<{ name : String, opt : Bool, t : TType }>, ret : TType );
 	TAnon( fields : Array<{ name : String, opt : Bool, t : TType }> );
+	TLazy( f : Void -> TType );
 }
 
 private enum WithType {
@@ -68,6 +69,7 @@ typedef CTypedef = {> CNamedType,
 }
 
 typedef CAbstract = {> CNamedType,
+	var t : TType;
 }
 
 class Completion {
@@ -193,11 +195,13 @@ class CheckerTypes {
 			var ta : CAbstract = {
 				name : a.path,
 				params : [],
+				t : null,
 			};
 			for( p in a.params )
 				ta.params.push(TParam(p));
 			todo.push(function() {
 				localParams = [for( t in ta.params ) a.path+"."+Checker.typeStr(t) => t];
+				ta.t = makeXmlType(a.athis);
 				localParams = null;
 			});
 			types.set(a.path, CTAbstract(ta));
@@ -234,8 +238,18 @@ class CheckerTypes {
 			if( t != null ) return t;
 		}
 		var t = resolve(name,args);
-		if( t == null )
+		if( t == null ) {
+			var pack = name.split(".");
+			if( pack.length > 1 ) {
+				// bugfix for some args reported as pack._Name.Name while they are not private
+				var priv = pack[pack.length-2];
+				if( priv.charCodeAt(0) == "_".code ) {
+					pack.remove(priv);
+					return getType(pack.join("."), args);
+				}
+			}
 			return TUnresolved(name); // most likely private class
+		}
 		return t;
 	}
 
@@ -266,12 +280,21 @@ class Checker {
 	var events : Map<String,TType> = new Map();
 	var currentFunType : TType;
 	var isCompletion : Bool;
+	var allowDefine : Bool;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
+	public var allowGlobalsDefine : Bool;
+	public var allowUntypedMeta : Bool;
 
 	public function new( ?types ) {
 		if( types == null ) types = new CheckerTypes();
 		this.types = types;
+	}
+
+	public function setGlobals( cl : CClass ) {
+		for( f in cl.fields )
+			if( f.isPublic )
+				setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(() -> apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
 	}
 
 	public function removeGlobal( name : String ) {
@@ -301,12 +324,19 @@ class Checker {
 	public function check( expr : Expr, ?withType : WithType, ?isCompletion = false ) {
 		if( withType == null ) withType = NoValue;
 		locals = new Map();
+		allowDefine = allowGlobalsDefine;
 		this.isCompletion = isCompletion;
 		switch( edef(expr) ) {
 		case EBlock(el):
 			var delayed = [];
 			var last = TVoid;
-			for( e in el )
+			for( e in el ) {
+				while( true ) {
+					switch( edef(e) ) {
+					case EMeta(_,_,e2): e = e2;
+					default: break;
+					}
+				}
 				switch( edef(e) ) {
 				case EFunction(args,_,name,ret) if( name != null ):
 					var tret = ret == null ? makeMono() : makeType(ret, e);
@@ -325,6 +355,7 @@ class Checker {
 					else
 						typeExpr(e, NoValue);
 				}
+			}
 			for( f in delayed )
 				last = f();
 			return last;
@@ -354,7 +385,7 @@ class Checker {
 	function makeType( t : CType, e : Expr ) : TType {
 		return switch (t) {
 		case CTPath(path, params):
-			var ct = types.resolve(path.join("."),params == null ? [] : [for( p in params ) makeType(t,e)]);
+			var ct = types.resolve(path.join("."),params == null ? [] : [for( p in params ) makeType(p,e)]);
 			if( ct == null ) {
 				error("Unknown type "+path, e);
 				ct = TDynamic;
@@ -573,6 +604,25 @@ class Checker {
 				if( !typeEq(pl1[i],pl2[i]) )
 					return false;
 			return true;
+		case [TInst(cl1,pl1),TAnon(fl)]:
+			for( i in 0...fl.length ) {
+				var f2 = fl[i];
+				var f1 = null;
+				var cl = cl1;
+				while( true ) {
+				 	f1 = cl.fields.get(f2.name);
+					if( f1 != null ) break;
+					if( cl.superClass == null )
+						return false;
+					cl = switch( cl.superClass ) {
+					case TInst(c,_): c;
+					default: throw "assert";
+					}
+				}
+				if( !typeEq(f1.t,f2.t) )
+					return false;
+			}
+			return true;
 		case [TInt, TFloat]:
 			return true;
 		case [TFun(_), TAbstract({ name : "haxe.Function" },_)]:
@@ -625,6 +675,8 @@ class Checker {
 			return TFun([for( a in args ) { name : a.name, opt : a.opt, t : f(a.t) }], f(ret));
 		case TAnon(fields):
 			return TAnon([for( af in fields ) { name : af.name, opt : af.opt, t : f(af.t) }]);
+		case TLazy(l):
+			return f(l());
 		}
 	}
 
@@ -633,6 +685,7 @@ class Checker {
 		case TMono(r): if( r.r != null ) follow(r.r) else t;
 		case TType(t,args): apply(t.t, t.params, args);
 		case TNull(t): follow(t);
+		case TLazy(f): f();
 		default: t;
 		}
 	}
@@ -678,7 +731,9 @@ class Checker {
 			}
 			if( !cf.isPublic )
 				error("Can't access private field "+f+" on "+c.name, e);
-			return apply(cf.t, c.params, args);
+			var t = cf.t;
+			if( cf.params != null ) t = apply(t, cf.params, [for( i in 0...cf.params.length ) makeMono()]);
+			return apply(t, c.params, args);
 		case TDynamic:
 			return makeMono();
 		case TAnon(fields):
@@ -752,7 +807,12 @@ class Checker {
 			var l = locals.get(v);
 			if( l != null ) return l;
 			var g = globals.get(v);
-			if( g != null ) return g;
+			if( g != null ) {
+				return switch( g ) {
+				case TLazy(f): f();
+				default: g;
+				}
+			}
 			if( allowAsync ) {
 				g = globals.get("a_"+v);
 				if( g != null ) g = unasync(g);
@@ -792,7 +852,10 @@ class Checker {
 			case TFun(args, ret):
 				for( i in 0...params.length ) {
 					var a = args[i];
-					if( a == null ) error("Too many arguments", params[i]);
+					if( a == null ) {
+						error("Too many arguments", params[i]);
+						break;
+					}
 					var t = typeExpr(params[i], a == null ? Value : WithType(a.t));
 					unify(t, a.t, params[i]);
 				}
@@ -822,7 +885,9 @@ class Checker {
 			var vt = typeExpr(v, WithType(ct));
 			unify(vt, ct, v);
 			return ct;
-		case EMeta(_, _, e):
+		case EMeta(m, _, e):
+			if( m == ":untyped" && allowUntypedMeta )
+				return makeMono();
 			return typeExpr(e, withType);
 		case EIf(cond, e1, e2), ETernary(cond, e1, e2):
 			typeExprWith(cond, TBool);
@@ -873,7 +938,7 @@ class Checker {
 					if( tryUnify(et,t) ) et = t else unify(t,et,v);
 				}
 			}
-			if( et == null ) et = TDynamic;
+			if( et == null ) et = makeMono();
 			return types.getType("Array",[et]);
 		case EArray(a, index):
 			typeExprWith(index, TInt);
@@ -901,7 +966,9 @@ class Checker {
 			}
 			var locals = saveLocals();
 			var oldRet = allowReturn;
+			var oldGDef = allowDefine;
 			allowReturn = tret;
+			allowDefine = false;
 			var withArgs = null;
 			if( name != null && !withType.match(WithType(follow(_) => TFun(_))) ) {
 				var ev = events.get(name);
@@ -920,6 +987,7 @@ class Checker {
 				this.locals.set(a.name, a.t);
 			}
 			typeExpr(body,NoValue);
+			allowDefine = oldGDef;
 			allowReturn = oldRet;
 			this.locals = locals;
 			if( ft == null ) {
@@ -945,13 +1013,27 @@ class Checker {
 			case TInst({name:"Array"},[t]):
 				t;
 			default:
+				var ft = getField(itt,"iterator", it);
+				if( ft == null )
+					switch( itt ) {
+					case TAbstract(a, args):
+						// special case : we allow unconditional access
+						// to an abstract iterator() underlying value (eg: ArrayProxy)
+						ft = getField(apply(a.t,a.params,args),"iterator",it);
+					default:
+					}
+				if( ft != null )
+					switch( ft ) {
+					case TFun([],ret): ft = ret;
+					default: ft = null;
+					}
 				var t = makeMono();
 				var iter = makeIterator(t);
-				unify(itt,iter,it);
+				unify(ft != null ? ft : itt,iter,it);
 				t;
 			}
 			this.locals.set(v, vt);
-			typeExpr(e, Value);
+			typeExpr(e, NoValue);
 			this.locals = locals;
 			return TVoid;
 		case EBinop(op, e1, e2):
@@ -961,6 +1043,15 @@ class Checker {
 				typeExprWith(e2,TInt);
 				return TInt;
 			case "=":
+				if( allowDefine ) {
+					switch( edef(e1) ) {
+					case EIdent(i) if( !locals.exists(i) && !globals.exists(i) ):
+						var vt = typeExpr(e2,Value);
+						locals.set(i, vt);
+						return vt;
+					default:
+					}
+				}
 				var vt = typeExpr(e1, Value);
 				typeExprWith(e2,vt);
 				return vt;
@@ -1058,7 +1149,7 @@ class Checker {
 			for( c in cases ) {
 				for( v in c.values ) {
 					var ct = typeExpr(v, WithType(vt));
-					unify(vt, ct, v);
+					unify(ct, vt, v);
 				}
 				var et = typeExpr(c.expr, withType);
 				mergeType(et, c.expr);
