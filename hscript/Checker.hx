@@ -683,9 +683,9 @@ class Checker {
 	public function follow( t : TType ) {
 		return switch( t ) {
 		case TMono(r): if( r.r != null ) follow(r.r) else t;
-		case TType(t,args): apply(t.t, t.params, args);
+		case TType(t,args): follow(apply(t.t, t.params, args));
 		case TNull(t): follow(t);
-		case TLazy(f): f();
+		case TLazy(f): follow(f());
 		default: t;
 		}
 	}
