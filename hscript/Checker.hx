@@ -637,7 +637,7 @@ class Checker {
 			error(typeStr(t1)+" should be "+typeStr(t2),e);
 	}
 
-	function apply( t : TType, params : Array<TType>, args : Array<TType> ) {
+	public function apply( t : TType, params : Array<TType>, args : Array<TType> ) {
 		if( args.length != params.length ) throw "Invalid number of type parameters";
 		if( args.length == 0 )
 			return t;
