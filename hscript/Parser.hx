@@ -1358,6 +1358,8 @@ class Parser {
 				return TEof;
 			}
 			switch( char ) {
+			case 0:
+				return TEof;
 			case 32,9,13: // space, tab, CR
 				#if hscriptPos
 				tokenMin++;
@@ -1529,6 +1531,7 @@ class Parser {
 					var prev = -1;
 					while( true ) {
 						char = readChar();
+						if( StringTools.isEof(char) ) char = 0;
 						if( !ops[char] || prev == '='.code ) {
 							if( op.charCodeAt(0) == '/'.code )
 								return tokenComment(op,char);
@@ -1543,6 +1546,7 @@ class Parser {
 					var id = String.fromCharCode(char);
 					while( true ) {
 						char = readChar();
+						if( StringTools.isEof(char) ) char = 0;
 						if( !idents[char] ) {
 							this.char = char;
 							return TId(id);
