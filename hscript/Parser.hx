@@ -1256,7 +1256,7 @@ class Parser {
 
 	function readString( until ) {
 		var c = 0;
-		var b = new haxe.io.BytesOutput();
+		var b = new StringBuf();
 		var esc = false;
 		var old = line;
 		var s = input;
@@ -1273,11 +1273,11 @@ class Parser {
 			if( esc ) {
 				esc = false;
 				switch( c ) {
-				case 'n'.code: b.writeByte(10);
-				case 'r'.code: b.writeByte(13);
-				case 't'.code: b.writeByte(9);
-				case "'".code, '"'.code, '\\'.code: b.writeByte(c);
-				case '/'.code: if( allowJSON ) b.writeByte(c) else invalidChar(c);
+				case 'n'.code: b.addChar('\n'.code);
+				case 'r'.code: b.addChar('\r'.code);
+				case 't'.code: b.addChar('\t'.code);
+				case "'".code, '"'.code, '\\'.code: b.addChar(c);
+				case '/'.code: if( allowJSON ) b.addChar(c) else invalidChar(c);
 				case "u".code:
 					if( !allowJSON ) invalidChar(c);
 					var k = 0;
@@ -1299,17 +1299,7 @@ class Parser {
 							invalidChar(char);
 						}
 					}
-					// encode k in UTF8
-					if( k <= 0x7F )
-						b.writeByte(k);
-					else if( k <= 0x7FF ) {
-						b.writeByte( 0xC0 | (k >> 6));
-						b.writeByte( 0x80 | (k & 63));
-					} else {
-						b.writeByte( 0xE0 | (k >> 12) );
-						b.writeByte( 0x80 | ((k >> 6) & 63) );
-						b.writeByte( 0x80 | (k & 63) );
-					}
+					b.addChar(k);
 				default: invalidChar(c);
 				}
 			} else if( c == 92 )
@@ -1318,10 +1308,10 @@ class Parser {
 				break;
 			else {
 				if( c == 10 ) line++;
-				b.writeByte(c);
+				b.addChar(c);
 			}
 		}
-		return b.getBytes().toString();
+		return b.toString();
 	}
 
 	function token() {
