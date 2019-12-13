@@ -54,6 +54,7 @@ typedef CClass = {> CNamedType,
 
 typedef CField = {
 	var isPublic : Bool;
+	var canWrite : Bool;
 	var complete : Bool;
 	var params : Array<TType>;
 	var name : String;
@@ -140,7 +141,7 @@ class CheckerTypes {
 							complete = false;
 					}
 					if( skip ) continue;
-					var fl : CField = { isPublic : f.isPublic, complete : complete, params : [], name : f.name, t : null };
+					var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
 					for( p in f.params ) {
 						var pt = TParam(p);
 						var key = f.name+"."+p;
@@ -711,7 +712,7 @@ class Checker {
 		return fields;
 	}
 
-	function getField( t : TType, f : String, e : Expr ) {
+	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
 		switch( follow(t) ) {
 		case TInst(c, args):
 			var cf = c.fields.get(f);
@@ -719,18 +720,20 @@ class Checker {
 				cf = c.fields.get("a_"+f);
 				if( cf != null ) {
 					var isPublic = true; // consider a_ prefixed as script specific
-					cf = { isPublic : isPublic, params : cf.params, name : cf.name, t : unasync(cf.t), complete : cf.complete };
+					cf = { isPublic : isPublic, canWrite : false, params : cf.params, name : cf.name, t : unasync(cf.t), complete : cf.complete };
 					if( cf.t == null ) cf = null;
 				}
 			}
 			if( cf == null ) {
 				if( c.superClass == null ) return null;
-				var ft = getField(c.superClass, f, e);
+				var ft = getField(c.superClass, f, e, forWrite);
 				if( ft != null ) ft = apply(ft, c.params, args);
 				return ft;
 			}
 			if( !cf.isPublic )
 				error("Can't access private field "+f+" on "+c.name, e);
+			if( forWrite && !cf.canWrite )
+				error("Can't write readonly field "+f+" on "+c.name, e);
 			var t = cf.t;
 			if( cf.params != null ) t = apply(t, cf.params, [for( i in 0...cf.params.length ) makeMono()]);
 			return apply(t, c.params, args);
@@ -788,6 +791,18 @@ class Checker {
 
 	function onCompletion( expr : Expr, t : TType ) {
 		if( isCompletion ) throw new Completion(expr, t);
+	}
+
+	function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool ) {
+		var ot = typeExpr(o, Value);
+		if( f == null )
+			onCompletion(expr, ot);
+		var ft = getField(ot, f, expr, forWrite);
+		if( ft == null ) {
+			error(typeStr(ot)+" has no field "+f, expr);
+			ft = TDynamic;
+		}
+		return ft;
 	}
 
 	function typeExpr( expr : Expr, withType : WithType ) : TType {
@@ -871,15 +886,7 @@ class Checker {
 				return makeMono();
 			}
 		case EField(o, f):
-			var ot = typeExpr(o, Value);
-			if( f == null )
-				onCompletion(expr, ot);
-			var ft = getField(ot, f, expr);
-			if( ft == null ) {
-				error(typeStr(ot)+" has no field "+f, expr);
-				ft = TDynamic;
-			}
-			return ft;
+			return typeField(o,f,expr,false);
 		case ECheckType(v, t):
 			var ct = makeType(t, expr);
 			var vt = typeExpr(v, WithType(ct));
@@ -982,8 +989,12 @@ class Checker {
 				targs = typeArgs(args,expr);
 			for( i in 0...targs.length ) {
 				var a = targs[i];
-				if( withArgs != null && withArgs.length > i )
-					unify(withArgs[i].t, a.t, expr);
+				if( withArgs != null ) {
+					if( i < withArgs.length )
+						unify(withArgs[i].t, a.t, expr);
+					else
+						error("Extra argument "+a.name, expr);
+				}
 				this.locals.set(a.name, a.t);
 			}
 			typeExpr(body,NoValue);
@@ -1052,7 +1063,10 @@ class Checker {
 					default:
 					}
 				}
-				var vt = typeExpr(e1, Value);
+				var vt = switch( edef(e1) ) {
+				case EField(o,f): typeField(o, f, e1, true);
+				default: typeExpr(e1,Value);
+				}
 				typeExprWith(e2,vt);
 				return vt;
 			case "+":
