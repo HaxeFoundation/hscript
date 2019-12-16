@@ -997,6 +997,8 @@ class Checker {
 				}
 				this.locals.set(a.name, a.t);
 			}
+			if( withArgs != null && targs.length < withArgs.length )
+				error("Missing "+(withArgs.length - targs.length)+" arguments ("+[for( i in targs.length...withArgs.length ) typeStr(withArgs[i].t)].join(",")+")", expr);
 			typeExpr(body,NoValue);
 			allowDefine = oldGDef;
 			allowReturn = oldRet;
