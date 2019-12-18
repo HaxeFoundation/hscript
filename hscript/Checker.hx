@@ -1011,7 +1011,7 @@ class Checker {
 		case EUnop(op, _, e):
 			var et = typeExpr(e, Value);
 			switch( op ) {
-			case "++", "--":
+			case "++", "--", "-":
 				unify(et,TInt,e);
 				return et;
 			case "!":
