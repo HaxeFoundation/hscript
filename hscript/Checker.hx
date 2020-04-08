@@ -62,7 +62,7 @@ typedef CField = {
 }
 
 typedef CEnum = {> CNamedType,
-	var constructors : Map<String,TType>;
+	var constructors : Array<{ name : String, ?args : Array<{ name : String, opt : Bool, t : TType }> }>;
 }
 
 typedef CTypedef = {> CNamedType,
@@ -165,12 +165,14 @@ class CheckerTypes {
 			var en : CEnum = {
 				name : e.path,
 				params : [],
-				constructors: new Map(),
+				constructors: [],
 			};
 			for( p in e.params )
 				en.params.push(TParam(p));
 			todo.push(function() {
 				localParams = [for( t in en.params ) e.path+"."+Checker.typeStr(t) => t];
+				for( c in e.constructors )
+					en.constructors.push({ name : c.name, args : c.args == null ? null : [for( a in c.args ) { name : a.name, opt : a.opt, t : makeXmlType(a.t) }] });
 				localParams = null;
 			});
 			types.set(en.name, CTEnum(en));
