@@ -68,24 +68,36 @@ You can use `parser.allowMetadata` to parse metadata before expressions on in an
 
 You can use `new hscript.Macro(pos).convert(ast)` to convert an hscript AST to a Haxe macros one.
 
+You can use `hscript.Checker` in order to type check and even get completion, using `haxe -xml` output for type information.
+
 Limitations
 -----------
 
 Compared to Haxe, limitations are :
 
-- no type declarations (classes, enums, typedefs) : only expressions
 - `switch` construct is supported but not pattern matching (no variable capture, we use strict equality to compare `case` values and `switch` value)
 - only one variable declaration is allowed in `var`
 - the parser supports optional types for `var` and `function` if `allowTypes` is set, but the interpreter ignores them
 - you can enable per-expression position tracking by compiling with `-D hscriptPos`
+- you can parse some type declarations (import, class, typedef, etc.) with parseModule
 
 Install
 -------
 
 In order to install Haxe Script, use `haxelib install hscript` and compile your program with `-lib hscript`.
 
-There are only three files in hscript :
+These are the main required files in hscript :
 
   - `hscript.Expr` : contains enums declarations
   - `hscript.Parser` : a small parser that turns a string into an expression structure (AST)
   - `hscript.Interp` : a small interpreter that execute the AST and returns the latest evaluated value
+
+Some other optional files :
+  
+  - `hscript.Async` : converts Expr into asynchronous version
+  - `hscript.Bytes` : Expr serializer/unserializer
+  - `hscript.Checker` : type checking and completion for hscript Expr
+  - `hscript.Macro` : convert Haxe macro into hscript Expr
+  - `hscript.Printer` : convert hscript Expr to String
+  - `hscript.Tools` : utility functions (map/iter)
+ 
