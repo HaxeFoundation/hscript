@@ -75,12 +75,16 @@ class Async {
 		return a.build(e, topLevelSync);
 	}
 
+	public dynamic function getTopLevelEnd() {
+		return ignore();
+	}
+
 	public function build( e : Expr, topLevelSync = false ) {
 		if( topLevelSync ) {
 			return buildSync(e,null);
 		} else {
-			var nothing = ignore();
-			return toCps(e, nothing, nothing);
+			var end = getTopLevelEnd();
+			return toCps(e, end, end);
 		}
 	}
 
@@ -410,6 +414,8 @@ class Async {
 			return toCps(v, mk(EFunction([ { name : "_c", t : null } ], mk(ESwitch(ident("_c",v), cases, def == null ? retNull(rest) : toCps(def, rest, exit)),e)),e), exit );
 		case EThrow(v):
 			return toCps(v, mk(EFunction([ { name : "_v", t : null } ], mk(EThrow(v),v)), v), exit);
+		case EMeta(name,_,e) if( name.charCodeAt(0) == ":".code ): // ignore custom ":" metadata
+			return toCps(e, rest, exit);
 		//case EDoWhile(_), ETry(_), ECall(_):
 		default:
 			throw "Unsupported async expression " + Printer.toString(e);

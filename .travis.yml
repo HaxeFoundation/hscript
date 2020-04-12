@@ -4,11 +4,11 @@ os:
   - linux
   - osx
 
-sudo: false
-dist: trusty
+dist: bionic
 
 haxe:
   - "3.4.7"
+  - "4.0.3"
   - development
 
 addons:
@@ -19,27 +19,20 @@ addons:
       - g++-multilib
       # Python
       - python3
+      # PHP
+      - php-cli
+      - php-mbstring
       # C#
       - mono-devel
       - mono-mcs
-      # Flash
-      - libglib2.0
-      - libfreetype6
 
 install:
   # os-specific config
-  - if [ "${TRAVIS_OS_NAME}" = "linux" ]; then
-      export DISPLAY=:99.0;
-      export AUDIODEV=null;
-      phpenv global 7.0;
-    elif [ "${TRAVIS_OS_NAME}" = "osx" ]; then
+  - if [ "${TRAVIS_OS_NAME}" = "osx" ]; then
       brew update;
       brew install mono;
-      brew upgrade python;
       brew install php;
     fi
-  # Download and setup a standalone flash player debugger
-  - haxe flash/install.hxml
   # Install haxelibs
   - if [ "${TRAVIS_HAXE_VERSION}" = "development" ]; then
       haxelib git hxcpp https://github.com/HaxeFoundation/hxcpp.git;
@@ -67,8 +60,10 @@ script:
   - haxe bin/build-neko.hxml         && neko bin/Test.n
   - haxe bin/build-js.hxml           && node bin/Test.js
   - haxe bin/build-java.hxml         && java -jar bin/Test.jar
-#  - haxe bin/build-cs.hxml           && mono bin/bin/Test.exe
+  # Only test C# for Haxe 4+
+  - if [[ $(haxe -version 2&>1 | head -c 1) > 3 ]]; then
+    haxe bin/build-cs.hxml           && mono bin/bin/Test.exe;
+    fi
   - haxe bin/build-cpp.hxml          && ./bin/Test
-  - haxe bin/build-flash.hxml -D fdb && haxe flash/run.hxml bin/Test.swf
-  - haxe bin/build-php.hxml          && php bin/index.php
+  - haxe bin/build-php.hxml -D php7  && php bin/index.php
   - haxe bin/build-python.hxml       && python3 bin/Test.py
