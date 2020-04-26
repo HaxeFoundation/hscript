@@ -51,11 +51,9 @@ class Parser {
 	#if haxe3
 	public var opPriority : Map<String,Int>;
 	public var opRightAssoc : Map<String,Bool>;
-	public var unops : Map<String,Bool>; // true if allow postfix
 	#else
 	public var opPriority : Hash<Int>;
 	public var opRightAssoc : Hash<Bool>;
-	public var unops : Hash<Bool>; // true if allow postfix
 	#end
 
 	/**
@@ -131,11 +129,9 @@ class Parser {
 		#if haxe3
 		opPriority = new Map();
 		opRightAssoc = new Map();
-		unops = new Map();
 		#else
 		opPriority = new Hash();
 		opRightAssoc = new Hash();
-		unops = new Hash();
 		#end
 		for( i in 0...priorities.length )
 			for( x in priorities[i] ) {
@@ -143,7 +139,7 @@ class Parser {
 				if( i == 9 ) opRightAssoc.set(x, true);
 			}
 		for( x in ["!", "++", "--", "-", "~"] )
-			unops.set(x, x == "++" || x == "--");
+			opPriority.set(x, x == "++" || x == "--" ? -1 : -2);
 	}
 
 	public inline function error( err, pmin, pmax ) {
@@ -433,7 +429,7 @@ class Parser {
 			}
 			return mk(EBlock(a),p1);
 		case TOp(op):
-			if( unops.exists(op) ) {
+			if( opPriority.get(op) < 0 ) {
 				var start = tokenMin;
 				var e = parseExpr();
 				if( op == "-" && e != null )
@@ -783,7 +779,7 @@ class Parser {
 				unexpected(tk);
 			}
 
-			if( unops.get(op) ) {
+			if( opPriority.get(op) == -1 ) {
 				if( isBlock(e1) || switch(expr(e1)) { case EParent(_): true; default: false; } ) {
 					push(tk);
 					return e1;
@@ -1529,7 +1525,12 @@ class Parser {
 							return TOp(op);
 						}
 						prev = char;
+						var pop = op;
 						op += String.fromCharCode(char);
+						if( !opPriority.exists(op) && opPriority.exists(pop) ) {
+							this.char = char;
+							return TOp(pop);
+						}
 					}
 				}
 				if( idents[char] ) {
