@@ -125,6 +125,7 @@ class Parser {
 			["&&"],
 			["||"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
+			["->"]
 		];
 		#if haxe3
 		opPriority = new Map();
@@ -1514,20 +1515,18 @@ class Parser {
 			default:
 				if( ops[char] ) {
 					var op = String.fromCharCode(char);
-					var prev = -1;
 					while( true ) {
 						char = readChar();
 						if( StringTools.isEof(char) ) char = 0;
-						if( !ops[char] || prev == '='.code ) {
-							if( op.charCodeAt(0) == '/'.code )
-								return tokenComment(op,char);
+						if( !ops[char] ) {
 							this.char = char;
 							return TOp(op);
 						}
-						prev = char;
 						var pop = op;
 						op += String.fromCharCode(char);
 						if( !opPriority.exists(op) && opPriority.exists(pop) ) {
+							if( op == "//" || op == "/*" )
+								return tokenComment(op,char);
 							this.char = char;
 							return TOp(pop);
 						}
