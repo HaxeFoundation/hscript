@@ -360,6 +360,13 @@ class Parser {
 		case TConst(c):
 			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
+			tk = token();
+			if( tk == TPClose ) {
+				ensureToken(TOp("->"));
+				var eret = parseExpr();
+				return mk(EFunction([], mk(EReturn(eret),p1)), p1);
+			}
+			push(tk);
 			var e = parseExpr();
 			tk = token();
 			switch( tk ) {
