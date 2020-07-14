@@ -139,7 +139,7 @@ class Parser {
 				opPriority.set(x, i);
 				if( i == 9 ) opRightAssoc.set(x, true);
 			}
-		for( x in ["!", "++", "--", "-", "~"] )
+		for( x in ["!", "++", "--", "~"] ) // unary "-" handled in parser directly!
 			opPriority.set(x, x == "++" || x == "--" ? -1 : -2);
 	}
 
@@ -437,19 +437,22 @@ class Parser {
 			}
 			return mk(EBlock(a),p1);
 		case TOp(op):
-			if( opPriority.get(op) < 0 ) {
+			if( op == "-" ) {
 				var start = tokenMin;
 				var e = parseExpr();
-				if( op == "-" && e != null )
-					switch( expr(e) ) {
-					case EConst(CInt(i)):
-						return mk(EConst(CInt(-i)), start, pmax(e));
-					case EConst(CFloat(f)):
-						return mk(EConst(CFloat(-f)), start, pmax(e));
-					default:
-					}
-				return makeUnop(op,e);
+				if( e == null )
+					return makeUnop(op,e);
+				switch( expr(e) ) {
+				case EConst(CInt(i)):
+					return mk(EConst(CInt(-i)), start, pmax(e));
+				case EConst(CFloat(f)):
+					return mk(EConst(CFloat(-f)), start, pmax(e));
+				default:
+					return makeUnop(op,e);
+				}
 			}
+			if( opPriority.get(op) < 0 )
+				return makeUnop(op,parseExpr());
 			return unexpected(tk);
 		case TBkOpen:
 			var a = new Array();
