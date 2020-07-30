@@ -67,7 +67,7 @@ class Interp {
 		#else
 		variables = new Hash();
 		#end
-		
+
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
@@ -128,13 +128,17 @@ class Interp {
 		assignOp(">>>=",function(v1,v2) return v1 >>> v2);
 	}
 
+	function setVar( name : String, v : Dynamic ) {
+		variables.set(name, v);
+	}
+
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
 		var v = expr(e2);
 		switch( Tools.expr(e1) ) {
 		case EIdent(id):
 			var l = locals.get(id);
 			if( l == null )
-				variables.set(id,v)
+				setVar(id,v)
 			else
 				l.r = v;
 		case EField(e,f):
@@ -167,7 +171,7 @@ class Interp {
 			var l = locals.get(id);
 			v = fop(expr(e1),expr(e2));
 			if( l == null )
-				variables.set(id,v)
+				setVar(id,v)
 			else
 				l.r = v;
 		case EField(e,f):
@@ -199,12 +203,12 @@ class Interp {
 		switch(e) {
 		case EIdent(id):
 			var l = locals.get(id);
-			var v : Dynamic = (l == null) ? variables.get(id) : l.r;
+			var v : Dynamic = (l == null) ? resolve(id) : l.r;
 			if( prefix ) {
 				v += delta;
-				if( l == null ) variables.set(id,v) else l.r = v;
+				if( l == null ) setVar(id,v) else l.r = v;
 			} else
-				if( l == null ) variables.set(id,v + delta) else l.r = v + delta;
+				if( l == null ) setVar(id,v + delta) else l.r = v + delta;
 			return v;
 		case EField(e,f):
 			var obj = expr(e);
