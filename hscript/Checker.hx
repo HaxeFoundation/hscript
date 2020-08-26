@@ -295,9 +295,17 @@ class Checker {
 	}
 
 	public function setGlobals( cl : CClass ) {
-		for( f in cl.fields )
-			if( f.isPublic )
-				setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() return apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
+		while( true ) {
+			for( f in cl.fields )
+				if( f.isPublic )
+					setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() return apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
+			if( cl.superClass == null )
+				break;
+			cl = switch( cl.superClass ) {
+			case TInst(c,_): c;
+			default: throw "assert";
+			}
+		}
 	}
 
 	public function removeGlobal( name : String ) {
