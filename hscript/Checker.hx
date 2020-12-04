@@ -48,6 +48,7 @@ typedef CNamedType = {
 typedef CClass = {> CNamedType,
 	@:optional var superClass : TType;
 	@:optional var constructor : CField;
+	@:optional var interfaces : Array<TType>;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
 }
@@ -127,6 +128,11 @@ class CheckerTypes {
 				localParams = [for( t in cl.params ) c.path+"."+Checker.typeStr(t) => t];
 				if( c.superClass != null )
 					cl.superClass = getType(c.superClass.path, [for( t in c.superClass.params ) makeXmlType(t)]);
+				if( c.interfaces != null ) {
+					cl.interfaces = [];
+					for( i in c.interfaces )
+						cl.interfaces.push(getType(i.path, [for( t in i.params ) makeXmlType(t)]));
+				}
 				var pkeys = [];
 				for( f in c.fields ) {
 					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) continue;
@@ -603,6 +609,18 @@ class Checker {
 			return true;
 		case [TInst(cl1,pl1), TInst(cl2,pl2)]:
 			while( cl1 != cl2 ) {
+				if( cl1.interfaces != null ) {
+					for( i in cl1.interfaces ) {
+						switch( i ) {
+						case TInst(cli, args):
+							var i = TInst(cli, [for( a in args ) apply(a, cl1.params, pl1)]);
+							if( tryUnify(i, t2) )
+								return true;
+						default:
+							throw "assert";
+						}
+					}
+				}
 				switch( cl1.superClass ) {
 				case null: return false;
 				case TInst(c, args):
