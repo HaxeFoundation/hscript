@@ -49,6 +49,7 @@ typedef CClass = {> CNamedType,
 	@:optional var superClass : TType;
 	@:optional var constructor : CField;
 	@:optional var interfaces : Array<TType>;
+	@:optional var isInterface : Bool;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
 }
@@ -122,6 +123,8 @@ class CheckerTypes {
 				fields : new Map(),
 				statics : new Map(),
 			};
+			if( c.isInterface )
+				cl.isInterface = true;
 			for( p in c.params )
 				cl.params.push(TParam(p));
 			todo.push(function() {
@@ -719,23 +722,42 @@ class Checker {
 		}
 	}
 
-	public function getFields( t : TType ) {
+	public function getFields( t : TType ) : Array<{ name : String, t : TType }> {
 		var fields = [];
-		while( t != null ) {
-			t = follow(t);
-			switch( t ) {
-			case TInst(c, args):
+		switch( follow(t) ) {
+		case TInst(c, args):
+			var map = (t) -> apply(t,c.params,args);
+			while( c != null ) {
 				for( fname in c.fields.keys() ) {
 					var f = c.fields.get(fname);
-					fields.push({ name : f.name, t : f.t });
+					if( !f.isPublic || !f.complete ) continue;
+					var name = f.name, t = map(f.t);
+					if( allowAsync && StringTools.startsWith(name,"a_") ) {
+						t = unasync(t);
+						name = name.substr(2);
+					}
+					fields.push({ name : name, t : t });
 				}
-				t = c.superClass;
-			case TAnon(fl):
-				for( f in fl )
-					fields.push({ name : f.name, t : f.t });
-				break;
-			default:
+				if( c.isInterface && c.interfaces != null ) {
+					for( i in c.interfaces ) {
+						for( f in getFields(i) )
+							fields.push({ name : f.name, t : map(f.t) });
+					}
+				}
+				if( c.superClass == null ) break;
+				switch( c.superClass ) {
+				case TInst(csup,args):
+					var curMap = map;
+					map = (t) -> curMap(apply(t,csup.params,args));
+					c = csup;
+				default:
+					break;
+				}
 			}
+		case TAnon(fl):
+			for( f in fl )
+				fields.push({ name : f.name, t : f.t });
+		default:
 		}
 		return fields;
 	}
@@ -750,6 +772,13 @@ class Checker {
 					var isPublic = true; // consider a_ prefixed as script specific
 					cf = { isPublic : isPublic, canWrite : false, params : cf.params, name : cf.name, t : unasync(cf.t), complete : cf.complete };
 					if( cf.t == null ) cf = null;
+				}
+			}
+			if( cf == null && c.isInterface && c.interfaces != null ) {
+				for( i in c.interfaces ) {
+					var ft = getField(i, f, e, forWrite);
+					if( ft != null )
+						return apply(ft, c.params, args);
 				}
 			}
 			if( cf == null ) {
