@@ -681,7 +681,9 @@ class Interp {
 	}
 
 	function fcall( o : Dynamic, f : String, args : Array<Dynamic> ) : Dynamic {
-		return call(o, get(o, f), args);
+		var field = get(o, f);
+		if( field == null ) error(EInvalidAccess(f));
+		return call(o, field, args);
 	}
 
 	function call( o : Dynamic, f : Dynamic, args : Array<Dynamic> ) : Dynamic {
