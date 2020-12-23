@@ -131,7 +131,7 @@ class Async {
 			currentBreak = oldBreak;
 			return e;
 		case EReturn(eret) if( exit != null ):
-			return block([eret == null ? retNull(exit, e) : call(exit,[eret], e), mk(EReturn(),e)], e);
+			return block([eret == null ? retNull(exit, e) : call(exit,[eret], e), mk(EReturn(eret),e)], e);
 		default:
 			return Tools.map(e, buildSync.bind(_, exit));
 		}
@@ -454,7 +454,7 @@ class AsyncInterp extends Interp {
 			var obj = v.obj;
 			variables.set("a_" + v.v, Reflect.makeVarArgs(function(args:Array<Dynamic>) {
 				var onEnd = args.shift();
-				onEnd(Reflect.callMethod(obj, fv, args));
+				return onEnd(Reflect.callMethod(obj, fv, args));
 			}));
 		}
 	}
