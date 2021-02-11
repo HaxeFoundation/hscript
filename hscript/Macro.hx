@@ -92,6 +92,9 @@ class Macro {
 			case OpNegBits: "~";
 			case OpIncrement: "++";
 			case OpDecrement: "--";
+			#if (haxe_ver >= 4.2)
+			case OpSpread: continue;
+			#end
 			}
 			unops.set(str, op);
 		}
