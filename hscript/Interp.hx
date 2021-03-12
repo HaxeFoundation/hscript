@@ -22,6 +22,7 @@
 package hscript;
 import haxe.PosInfos;
 import hscript.Expr;
+import haxe.Constraints.IMap;
 
 private enum Stop {
 	SBreak;
@@ -484,8 +485,8 @@ class Interp {
 						case EBinop("=>", eKey, eValue): {
 							var key:Dynamic = expr(eKey);
 							var value:Dynamic = expr(eValue);
-							isAllString = isAllString && Std.is(key, String);
-							isAllInt = isAllInt && Std.is(key, Int);
+							isAllString = isAllString && (key is String);
+							isAllInt = isAllInt && (key is Int);
 							isAllObject = isAllObject && Reflect.isObject(key);
 							isAllEnum = isAllEnum && Reflect.isEnumValue(key);
 							keys.push(key);
@@ -647,7 +648,7 @@ class Interp {
 	}
 
 	inline function isMap(o:Dynamic):Bool {
-		return Std.is(o, haxe.Constraints.IMap);
+		return (o is IMap);
 	}
 
 	inline function getMapValue(map:Dynamic, key:Dynamic):Dynamic {
