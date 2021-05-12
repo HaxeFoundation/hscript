@@ -624,6 +624,16 @@ class Interp {
 		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
 		#end
+
+		// IntIterator has inline methods so need to wrap to call them
+		if(Std.isOfType(v, IntIterator)) {
+			final intIterator = cast(v, IntIterator);
+			return {
+				hasNext: () -> intIterator.hasNext(),
+				next: () -> intIterator.next()
+			}
+		}
+
 		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));
 		return v;
 	}
