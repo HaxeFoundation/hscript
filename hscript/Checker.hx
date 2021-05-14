@@ -597,6 +597,8 @@ class Checker {
 		case [TDynamic, _]:
 			return true;
 		case [TAnon(a1),TAnon(a2)]:
+			if( a2.length == 0 ) // always unify with {}
+				return true;
 			var m = new Map();
 			for( f in a1 )
 				m.set(f.name, f);
