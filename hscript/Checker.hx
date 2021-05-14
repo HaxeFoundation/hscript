@@ -974,7 +974,7 @@ class Checker {
 			return TVoid;
 		case EObject(fl):
 			switch( withType ) {
-			case WithType(follow(_) => TAnon(tfields)):
+			case WithType(follow(_) => TAnon(tfields)) if( tfields.length > 0 ):
 				var map = [for( f in tfields ) f.name => f];
 				return TAnon([for( f in fl ) {
 					var ft = map.get(f.name);
