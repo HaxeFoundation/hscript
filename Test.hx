@@ -25,15 +25,8 @@ class Test extends TestCase {
 	function test():Void {
 		assertScript("0",0);
 		assertScript("0xFF", 255);
-		#if !(php || python)
-			#if haxe3
-			assertScript("0xBFFFFFFF", 0xBFFFFFFF);
-			assertScript("0x7FFFFFFF", 0x7FFFFFFF);
-			#elseif !neko
-			assertScript("n(0xBFFFFFFF)", 0xBFFFFFFF, { n : haxe.Int32.toNativeInt });
-			assertScript("n(0x7FFFFFFF)", 0x7FFFFFFF, { n : haxe.Int32.toNativeInt } );
-			#end
-		#end
+		assertScript("0xBFFFFFFF", 0xBFFFFFFF);
+		assertScript("0x7FFFFFFF", 0x7FFFFFFF);
 		assertScript("-123",-123);
 		assertScript("- 123",-123);
 		assertScript("1.546",1.546);
