@@ -124,6 +124,8 @@ class TestHScript extends TestCase {
 		assertScript("var f:(x:Int)->(Int, Int)->Int = (x:Int) -> (y:Int, z:Int) -> x + y + z; f(3)(1, 2)", 6, null, true);
 		assertScript("var a = 10; var b = 5; a - -b", 15);
 		assertScript("var a = 10; var b = 5; a - b / 2", 7.5);
+		assertScript("var a; a", null);
+		assertScript("var a, b = 5; if (a == null) a = 2; a + b;", 7);
 		assertScript("false && xxx", false);
 		assertScript("true || xxx", true);
 		assertScript("[for( x in arr ) switch( x ) { case 1: 55; case 3: 66; default: 0; }].join(':')",'55:0:66',{ arr : [1,2,3] });
