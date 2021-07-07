@@ -612,10 +612,14 @@ class Parser {
 				tk = token();
 			}
 			var e = null;
-			if( Type.enumEq(tk,TOp("=")) )
-				e = parseExpr();
-			else
-				push(tk);
+
+			switch (tk)
+			{
+				case TOp("="): e = parseExpr();
+				case TComma | TSemicolon: push(tk);
+				default: unexpected(tk);
+			}
+
 			mk(EVar(ident,t,e),p1,(e == null) ? tokenMax : pmax(e));
 		case "while":
 			var econd = parseExpr();
