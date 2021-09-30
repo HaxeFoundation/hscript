@@ -1167,6 +1167,50 @@ class Parser {
                 to: to,
                 fields: fields
             });
+        case "interface":
+            var name = getIdent();
+			var params = parseParams();
+			var extend = [];
+			while( true ) {
+				var t = token();
+				switch( t ) {
+				case TId("extends"):
+					extend.push(parseType());
+				default:
+					push(t);
+					break;
+				}
+			}
+
+			var fields = [];
+			ensure(TBrOpen);
+			while( !maybe(TBrClose) )
+				fields.push(parseField(true));
+
+			return DInterface({
+				name : name,
+				meta : meta,
+				params : params,
+				extend : extend,
+				fields : fields,
+				isPrivate : isPrivate,
+				isExtern : isExtern,
+			});
+        case "enum": // TODO: enum abstracts
+            var name = getIdent();
+            var params = parseParams();
+            var fields = [];
+			ensure(TBrOpen);
+			while( !maybe(TBrClose) )
+				fields.push(parseEnumCtor());
+            return DEnum({
+                name: name,
+                params: params,
+                fields: fields,
+                meta: meta,
+                isPrivate: isPrivate,
+                isExtern: isExtern
+            });
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
@@ -1300,7 +1344,23 @@ class Parser {
 		}
 		return null;
 	}
-
+    function parseEnumCtor() {
+        var meta = parseMetadata();
+        var name = getIdent();
+        var inf = parseFunctionDecl();
+        if(inf.body != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
+        
+        return {
+            name : name,
+            meta : meta,
+            access : [APublic],
+            kind : KFunction({
+                args : inf.args,
+                expr : inf.body,
+                ret : inf.ret,
+            }),
+        };
+	}
 	// ------------------------ lexing -------------------------------
 
 	inline function readChar() {
@@ -1769,4 +1829,6 @@ class Parser {
 		}
 	}
 
+
+	
 }
