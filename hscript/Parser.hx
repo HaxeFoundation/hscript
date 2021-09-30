@@ -871,7 +871,8 @@ class Parser {
 			else
 				ret = parseType();
 		}
-		return { args : args, ret : ret, body : parseExpr() };
+        var noBody = maybe(TSemicolon);
+		return { args : args, ret : ret, body : if(noBody) null else parseExpr() };
 	}
 
 	function parsePath() {
@@ -1131,6 +1132,41 @@ class Parser {
 			}
 			ensure(TSemicolon);
 			return DImport(path, star);
+        case "abstract":
+            var name = getIdent();
+            var params = parseParams();
+            var underlying = null;
+            if(maybe(TPOpen)) {
+                underlying = parseType();
+                ensure(TPClose);
+            }
+            
+            var to = [];
+            var from = [];
+            while ( true ) {
+                var ident = getIdent();
+                switch ident {
+                    case "from":
+                        from.push(parseType());
+                    case "to":
+                        to.push(parseType());
+                }
+            }
+            var fields = [];
+			ensure(TBrOpen);
+			while( !maybe(TBrClose) )
+				fields.push(parseField());
+            return DAbstract({
+                name: name,
+                t: null,
+                params: params,
+                meta: meta,
+                isPrivate: isPrivate,
+                isExtern: isExtern,
+                from: from,
+                to: to,
+                fields: fields
+            });
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
@@ -1183,27 +1219,37 @@ class Parser {
 		return null;
 	}
 
-	function parseField() : FieldDecl {
+	function parseField(?isInterface = false) : FieldDecl {
 		var meta = parseMetadata();
 		var access = [];
+        
+        inline function addAccess(modifier:FieldAccess) {
+            if(isInterface) {
+                error(EUnexpected('access modifier $modifier on interface member'), readPos, readPos+1);
+            } else access.push(modifier);
+        }
 		while( true ) {
 			var id = getIdent();
 			switch( id ) {
 			case "override":
-				access.push(AOverride);
+				addAccess(AOverride);
 			case "public":
-				access.push(APublic);
+				addAccess(APublic);
 			case "private":
-				access.push(APrivate);
+				addAccess(APrivate);
 			case "inline":
-				access.push(AInline);
+				addAccess(AInline);
 			case "static":
-				access.push(AStatic);
+				addAccess(AStatic);
 			case "macro":
-				access.push(AMacro);
+				addAccess(AMacro);
 			case "function":
 				var name = getIdent();
 				var inf = parseFunctionDecl();
+                if(isInterface) 
+
+                    if(inf.body != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
+                
 				return {
 					name : name,
 					meta : meta,
@@ -1225,9 +1271,10 @@ class Parser {
 				}
 				var type = maybe(TDoubleDot) ? parseType() : null;
 				var expr = maybe(TOp("=")) ? parseExpr() : null;
-
+                
 				if( expr != null ) {
-					if( isBlock(expr) )
+                    if(isInterface) error(EUnexpected("field initializer"), readPos, readPos+1);
+					else if( isBlock(expr) )
 						maybe(TSemicolon);
 					else
 						ensure(TSemicolon);
@@ -1235,7 +1282,6 @@ class Parser {
 					maybe(TSemicolon);
 				} else
 					ensure(TSemicolon);
-
 				return {
 					name : name,
 					meta : meta,

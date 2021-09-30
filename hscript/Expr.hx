@@ -125,6 +125,10 @@ enum ModuleDecl {
 	DImport( path : Array<String>, ?everything : Bool );
 	DClass( c : ClassDecl );
 	DTypedef( c : TypeDecl );
+    DAbstract(a:AbstractDecl);
+    DEnum(e:EnumDecl);
+    DInterface(i:InterfaceDecl);
+
 }
 
 typedef ModuleType = {
@@ -133,17 +137,29 @@ typedef ModuleType = {
 	var meta : Metadata;
 	var isPrivate : Bool;
 }
+typedef InstancedType = {>ModuleType,
+    var fields : Array<FieldDecl>;
+	var isExtern : Bool;
+}
 
-typedef ClassDecl = {> ModuleType,
+typedef ClassDecl = {> InstancedType,
 	var extend : Null<CType>;
 	var implement : Array<CType>;
-	var fields : Array<FieldDecl>;
-	var isExtern : Bool;
+}
+typedef InterfaceDecl = {>InstancedType,
+    var extend : Array<CType>;
 }
 
 typedef TypeDecl = {> ModuleType,
 	var t : CType;
 }
+typedef AbstractDecl = {>InstancedType,
+    var t:CType;
+    var to:Array<CType>;
+    var from:Array<CType>;
+}
+typedef EnumDecl = InstancedType;
+
 
 typedef FieldDecl = {
 	var name : String;
