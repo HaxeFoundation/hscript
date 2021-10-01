@@ -50,8 +50,8 @@ typedef CClass = {> CNamedType,
     @:optional var constructor : CField;
     @:optional var interfaces : Array<TType>;
 	@:optional var isInterface : Bool;
-    var fields : Map<String,CField>;
-    var statics : Map<String,CField>;
+    var fields : Array<CField>;
+    var statics : Array<CField>;
 }
 
 typedef CField = {
@@ -73,6 +73,9 @@ typedef CTypedef = {> CNamedType,
 
 typedef CAbstract = {> CNamedType,
     var t : TType;
+    @:optional var constructor : CField;
+    var fields : Array<CField>;
+    var statics : Array<CField>;
 }
 
 class Completion {
