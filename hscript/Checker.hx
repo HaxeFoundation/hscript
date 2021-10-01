@@ -888,7 +888,7 @@ class Checker {
         if( isCompletion ) throw new Completion(expr, t);
     }
 
-    function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool ) {
+    function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool, ?args:Array<Expr>) {
         var ot = typeExpr(o, Value);
         if( f == null )
             onCompletion(expr, ot);
@@ -900,7 +900,7 @@ class Checker {
         return ft;
     }
 
-    function typeExpr( expr : Expr, withType : WithType ) : TType {
+    function typeExpr( expr : Expr, withType : WithType, ?args:Array<Expr>) : TType {
         if( expr == null && isCompletion )
             return switch( withType ) {
             case WithType(t): t;
@@ -958,7 +958,7 @@ class Checker {
         case EParent(e):
             return typeExpr(e,withType);
         case ECall(e, params):
-            var ft = typeExpr(e, Value);
+            var ft = typeExpr(e, Value, params);
             switch( follow(ft) ) {
             case TFun(args, ret):
                 for( i in 0...params.length ) {
@@ -983,8 +983,8 @@ class Checker {
             }
         case EField(o, f):
             var typeName = new Printer().exprToString(o);
-            if(globals.exists(typeName)) return typeField(EIdent(typeName).mk(expr),f, expr, false);
-            else return typeField(o,f,expr,false);
+            if(globals.exists(typeName)) return typeField(EIdent(typeName).mk(expr),f, expr, false, args);
+            else return typeField(o,f,expr,false, args);
         case ECheckType(v, t):
             var ct = makeType(t, expr);
             var vt = typeExpr(v, WithType(ct));
