@@ -83,6 +83,8 @@ enum CType {
 	CTParent( t : CType );
 	CTOpt( t : CType );
 	CTNamed( n : String, t : CType );
+
+    CTParam(p:String);
 }
 
 #if hscriptPos

@@ -1,6 +1,6 @@
 package hscript;
 import hscript.Expr;
-
+using hscript.Tools;
 /**
     This is a special type that can be used in API.
     It will be type-checked as `Script` but will compile/execute as `Real`
@@ -346,13 +346,15 @@ class Checker {
             { name : a.name, opt : a.opt, t : at };
         }];
     }
-
+   
     public function check( expr : Expr, ?withType : WithType, ?isCompletion = false ) {
         if( withType == null ) withType = NoValue;
         locals = new Map();
         allowDefine = allowGlobalsDefine;
         this.isCompletion = isCompletion;
         switch( edef(expr) ) {
+        
+            
         case EBlock(el):
             var delayed = [];
             var last = TVoid;
@@ -410,6 +412,7 @@ class Checker {
 
     public function makeType( t : CType, ?e : Expr,?pos:haxe.PosInfos) : TType {
         return if(t == null) TVoid else switch (t) {
+        case CTParam(p): TParam(p);
         case CTPath(path, params):
             var ct = types.resolve(path.join("."),params == null ? [] : [for( p in params ) makeType(p,e)]);
             if( ct == null ) {
@@ -563,9 +566,15 @@ class Checker {
     }
 
     function tryUnify( t1 : TType, t2 : TType ) {
+        
         if( t1 == t2 )
             return true;
         switch( [t1,t2] ) {
+            // deferred resolution
+        case [TUnresolved(unresolved), _]:
+            return tryUnify(types.resolve(unresolved), t2);
+        case [_, TUnresolved(unresolved)]:
+            return tryUnify(t1, types.resolve(unresolved));
         case [TMono(r), _]:
             if( r.r == null ) {
                 if( !link(t1,t2,r) )
@@ -732,8 +741,9 @@ class Checker {
 
 	public function getFields( t : TType ) : Array<{ name : String, t : TType }> {
 		var fields = [];
-		switch( follow(t) ) {
-		case TInst(c, args):
+        
+		switch( t ) {
+		case follow(_) => TInst(c, args):
 			var map = (t) -> apply(t,c.params,args);
 			while( c != null ) {
 				for( fname in c.fields.keys() ) {
@@ -762,7 +772,7 @@ class Checker {
 					break;
 				}
 			}
-		case TAnon(fl):
+		case follow(_) =>TAnon(fl):
 			for( f in fl )
 				fields.push({ name : f.name, t : f.t });
 		default:
@@ -771,8 +781,14 @@ class Checker {
 	}
 
 	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
-		switch( follow(t) ) {
-		case TInst(c, args):
+        
+		switch( t ) {
+        case TType(_ => {name: typeName, params: params, t: follow(_) => instType},args ) if(instType.match(TInst(_))):
+            return switch instType {
+                default: null;
+                case TInst(c, _): c.statics[f].t;
+            }
+		case follow(_) => TInst(c, args):
 			var cf = c.fields.get(f);
 			if( cf == null && allowAsync ) {
 				cf = c.fields.get("a_"+f);
@@ -802,9 +818,9 @@ class Checker {
 			var t = cf.t;
 			if( cf.params != null ) t = apply(t, cf.params, [for( i in 0...cf.params.length ) makeMono()]);
 			return apply(t, c.params, args);
-		case TDynamic:
+		case  follow(_) => TDynamic:
 			return makeMono();
-		case TAnon(fields):
+		case  follow(_) =>  TAnon(fields):
 			for( af in fields )
 				if( af.name == f )
 					return af.t;
@@ -877,6 +893,7 @@ class Checker {
             default: TDynamic;
             }
         switch( edef(expr) ) {
+            
         case EConst(c):
             return switch (c) {
             case CInt(_): TInt;
@@ -941,7 +958,7 @@ class Checker {
                 }
                 for( i in params.length...args.length )
                     if( !args[i].opt )
-                        error("Missing argument "+args[i].name+":"+typeStr(args[i].t), expr);
+                        error("Missing argument "+args[i].name+":"+typeStr(args[i].t)/* +"\r\n"+typeStr(ft) */, expr);
                 return ret;
             case TDynamic:
                 for( p in params ) typeExpr(p,Value);
@@ -951,7 +968,9 @@ class Checker {
                 return makeMono();
             }
         case EField(o, f):
-            return typeField(o,f,expr,false);
+            var typeName = new Printer().exprToString(o);
+            if(globals.exists(typeName)) return typeField(EIdent(typeName).mk(expr),f, expr, false);
+            else return typeField(o,f,expr,false);
         case ECheckType(v, t):
             var ct = makeType(t, expr);
             var vt = typeExpr(v, WithType(ct));
@@ -1244,4 +1263,6 @@ class Checker {
         return TDynamic;
     }
 
+
+	
 }

@@ -48,6 +48,8 @@ class Printer {
 
 	function type( t : CType ) {
 		switch( t ) {
+        case CTParam(p):
+            add(p);
 		case CTOpt(t):
 			add('?');
 			type(t);
