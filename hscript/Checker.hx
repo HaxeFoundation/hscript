@@ -1,6 +1,7 @@
 package hscript;
 import hscript.Expr;
 using hscript.Tools;
+using Lambda;
 /**
     This is a special type that can be used in API.
     It will be type-checked as `Script` but will compile/execute as `Real`
@@ -129,8 +130,8 @@ class XmlCheckerTypes implements CheckerTypes {
             var cl : CClass = {
                 name : c.path,
                 params : [],
-                fields : new Map(),
-                statics : new Map(),
+                fields : [],
+                statics : [],
             };
             if( c.isInterface )
 				cl.isInterface = true;
@@ -173,7 +174,7 @@ class XmlCheckerTypes implements CheckerTypes {
                     if( fl.name == "new" )
                         cl.constructor = fl;
                     else
-                        cl.fields.set(f.name, fl);
+                        cl.fields.push(fl);
                 }
                 localParams = null;
             });
@@ -217,6 +218,16 @@ class XmlCheckerTypes implements CheckerTypes {
                 name : a.path,
                 params : [],
                 t : null,
+                fields: [for(f in a.impl.fields) {
+                    var complete = !StringTools.startsWith(f.name,"__"); // __uid, etc. (no metadata in such fields)
+                    var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
+                    fl;
+                }],
+                statics: [for(f in a.impl.statics) {
+                    var complete = !StringTools.startsWith(f.name,"__"); // __uid, etc. (no metadata in such fields)
+                    var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
+                    fl;
+                }]
             };
             for( p in a.params )
                 ta.params.push(TParam(p));
@@ -662,7 +673,7 @@ class Checker {
                 var f1 = null;
                 var cl = cl1;
                 while( true ) {
-                     f1 = cl.fields.get(f2.name);
+                     f1 = cl.fields.find(f -> f.name == f2.name);
                     if( f1 != null ) break;
                     if( cl.superClass == null )
                         return false;
@@ -749,8 +760,8 @@ class Checker {
 		case follow(_) => TInst(c, args):
 			var map = (t) -> apply(t,c.params,args);
 			while( c != null ) {
-				for( fname in c.fields.keys() ) {
-					var f = c.fields.get(fname);
+				for( f in c.fields ) {
+					// var f = c.fields.get(fname);
 					if( !f.isPublic || !f.complete ) continue;
 					var name = f.name, t = map(f.t);
 					if( allowAsync && StringTools.startsWith(name,"a_") ) {
@@ -789,12 +800,12 @@ class Checker {
         case TType(_ => {name: typeName, params: params, t: follow(_) => instType},args ) if(instType.match(TInst(_))):
             return switch instType {
                 default: null;
-                case TInst(c, _): c.statics[f].t;
+                case TInst(c, _): c.statics.find(field -> field.name == f).t;
             }
 		case follow(_) => TInst(c, args):
-			var cf = c.fields.get(f);
+			var cf = c.fields.find(field -> field.name == f);
 			if( cf == null && allowAsync ) {
-				cf = c.fields.get("a_"+f);
+				cf = c.fields.find(field -> field.name == "a_"+f);
 				if( cf != null ) {
 					var isPublic = true; // consider a_ prefixed as script specific
 					cf = { isPublic : isPublic, canWrite : false, params : cf.params, name : cf.name, t : unasync(cf.t), complete : cf.complete };
