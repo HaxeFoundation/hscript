@@ -100,6 +100,7 @@ class Tools {
 
 	public static inline function mk( e : ExprDef, p : Expr ) {
 		#if hscriptPos
+        if(p == null) p = {pmin: 0, pmax: 0, origin: null, line: 0, e: null}; 
 		return { e : e, pmin : p.pmin, pmax : p.pmax, origin : p.origin, line : p.line };
 		#else
 		return e;
