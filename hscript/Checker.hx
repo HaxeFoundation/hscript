@@ -673,7 +673,7 @@ class Checker {
                 var f1 = null;
                 var cl = cl1;
                 while( true ) {
-                     f1 = cl.fields.find(f -> f.name == f2.name);
+                     f1 = cl.fields.find(f -> f.name == f2.name && tryUnify(f2.t, f.t));
                     if( f1 != null ) break;
                     if( cl.superClass == null )
                         return false;
@@ -794,16 +794,38 @@ class Checker {
 		return fields;
 	}
 
-	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
-        
+	function getField( t : TType, f : String, e : Expr, forWrite = false, ?args:Array<TType>, ?ret:TType) {
+        function resolveMember(field:CField) return field.name == f && (
+            args == null ||
+            // if there were arguments (e.g. from an ECall expression), do method overload resolution..
+            switch field.t {
+            case TFun(fArgs, fRet):
+                var match = true;
+                for(i in 0...args.length) {
+                    var arg = args[i];
+                    var fArg = fArgs[i];
+                    if(!tryUnify(arg, fArg.t)) {
+                        match = false;
+                        break;
+                    }
+                }
+                match = match && tryUnify(fRet, ret);
+                match;
+            default: false;
+        });
 		switch( t ) {
         case TType(_ => {name: typeName, params: params, t: follow(_) => instType},args ) if(instType.match(TInst(_))):
             return switch instType {
                 default: null;
-                case TInst(c, _): c.statics.find(field -> field.name == f).t;
+                case TInst(c, _): 
+                    var resolved = c.statics.find(resolveMember).t;
+                    if(resolved != null) resolved;
+                    else c.statics.find(field -> field.name == f).t;
+                    // in case overload resolution fails, fallback to default behavior.. name-based resolution
             }
 		case follow(_) => TInst(c, args):
-			var cf = c.fields.find(field -> field.name == f);
+			var cf = c.fields.find(resolveMember);
+            if(cf == null) cf = c.fields.find(field -> field.name == f);
 			if( cf == null && allowAsync ) {
 				cf = c.fields.find(field -> field.name == "a_"+f);
 				if( cf != null ) {
@@ -814,14 +836,14 @@ class Checker {
 			}
 			if( cf == null && c.isInterface && c.interfaces != null ) {
 				for( i in c.interfaces ) {
-					var ft = getField(i, f, e, forWrite);
+					var ft = getField(i, f, e, forWrite, args, ret);
 					if( ft != null )
 						return apply(ft, c.params, args);
 				}
 			}
 			if( cf == null ) {
 				if( c.superClass == null ) return null;
-				var ft = getField(c.superClass, f, e, forWrite);
+				var ft = getField(c.superClass, f, e, forWrite, args, ret);
 				if( ft != null ) ft = apply(ft, c.params, args);
 				return ft;
 			}
@@ -888,11 +910,11 @@ class Checker {
         if( isCompletion ) throw new Completion(expr, t);
     }
 
-    function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool, ?args:Array<Expr>) {
+    function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool, ?args:Array<TType>, ?ret:TType = TDynamic) {
         var ot = typeExpr(o, Value);
         if( f == null )
             onCompletion(expr, ot);
-        var ft = getField(ot, f, expr, forWrite);
+        var ft = getField(ot, f, expr, forWrite, args, ret);
         if( ft == null ) {
             error(typeStr(ot)+" has no field "+f, expr);
             ft = TDynamic;
@@ -900,7 +922,7 @@ class Checker {
         return ft;
     }
 
-    function typeExpr( expr : Expr, withType : WithType, ?args:Array<Expr>) : TType {
+    function typeExpr( expr : Expr, withType : WithType, ?args:Array<TType>, ?ret:TType) : TType {
         if( expr == null && isCompletion )
             return switch( withType ) {
             case WithType(t): t;
@@ -958,7 +980,7 @@ class Checker {
         case EParent(e):
             return typeExpr(e,withType);
         case ECall(e, params):
-            var ft = typeExpr(e, Value, params);
+            var ft = typeExpr(e, Value, [for(param in params) typeExpr(param, Value)]);
             switch( follow(ft) ) {
             case TFun(args, ret):
                 for( i in 0...params.length ) {
@@ -983,8 +1005,13 @@ class Checker {
             }
         case EField(o, f):
             var typeName = new Printer().exprToString(o);
-            if(globals.exists(typeName)) return typeField(EIdent(typeName).mk(expr),f, expr, false, args);
-            else return typeField(o,f,expr,false, args);
+            var retType = switch withType {
+                case NoValue: TVoid;
+                case Value: TDynamic;
+                case WithType(t): t;
+            };
+            if(globals.exists(typeName)) return typeField(EIdent(typeName).mk(expr),f, expr, false, args, retType);
+            else return typeField(o,f,expr,false, args, retType);
         case ECheckType(v, t):
             var ct = makeType(t, expr);
             var vt = typeExpr(v, WithType(ct));
@@ -1150,8 +1177,8 @@ class Checker {
         case EBinop(op, e1, e2):
             switch( op ) {
             case "&", "|", "^", ">>", ">>>", "<<":
-                typeExprWith(e1,TInt);
-                typeExprWith(e2,TInt);
+                // typeExprWith(e1,TInt);
+                typeExprWith(e2,getVarType(e1));
                 return TInt;
             case "=":
                 if( allowDefine ) {
@@ -1163,14 +1190,11 @@ class Checker {
                     default:
                     }
                 }
-                var vt = switch( edef(e1) ) {
-                case EField(o,f): typeField(o, f, e1, true);
-                default: typeExpr(e1,Value);
-                }
+                var vt = getVarType(e1);
                 typeExprWith(e2,vt);
                 return vt;
             case "+":
-                var t1 = typeExpr(e1,WithType(TInt));
+                var t1 = getVarType(e1);
                 var t2 = typeExpr(e2,WithType(t1));
                 tryUnify(t1,t2);
                 switch( [follow(t1), follow(t2)]) {
@@ -1187,7 +1211,7 @@ class Checker {
                     unify(t2, TFloat, e2);
                 }
             case "-", "*", "/", "%":
-                var t1 = typeExpr(e1,WithType(TInt));
+                var t1 = getVarType(e1);
                 var t2 = typeExpr(e2,WithType(t1));
                 if( !tryUnify(t1,t2) )
                     unify(t2,t1,e2);
@@ -1278,5 +1302,12 @@ class Checker {
     }
 
 
+	
+
+	function getVarType(e1:Expr) 
+		return switch( edef(e1) ) {
+            case EField(o,f): typeField(o, f, e1, true);
+            default: typeExpr(e1,Value);
+            }
 	
 }
