@@ -132,10 +132,10 @@ enum ModuleDecl {
     DInterface(i:InterfaceDecl);
 
 }
-
+typedef Params = Array<TypeParamDecl>;
 typedef ModuleType = {
 	var name : String;
-	var params : {}; // TODO : not yet parsed
+	var params : Params; // TODO : not yet parsed
 	var meta : Metadata;
 	var isPrivate : Bool;
 }
@@ -174,6 +174,7 @@ enum FieldAccess {
 	APublic;
 	APrivate;
 	AOverride;
+    AInline;
 	AStatic;
 	AMacro;
 }

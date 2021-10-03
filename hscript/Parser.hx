@@ -1085,16 +1085,52 @@ class Parser {
 		return meta;
 	}
 
-	function parseParams() {
+	function parseParams():Params {
 		if( maybe(TOp("<")) )
 			error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
-		return {};
+		return  [];
 	}
-
+    
 	function parseModuleDecl() : ModuleDecl {
 		var meta = parseMetadata();
 		var ident = getIdent();
 		var isPrivate = false, isExtern = false;
+        inline function parseAbstract() {
+            var name = getIdent();
+            var params = parseParams();
+            var underlying = null;
+            if(maybe(TPOpen)) {
+                underlying = parseType();
+                ensure(TPClose);
+            }
+            
+            var to = [];
+            var from = [];
+            while ( true ) {
+                var ident = getIdent();
+                switch ident {
+                    case "from":
+                        from.push(parseType());
+                    case "to":
+                        to.push(parseType());
+                }
+            }
+            var fields = [];
+            ensure(TBrOpen);
+            while( !maybe(TBrClose) )
+                fields.push(parseField());
+            return DAbstract({
+                name: name,
+                t: null,
+                params: params,
+                meta: meta,
+                isPrivate: isPrivate,
+                isExtern: isExtern,
+                from: from,
+                to: to,
+                fields: fields
+            });
+        }
 		while( true ) {
 			switch( ident ) {
 			case "private":
@@ -1133,40 +1169,7 @@ class Parser {
 			ensure(TSemicolon);
 			return DImport(path, star);
         case "abstract":
-            var name = getIdent();
-            var params = parseParams();
-            var underlying = null;
-            if(maybe(TPOpen)) {
-                underlying = parseType();
-                ensure(TPClose);
-            }
-            
-            var to = [];
-            var from = [];
-            while ( true ) {
-                var ident = getIdent();
-                switch ident {
-                    case "from":
-                        from.push(parseType());
-                    case "to":
-                        to.push(parseType());
-                }
-            }
-            var fields = [];
-			ensure(TBrOpen);
-			while( !maybe(TBrClose) )
-				fields.push(parseField());
-            return DAbstract({
-                name: name,
-                t: null,
-                params: params,
-                meta: meta,
-                isPrivate: isPrivate,
-                isExtern: isExtern,
-                from: from,
-                to: to,
-                fields: fields
-            });
+            return parseAbstract();
         case "interface":
             var name = getIdent();
 			var params = parseParams();
@@ -1196,21 +1199,51 @@ class Parser {
 				isPrivate : isPrivate,
 				isExtern : isExtern,
 			});
-        case "enum": // TODO: enum abstracts
-            var name = getIdent();
-            var params = parseParams();
-            var fields = [];
-			ensure(TBrOpen);
-			while( !maybe(TBrClose) )
-				fields.push(parseEnumCtor());
-            return DEnum({
-                name: name,
-                params: params,
-                fields: fields,
-                meta: meta,
-                isPrivate: isPrivate,
-                isExtern: isExtern
-            });
+        case "enum": 
+            if(maybe(TId("abstract"))) {
+                return switch parseAbstract() {
+                    case DAbstract(a):
+                        var counter = 0;
+                        inline function fallbackInit(fieldName):Expr return switch a.t { // positions will be wrong
+                            case CTPath(['String'], _): mk(EConst(CString(fieldName)), readPos, readPos+1);
+                            case CTPath(['Int'], _): mk(EConst(CInt(counter++)), readPos, readPos+1);
+                            default: cast error(ECustom('expected variable initializer for $fieldName'), readPos, readPos+1);
+                        }
+                        a.fields = [for(f in a.fields) switch f.kind {
+                            case KVar(v):
+                                {
+                                    name: f.name,
+                                    meta: [{name: ':enum', params: []}].concat(f.meta),
+                                    kind: KVar({
+                                        type: CTPath(a.name.split('.'), [for(param in a.params) CTParam(param.name)]),
+                                        set: null,
+                                        get: null,
+                                        expr: if(v.expr == null) fallbackInit(f.name) else v.expr
+                                    }),
+                                    access: [APublic,AStatic,AInline]
+                                };
+                            default: f;
+                        }];
+                        DAbstract(a);
+                    default: cast error(ECustom('assert'), readPos, readPos+1);
+                }
+                
+            } else {
+                var name = getIdent();
+                var params = parseParams();
+                var fields = [];
+                ensure(TBrOpen);
+                while( !maybe(TBrClose) )
+                    fields.push(parseEnumCtor());
+                return DEnum({
+                    name: name,
+                    params: params,
+                    fields: fields,
+                    meta: meta,
+                    isPrivate: isPrivate,
+                    isExtern: isExtern
+                });
+            }
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
@@ -1283,8 +1316,7 @@ class Parser {
 			case "private":
 				addAccess(APrivate);
 			case "inline":
-                if(isInterface) unexpectedModifier('inline');
-				else inlined = true;
+                addAccess(AInline);
 			case "static":
 				addAccess(AStatic);
 			case "macro":
@@ -1833,4 +1865,8 @@ class Parser {
 
 
 	
+
+	function getEnmAbstrVal(arg0:String, arg1:CType):Null<Expr> {
+		throw new haxe.exceptions.NotImplementedException();
+	}
 }
