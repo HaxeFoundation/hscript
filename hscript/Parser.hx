@@ -1209,11 +1209,12 @@ class Parser {
                             case CTPath(['Int'], _): mk(EConst(CInt(counter++)), readPos, readPos+1);
                             default: cast error(ECustom('expected variable initializer for $fieldName'), readPos, readPos+1);
                         }
+                        a.meta = [{name: ':enum', params: []}].concat(a.meta);
                         a.fields = [for(f in a.fields) switch f.kind {
-                            case KVar(v):
+                            case KVar(v) if(f.access.length == 0):
                                 {
                                     name: f.name,
-                                    meta: [{name: ':enum', params: []}].concat(f.meta),
+                                    meta: f.meta,
                                     kind: KVar({
                                         type: CTPath(a.name.split('.'), [for(param in a.params) CTParam(param.name)]),
                                         set: null,
