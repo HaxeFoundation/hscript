@@ -1865,9 +1865,4 @@ class Parser {
 	}
 
 
-	
-
-	function getEnmAbstrVal(arg0:String, arg1:CType):Null<Expr> {
-		throw new haxe.exceptions.NotImplementedException();
-	}
 }
