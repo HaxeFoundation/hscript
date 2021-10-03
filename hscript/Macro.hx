@@ -209,7 +209,7 @@ class Macro {
 				EBreak;
 			case EContinue:
 				EContinue;
-			case EFunction(args, e, name, ret):
+			case EFunction(Tools.getFunctionName(_) => name, {args: args, expr: e, ret: ret}):
 				var targs = [];
 				for( a in args )
 					targs.push( {

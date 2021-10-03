@@ -190,7 +190,7 @@ class Bytes {
 			doEncode(it);
 			doEncode(e);
 		case EBreak, EContinue:
-		case EFunction(params,e,name,_):
+		case EFunction(Tools.getFunctionName(_) => name, {args: params,expr: e}):
 			bout.addByte(params.length);
 			for( p in params )
 				doEncodeString(p.name);
@@ -316,7 +316,7 @@ class Bytes {
 				params.push({ name : doDecodeString() });
 			var e = doDecode();
 			var name = doDecodeString();
-			EFunction(params,e,(name == "") ? null: name);
+			EFunction(Tools.getFunctionType(name), {args:params,expr:e});
 		case 15:
 			EReturn(doDecode());
 		case 16:

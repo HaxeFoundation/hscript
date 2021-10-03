@@ -96,15 +96,15 @@ class Async {
 	function lookupFunctions( el : Array<Expr> ) {
 		for( e in el )
 			switch( expr(e) ) {
-			case EFunction(_, _, name, _) if( name != null ): defineVar(name, Defined);
-			case EMeta("sync",_,expr(_) => EFunction(_,_,name,_)) if( name != null ): defineVar(name, ForceSync);
+			case EFunction(Tools.getFunctionName(_) => name, _) if( name != null ): defineVar(name, Defined);
+			case EMeta("sync",_,expr(_) => EFunction(Tools.getFunctionName(_) => name, _)) if( name != null ): defineVar(name, ForceSync);
 			default:
 			}
 	}
 
 	function buildSync( e : Expr, exit : Expr ) : Expr {
 		switch( expr(e) ) {
-		case EFunction(_,_,name,_):
+		case EFunction(Tools.getFunctionName(_) => name,_):
 			if( name != null )
 				return toCps(e, null, null);
 			return e;
@@ -116,8 +116,8 @@ class Async {
 			return e;
 		case EMeta("async", _, e):
 			return toCps(e, ignore(), ignore());
-		case EMeta("sync", args, ef = expr(_) => EFunction(fargs, body, name, ret)):
-			return mk(EMeta("sync",args,mk(EFunction(fargs, buildSync(body,null), name, ret),ef)),e);
+		case EMeta("sync", args, ef = expr(_) => EFunction(Tools.getFunctionName(_) => name, {args: fargs, expr: body, ret: ret })):
+			return mk(EMeta("sync",args,mk(EFunction(Tools.getFunctionType(name), {args: fargs, expr: buildSync(body,null), ret: ret}),ef)),e);
 		case EBreak if( currentBreak != null ):
 			return currentBreak(e);
 		case EContinue if( currentLoop != null ):
@@ -152,11 +152,11 @@ class Async {
 	}
 
 	inline function fun(arg:String, e, ?name) {
-		return mk(EFunction([{ name : arg, t : null }], e, name), e);
+		return mk(EFunction(FNamed(name, false), {args: [{ name : arg, t : null }], expr: e}), e);
 	}
 
 	inline function funs(arg:Array<String>, e, ?name) {
-		return mk(EFunction([for( a in arg ) { name : a, t : null }], e, name), e);
+		return mk(EFunction(FNamed(name, false), {expr: e, args: [for( a in arg ) { name : a, t : null }]} ), e);
 	}
 
 	inline function block(arr:Array<Expr>, e) {
@@ -179,7 +179,7 @@ class Async {
 
 	function retNull(e:Expr,?pos) : Expr {
 		switch( expr(e) ) {
-		case EFunction([{name:"_"}], e, _, _): return e;
+		case EFunction(FNamed('_', false), {expr: e}): return e;
 		default:
 		}
 		return call(e, [nullId], pos == null ? e : pos);
@@ -213,7 +213,7 @@ class Async {
 		switch( expr(e) ) {
 		case ECall(_):
 			syncFlag = false;
-		case EFunction(_,_,name,_) if( name != null ):
+		case EFunction(Tools.getFunctionName(_) => name, _) if( name != null ):
 			syncFlag = false;
 		case EMeta("sync" | "async", _, _):
 			// isolated from the sync part
@@ -247,7 +247,7 @@ class Async {
 			}
 			restoreVars(vold);
 			return retNull(rest);
-		case EFunction(args, body, name, t):
+		case EFunction(Tools.getFunctionName(_) => name, {args: args, expr: body, ret: t}):
 			var vold = saveVars();
 			if( name != null )
 				defineVar(name, Defined);
@@ -258,7 +258,7 @@ class Async {
 			var oldFun = currentFun;
 			currentFun = name;
 			var body = toCps(body, frest, frest);
-			var f = mk(EFunction(args, body, name, t),e);
+			var f = mk(EFunction(FNamed(name, false), {args: args, expr: body, ret: t}),e);
 			restoreVars(vold);
 			return rest == null ? f : call(rest, [f],e);
 		case EParent(e):
@@ -411,9 +411,9 @@ class Async {
 			return block([retNull(currentLoop, e), mk(EReturn(),e)], e);
 		case ESwitch(v, cases, def):
 			var cases = [for( c in cases ) { values : c.values, expr : toCps(c.expr, rest, exit) } ];
-			return toCps(v, mk(EFunction([ { name : "_c", t : null } ], mk(ESwitch(ident("_c",v), cases, def == null ? retNull(rest) : toCps(def, rest, exit)),e)),e), exit );
+			return toCps(v, mk(EFunction (FAnonymous, {expr: mk(ESwitch(ident("_c",v), cases, def == null ? retNull(rest) : toCps(def, rest, exit)),e), args: [ { name : "_c", t : null } ]} ) ,e), exit );
 		case EThrow(v):
-			return toCps(v, mk(EFunction([ { name : "_v", t : null } ], mk(EThrow(v),v)), v), exit);
+			return toCps(v, mk(EFunction(FAnonymous, {args: [ { name : "_v", t : null } ], expr: mk(EThrow(v),v)} ) , v), exit);
 		case EMeta(name,_,e) if( name.charCodeAt(0) == ":".code ): // ignore custom ":" metadata
 			return toCps(e, rest, exit);
 		//case EDoWhile(_), ETry(_), ECall(_):

@@ -276,7 +276,7 @@ class Parser {
 		if( e == null ) return false;
 		return switch( expr(e) ) {
 		case EBlock(_), EObject(_), ESwitch(_): true;
-		case EFunction(_,e,_,_): isBlock(e);
+		case EFunction(_, {expr: e}): isBlock(e);
 		case EVar(_, t, e): e != null ? isBlock(e) : t != null ? t.match(CTAnon(_)) : false;
 		case EIf(_,e1,e2): if( e2 != null ) isBlock(e2) else isBlock(e1);
 		case EBinop(_,_,e): isBlock(e);
@@ -364,7 +364,7 @@ class Parser {
 			if( tk == TPClose ) {
 				ensureToken(TOp("->"));
 				var eret = parseExpr();
-				return mk(EFunction([], mk(EReturn(eret),p1)), p1);
+				return mk(EFunction(FArrow, {args: [], expr: mk(EReturn(eret),p1) }), p1);
 			}
 			push(tk);
 			var e = parseExpr();
@@ -502,7 +502,7 @@ class Parser {
 		}
 		ensureToken(TOp("->"));
 		var eret = parseExpr();
-		return mk(EFunction(args, mk(EReturn(eret),pmin)), pmin);
+		return mk(EFunction(FArrow, {args: args, expr: mk(EReturn(eret),pmin)}), pmin);
 	}
 
 	function parseMetaArgs() {
@@ -653,7 +653,7 @@ class Parser {
 			default: push(tk);
 			}
 			var inf = parseFunctionDecl();
-			mk(EFunction(inf.args, inf.body, name, inf.ret),p1,pmax(inf.body));
+			mk(EFunction(Tools.getFunctionType(name),{args: inf.args, expr: inf.body, ret: inf.ret}),p1,pmax(inf.body));
 		case "return":
 			var tk = token();
 			push(tk);
@@ -781,10 +781,10 @@ class Parser {
 				switch( expr(e1) ) {
 				case EIdent(i), EParent(expr(_) => EIdent(i)):
 					var eret = parseExpr();
-					return mk(EFunction([{ name : i }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+					return mk(EFunction(FArrow, {args: [{ name : i }], expr: mk(EReturn(eret),pmin(eret))}), pmin(e1));
 				case ECheckType(expr(_) => EIdent(i), t):
 					var eret = parseExpr();
-					return mk(EFunction([{ name : i, t : t }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+					return mk(EFunction(FArrow, {args: [{ name : i, t : t }], expr: mk(EReturn(eret),pmin(eret))} ), pmin(e1) );
 				default:
 				}
 				unexpected(tk);
@@ -1266,10 +1266,11 @@ class Parser {
 	function parseField(?isInterface = false) : FieldDecl {
 		var meta = parseMetadata();
 		var access = [];
-        
+        var inlined = false;
+        inline function unexpectedModifier(modifier:String) error(EUnexpected('access modifier $modifier on interface member'), readPos, readPos+1);
         inline function addAccess(modifier:FieldAccess) {
             if(isInterface) {
-                error(EUnexpected('access modifier $modifier on interface member'), readPos, readPos+1);
+                unexpectedModifier('$modifier');
             } else access.push(modifier);
         }
 		while( true ) {
@@ -1282,7 +1283,8 @@ class Parser {
 			case "private":
 				addAccess(APrivate);
 			case "inline":
-				addAccess(AInline);
+                if(isInterface) unexpectedModifier('inline');
+				else inlined = true;
 			case "static":
 				addAccess(AStatic);
 			case "macro":

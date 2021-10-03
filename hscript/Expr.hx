@@ -57,7 +57,7 @@ enum Expr {
 	EFor( v : String, it : Expr, e : Expr );
 	EBreak;
 	EContinue;
-	EFunction( args : Array<Argument>, e : Expr, ?name : String, ?ret : CType );
+	EFunction( k:FunctionKind, f:FunctionDecl );
 	EReturn( ?e : Expr );
 	EArray( e : Expr, index : Expr );
 	EArrayDecl( e : Array<Expr> );
@@ -72,7 +72,7 @@ enum Expr {
 	ECheckType( e : Expr, t : CType );
 }
 
-typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
+typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr, ?meta:Metadata };
 
 typedef Metadata = Array<{ name : String, params : Array<Expr> }>;
 
@@ -173,7 +173,6 @@ typedef FieldDecl = {
 enum FieldAccess {
 	APublic;
 	APrivate;
-	AInline;
 	AOverride;
 	AStatic;
 	AMacro;
@@ -184,12 +183,24 @@ enum FieldKind {
 	KVar( v : VarDecl );
 }
 
-typedef FunctionDecl = {
-	var args : Array<Argument>;
-	var expr : Expr;
-	var ret : Null<CType>;
+typedef TypeParamDecl = {
+    @:optional var params : Array<TypeParamDecl>; // what even..
+    var name:String;
+    @:optional var meta:Metadata;
+    @:optional var constraints:Array<CType>; // probably not right
+}
+enum FunctionKind {
+    FAnonymous;
+    FNamed(name:String, inlined:Bool);
+    FArrow;
 }
 
+typedef FunctionDecl = {
+	var args : Array<Argument>;
+    @:optional var params : Array<TypeParamDecl>;
+	var expr : Expr;
+	@:optional var ret : Null<CType>;
+}
 typedef VarDecl = {
 	var get : Null<String>;
 	var set : Null<String>;

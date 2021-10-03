@@ -380,7 +380,7 @@ class Checker {
                     }
                 }
                 switch( edef(e) ) {
-                case EFunction(args,_,name,ret) if( name != null ):
+                case EFunction(Tools.getFunctionName(_) => name, {args:args,ret:ret}) if( ['anon','arrow',null].indexOf(name) == -1):
                     var tret = ret == null ? makeMono() : makeType(ret, e);
                     var ft = TFun(typeArgs(args,e),tret);
                     locals.set(name, ft);
@@ -1082,7 +1082,7 @@ class Checker {
         case EThrow(e):
             typeExpr(e, Value);
             return makeMono();
-        case EFunction(args, body, name, ret):
+        case EFunction(Tools.getFunctionName(_) => name, {args:args, expr:body, ret:ret}):
             var ft = null, tret = null, targs = null;
             if( currentFunType != null ) {
                 switch( currentFunType ) {
