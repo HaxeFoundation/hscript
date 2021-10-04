@@ -1086,10 +1086,33 @@ class Parser {
 	}
 
 	function parseParams():Params {
-		if( maybe(TOp("<")) )
-			error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
-		return  [];
+        var ret:Params = [];
+		if( maybe(TOp("<")) ) {
+            ret.push(parseParam());
+            while(!maybe(TOp(">"))) {
+                ensure(TComma);
+                ret.push(parseParam());
+            }
+        }
+		return  ret;
 	}
+    inline function parseParam():TypeParamDecl {
+        var params = [];
+        var meta = parseMetadata();
+        var name = getIdent();
+        var constraints = [];
+        if(maybe(TDoubleDot)) {
+            do {
+                constraints.push(parseType());
+            }while(maybe(TOp('&')));
+        }
+        return {
+            params: params,
+            meta: meta,
+            name: name,
+            constraints: constraints
+        };
+    }
     
 	function parseModuleDecl() : ModuleDecl {
 		var meta = parseMetadata();

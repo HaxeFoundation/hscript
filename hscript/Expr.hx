@@ -185,7 +185,7 @@ enum FieldKind {
 }
 
 typedef TypeParamDecl = {
-    @:optional var params : Array<TypeParamDecl>; // what even..
+    @:optional var params : Params; // what even..
     var name:String;
     @:optional var meta:Metadata;
     @:optional var constraints:Array<CType>; // probably not right
