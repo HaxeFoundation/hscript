@@ -653,7 +653,7 @@ class Parser {
 			default: push(tk);
 			}
 			var inf = parseFunctionDecl();
-			mk(EFunction(Tools.getFunctionType(name),{args: inf.args, expr: inf.body, ret: inf.ret}),p1,pmax(inf.body));
+			mk(EFunction(Tools.getFunctionType(name),inf),p1,pmax(inf.expr));
 		case "return":
 			var tk = token();
 			push(tk);
@@ -860,7 +860,8 @@ class Parser {
 		return args;
 	}
 
-	function parseFunctionDecl() {
+	function parseFunctionDecl():FunctionDecl {
+        var params = parseParams();
 		ensure(TPOpen);
 		var args = parseFunctionArgs();
 		var ret = null;
@@ -872,7 +873,7 @@ class Parser {
 				ret = parseType();
 		}
         var noBody = maybe(TSemicolon);
-		return { args : args, ret : ret, body : if(noBody) null else parseExpr() };
+		return { args : args, ret : ret, params: params, expr : if(noBody) null else parseExpr() };
 	}
 
 	function parsePath() {
@@ -1350,17 +1351,13 @@ class Parser {
 				var inf = parseFunctionDecl();
                 if(isInterface) 
 
-                    if(inf.body != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
+                    if(inf.expr != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
                 
 				return {
 					name : name,
 					meta : meta,
 					access : access,
-					kind : KFunction({
-						args : inf.args,
-						expr : inf.body,
-						ret : inf.ret,
-					}),
+					kind : KFunction(inf),
 				};
 			case "var":
 				var name = getIdent();
@@ -1406,17 +1403,13 @@ class Parser {
         var meta = parseMetadata();
         var name = getIdent();
         var inf = parseFunctionDecl();
-        if(inf.body != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
+        if(inf.expr != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
         
         return {
             name : name,
             meta : meta,
             access : [APublic],
-            kind : KFunction({
-                args : inf.args,
-                expr : inf.body,
-                ret : inf.ret,
-            }),
+            kind : KFunction(inf),
         };
 	}
 	// ------------------------ lexing -------------------------------

@@ -198,7 +198,7 @@ enum FunctionKind {
 
 typedef FunctionDecl = {
 	var args : Array<Argument>;
-    @:optional var params : Array<TypeParamDecl>;
+    @:optional var params : Params;
 	var expr : Expr;
 	@:optional var ret : Null<CType>;
 }
