@@ -84,7 +84,7 @@ enum CType {
 	CTOpt( t : CType );
 	CTNamed( n : String, t : CType );
 
-    CTParam(p:String);
+    CTParam(p:String, index:Int);
 }
 
 #if hscriptPos

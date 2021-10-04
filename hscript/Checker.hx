@@ -15,7 +15,7 @@ enum TType {
     TFloat;
     TBool;
     TDynamic;
-    TParam( name : String );
+    TParam( name : String, index : Int );
     TUnresolved( name : String );
     TNull( t : TType );
     TInst( c : CClass, args : Array<TType> );
@@ -135,8 +135,9 @@ class XmlCheckerTypes implements CheckerTypes {
             };
             if( c.isInterface )
 				cl.isInterface = true;
+            var i = 0;
 			for( p in c.params )
-				cl.params.push(TParam(p));
+				cl.params.push(TParam(p, i++));
 			todo.push(function() {
 				localParams = [for( t in cl.params ) c.path+"."+Checker.typeStr(t) => t];
 				if( c.superClass != null )
@@ -161,8 +162,9 @@ class XmlCheckerTypes implements CheckerTypes {
                     }
                     if( skip ) continue;
                     var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
+                    var i = 0;
                     for( p in f.params ) {
-                        var pt = TParam(p);
+                        var pt = TParam(p, i++);
                         var key = f.name+"."+p;
                         pkeys.push(key);
                         fl.params.push(pt);
@@ -186,8 +188,9 @@ class XmlCheckerTypes implements CheckerTypes {
                 params : [],
                 constructors: [],
             };
+            var i = 0;
             for( p in e.params )
-                en.params.push(TParam(p));
+                en.params.push(TParam(p, i));
             todo.push(function() {
                 localParams = [for( t in en.params ) e.path+"."+Checker.typeStr(t) => t];
                 for( c in e.constructors )
@@ -202,8 +205,9 @@ class XmlCheckerTypes implements CheckerTypes {
                 params : [],
                 t : null,
             };
+            var i = 0;
             for( p in t.params )
-                td.params.push(TParam(p));
+                td.params.push(TParam(p, i++));
             if( t.path == "hscript.TypeCheck" )
                 td.params.reverse();
             todo.push(function() {
@@ -229,8 +233,9 @@ class XmlCheckerTypes implements CheckerTypes {
                     fl;
                 }]
             };
+            var i = 0;
             for( p in a.params )
-                ta.params.push(TParam(p));
+                ta.params.push(TParam(p, i++));
             todo.push(function() {
                 localParams = [for( t in ta.params ) a.path+"."+Checker.typeStr(t) => t];
                 ta.t = makeXmlType(a.athis);
@@ -426,7 +431,7 @@ class Checker {
 
     public function makeType( t : CType, ?e : Expr,?pos:haxe.PosInfos) : TType {
         return if(t == null) TVoid else switch (t) {
-        case CTParam(p): TParam(p);
+        case CTParam(p, i): TParam(p, i);
         case CTPath(path, params):
             var ct = types.resolve(path.join("."),params == null ? [] : [for( p in params ) makeType(p,e)]);
             if( ct == null ) {
@@ -462,7 +467,7 @@ class Checker {
         case TAbstract(a, args): a.name + makeArgs(args);
         case TFun(args, ret): "(" + [for( a in args ) (a.opt?"?":"")+(a.name == "" ? "" : a.name+":")+typeStr(a.t)].join(", ")+") -> "+typeStr(ret);
         case TAnon(fields): "{" + [for( f in fields ) (f.opt?"?":"")+f.name+":"+typeStr(f.t)].join(", ")+"}";
-        case TParam(name): name;
+        case TParam(name, _): name;
         case TNull(t): "Null<"+typeStr(t)+">";
         case TUnresolved(name): "?"+name;
         default: t.getName().substr(1);
@@ -579,7 +584,7 @@ class Checker {
         return false;
     }
 
-    function tryUnify( t1 : TType, t2 : TType ) {
+    public function tryUnify( t1 : TType, t2 : TType ) {
         
         if( t1 == t2 )
             return true;
@@ -793,9 +798,16 @@ class Checker {
 		}
 		return fields;
 	}
-
-	function getField( t : TType, f : String, e : Expr, forWrite = false, ?args:Array<TType>, ?ret:TType) {
-        function resolveMember(field:CField) return field.name == f && (
+    /**
+     * Test if a given field matches the desired characteristics
+     * @param f - The name of the field (if this is null, matching is done only on args and ret)
+     * @param field - The field to test
+     * @param args - The argument types to match against
+     * @param ret  - The return type to match against
+     */
+     // probably will use this for abstract casts
+    inline public function matchesMethod(?f:String, field:{name:String, t:TType}, args:Array<TType>, ?ret:TType) {
+        return (f == null || field.name == f) && (
             args == null ||
             // if there were arguments (e.g. from an ECall expression), do method overload resolution..
             switch field.t {
@@ -805,14 +817,33 @@ class Checker {
                     var arg = args[i];
                     var fArg = fArgs[i];
                     if(!tryUnify(arg, fArg.t)) {
-                        match = false;
-                        break;
+                        if(!fArg.opt) {
+                            match = false;
+                            break;
+                        }
                     }
                 }
-                match = match && tryUnify(fRet, ret);
+                match = match && (ret == null || tryUnify(fRet, ret));
                 match;
             default: false;
         });
+    }
+    public function isFieldStatic(t :TType, f:String, ?args:Array<TType>, ?ret:TType) {
+        var found = false;
+        switch follow(t) {
+            case TInst(c, args):
+                found = c.statics.exists(matchesMethod.bind(f, _, args, ret));
+            case TAbstract(a, args):
+                found = a.statics.exists(matchesMethod.bind(f, _, args, ret));
+            case TEnum(e, args):
+                found = e.constructors.exists(c -> c.name == f);
+            default:
+        }
+        return found;
+        
+    }
+	function getField( t : TType, f : String, e : Expr, forWrite = false, ?args:Array<TType>, ?ret:TType) {
+        function resolveMember(field:CField) return matchesMethod(f, field, args, ret);
 		switch( t ) {
         case TType(_ => {name: typeName, params: params, t: follow(_) => instType},args ) if(instType.match(TInst(_))):
             return switch instType {

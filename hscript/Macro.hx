@@ -116,7 +116,7 @@ class Macro {
 
 	function convertType( t : Expr.CType ) : ComplexType {
 		return switch( t ) {
-        case CTParam(p): TPath({name: p, pack: []});
+        case CTParam(p, _): TPath({name: p, pack: []});
 		case CTOpt(t): TOptional(convertType(t));
 		case CTPath(pack, args):
 			var params = [];

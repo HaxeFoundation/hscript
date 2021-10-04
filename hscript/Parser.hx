@@ -1216,7 +1216,7 @@ class Parser {
                                     name: f.name,
                                     meta: f.meta,
                                     kind: KVar({
-                                        type: CTPath(a.name.split('.'), [for(param in a.params) CTParam(param.name)]),
+                                        type: CTPath(a.name.split('.'), [for(i in 0...a.params.length) CTParam(a.params[i].name, i)]),
                                         set: null,
                                         get: null,
                                         expr: if(v.expr == null) fallbackInit(f.name) else v.expr

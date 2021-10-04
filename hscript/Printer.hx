@@ -48,7 +48,7 @@ class Printer {
 
 	function type( t : CType ) {
 		switch( t ) {
-        case CTParam(p):
+        case CTParam(p, _):
             add(p);
 		case CTOpt(t):
 			add('?');
