@@ -823,7 +823,7 @@ class Checker {
                         }
                     }
                 }
-                match = match && (ret == null || tryUnify(fRet, ret));
+                match = match && (ret == null || tryUnify(ret, fRet));
                 match;
             default: false;
         });
