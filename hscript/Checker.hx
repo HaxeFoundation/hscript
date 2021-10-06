@@ -367,6 +367,7 @@ class Checker {
     }
    
     public function check( expr : Expr, ?withType : WithType, ?isCompletion = false ) {
+        
         if( withType == null ) withType = NoValue;
         locals = new Map();
         allowDefine = allowGlobalsDefine;
@@ -593,6 +594,7 @@ class Checker {
         case [TUnresolved(unresolved), _]:
             return tryUnify(types.resolve(unresolved), t2);
         case [_, TUnresolved(unresolved)]:
+            
             return tryUnify(t1, types.resolve(unresolved));
         case [TMono(r), _]:
             if( r.r == null ) {
@@ -749,7 +751,9 @@ class Checker {
     }
 
     public function follow( t : TType ) {
-		return switch( t ) {
+        
+		return if(t == null) TVoid else switch( t ) {
+        case TUnresolved(name): types.resolve(name);
 		case TMono(r): if( r.r != null ) follow(r.r) else t;
 		case TType(t,args): follow(apply(t.t, t.params, args));
 		case TNull(t): follow(t);
@@ -842,7 +846,7 @@ class Checker {
         return found;
         
     }
-	function getField( t : TType, f : String, e : Expr, forWrite = false, ?args:Array<TType>, ?ret:TType) {
+	public function getField( t : TType, f : String, e : Expr, forWrite = false, ?args:Array<TType>, ?ret:TType) {
         function resolveMember(field:CField) return matchesMethod(f, field, args, ret);
 		switch( t ) {
         case TType(_ => {name: typeName, params: params, t: follow(_) => instType},args ) if(instType.match(TInst(_))):
@@ -934,7 +938,7 @@ class Checker {
 
     function isString( t : TType ) {
         t = follow(t);
-        return t.match(TInst({name:"String"},_));
+        return t.match(TInst({name:"String"},_)) || t.match(TUnresolved("String"));
     }
 
     function onCompletion( expr : Expr, t : TType ) {
@@ -954,6 +958,7 @@ class Checker {
     }
 
     function typeExpr( expr : Expr, withType : WithType, ?args:Array<TType>, ?ret:TType) : TType {
+        
         if( expr == null && isCompletion )
             return switch( withType ) {
             case WithType(t): t;
@@ -1326,7 +1331,7 @@ class Checker {
             if( defaultExpr != null )
                 mergeType( typeExpr(defaultExpr, withType), defaultExpr);
             return withType == NoValue ? TVoid : tmin == null ? makeMono() : tmin;
-        case ENew(cl, params):
+        case ENew(cl, params): return types.resolve(cl, [for(param in params) check(param) ] ) ;
         }
         error("Don't know how to type "+edef(expr).getName(), expr);
         return TDynamic;

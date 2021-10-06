@@ -1119,7 +1119,7 @@ class Parser {
 		var meta = parseMetadata();
 		var ident = getIdent();
 		var isPrivate = false, isExtern = false;
-        inline function parseAbstract() {
+        function parseAbstract() {
             var name = getIdent();
             var params = parseParams();
             var underlying = null;
@@ -1231,7 +1231,7 @@ class Parser {
                         inline function fallbackInit(fieldName):Expr return switch a.t { // positions will be wrong
                             case CTPath(['String'], _): mk(EConst(CString(fieldName)), readPos, readPos+1);
                             case CTPath(['Int'], _): mk(EConst(CInt(counter++)), readPos, readPos+1);
-                            default: cast error(ECustom('expected variable initializer for $fieldName'), readPos, readPos+1);
+                            default: error(ECustom('expected variable initializer for $fieldName'), readPos, readPos+1); null;
                         }
                         a.meta = [{name: ':enum', params: []}].concat(a.meta);
                         a.fields = [for(f in a.fields) switch f.kind {
@@ -1250,7 +1250,7 @@ class Parser {
                             default: f;
                         }];
                         DAbstract(a);
-                    default: cast error(ECustom('assert'), readPos, readPos+1);
+                    default:error(ECustom('assert'), readPos, readPos+1); null;
                 }
                 
             } else {
