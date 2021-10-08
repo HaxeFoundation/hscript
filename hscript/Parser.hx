@@ -1258,8 +1258,9 @@ class Parser {
                 var params = parseParams();
                 var fields = [];
                 ensure(TBrOpen);
+                var i = 0;
                 while( !maybe(TBrClose) )
-                    fields.push(parseEnumCtor());
+                    fields.push(parseEnumCtor(name, params, i++));
                 return DEnum({
                     name: name,
                     params: params,
@@ -1399,17 +1400,30 @@ class Parser {
 		}
 		return null;
 	}
-    function parseEnumCtor() {
+    function parseEnumCtor(enumName:String, params:Params, index:Int) {
         var meta = parseMetadata();
         var name = getIdent();
-        var inf = parseFunctionDecl();
-        if(inf.expr != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
-        
+        var i = 0;
+        var params = [for(param in params) CTParam(param.name, i++)];
+        var kind = if(maybe(TOp('='))) {
+            var varDecl:VarDecl = {
+                type: CTPath(enumName.split('.'), params),
+                expr: mk(EConst(CInt(index))),
+                get: null,
+                set: null
+            };
+            KVar(varDecl);
+        } else {
+
+            var inf = parseFunctionDecl();
+            if(inf.expr != null) error(EUnexpected("method body in interface"), readPos, readPos+1);
+            KFunction(inf);
+        }
         return {
             name : name,
             meta : meta,
             access : [APublic],
-            kind : KFunction(inf),
+            kind :kind
         };
 	}
 	// ------------------------ lexing -------------------------------
