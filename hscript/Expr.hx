@@ -138,6 +138,7 @@ typedef ModuleType = {
 	var params : Params; // TODO : not yet parsed
 	var meta : Metadata;
 	var isPrivate : Bool;
+    @:optional var doc : String;
 }
 typedef InstancedType = {>ModuleType,
     var fields : Array<FieldDecl>;

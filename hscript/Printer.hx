@@ -48,6 +48,7 @@ class Printer {
 
 	function type( t : CType ) {
 		switch( t ) {
+        case null: 'Void';
         case CTParam(p, _):
             add(p);
 		case CTOpt(t):
