@@ -440,6 +440,7 @@ class Interp {
 				for( i in 0...params.length )
 					me.locals.set(params[i].name,{ r : args[i] });
 				var r = null;
+				var oldDecl = declared.length;
 				if( inTry )
 					try {
 						r = me.exprReturn(fexpr);
@@ -454,6 +455,7 @@ class Interp {
 					}
 				else
 					r = me.exprReturn(fexpr);
+				restore(oldDecl);
 				me.locals = old;
 				me.depth = depth;
 				return r;
