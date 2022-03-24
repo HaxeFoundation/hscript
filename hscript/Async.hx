@@ -36,6 +36,7 @@ class Async {
 	var currentLoop : Expr;
 	var currentBreak : Expr -> Expr;
 	var uid = 0;
+	public var asyncIdents : Map<String,Bool>;
 
 	static var nullExpr : Expr = #if hscriptPos { e : null, pmin : 0, pmax : 0, origin : "<null>", line : 0 } #else null #end;
 	static var nullId = mk(EIdent("null"), nullExpr);
@@ -207,11 +208,17 @@ class Async {
 		return syncFlag;
 	}
 
+	inline function isAsyncIdent( id : String ) {
+		return asyncIdents == null || asyncIdents.exists(id);
+	}
+
 	function checkSync( e : Expr ) {
 		if( !syncFlag )
 			return;
 		switch( expr(e) ) {
-		case ECall(_):
+		case ECall(expr(_) => EIdent(i),_) if( isAsyncIdent(i) ):
+			syncFlag = false;
+		case ECall(expr(_) => EField(_,i),_) if( isAsyncIdent(i) ):
 			syncFlag = false;
 		case EFunction(_,_,name,_) if( name != null ):
 			syncFlag = false;
