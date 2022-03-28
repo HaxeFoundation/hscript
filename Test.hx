@@ -113,6 +113,12 @@ class Test extends TestCase {
 		assertScript("var f:(x:Int)->(Int, Int)->Int = (x:Int) -> (y:Int, z:Int) -> x + y + z; f(3)(1, 2)", 6, null, true);
 		assertScript("var a = 10; var b = 5; a - -b", 15);
 		assertScript("var a = 10; var b = 5; a - b / 2", 7.5);
+		assertScript("var a; a", null);
+		assertScript("var a = 1, b = 5; a + b;", 6);
+		assertScript("var a, b = 5; if (a == null) a = 2; a + b;", 7);
+		assertScript("var a:Int; a", null, null, true);
+		assertScript("var a:Int = 1, b:Int = 5; a + b;", 6, null, true);
+		assertScript("var a:Int, b:Int = 5; if (a == null) a = 2; a + b;", 7, null, true);
 	}
 
 	function testMap():Void {
