@@ -216,7 +216,7 @@ class Async {
 		if( !syncFlag )
 			return;
 		switch( expr(e) ) {
-		case ECall(expr(_) => EIdent(i),_) if( isAsyncIdent(i) ):
+		case ECall(expr(_) => EIdent(i),_) if( isAsyncIdent(i) || vars.get(i) == Defined ):
 			syncFlag = false;
 		case ECall(expr(_) => EField(_,i),_) if( isAsyncIdent(i) ):
 			syncFlag = false;
