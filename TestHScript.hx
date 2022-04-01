@@ -7,7 +7,7 @@ import hscript.Printer;
 import hscript.Checker;
 import haxe.unit.*;
 
-class Test extends TestCase {
+class TestHScript extends TestCase {
 	function assertScript(x,v:Dynamic,?vars : Dynamic, allowTypes=false, ?pos:haxe.PosInfos) {
 		var p = new hscript.Parser();
 		p.allowTypes = allowTypes;
@@ -173,7 +173,7 @@ class Test extends TestCase {
 		#end
 
 		var runner = new TestRunner();
-		runner.add(new Test());
+		runner.add(new TestHScript());
 		var succeed = runner.run();
 
 		#if sys
