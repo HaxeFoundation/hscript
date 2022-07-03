@@ -3,7 +3,7 @@
   "url": "https://github.com/HaxeFoundation/hscript",
   "license": "MIT",
   "description": "Haxe Script is a scripting engine for a subset of the Haxe language",
-  "version": "2.4.0",
-  "releasenote": "Haxe 4.0 final + type checking/completion (hscript.Checker)",
+  "version": "2.5.0",
+  "releasenote": "Haxe 4.2 compat and bug fixes",
   "contributors": ["ncannasse","HaxeFoundation"]
 }
