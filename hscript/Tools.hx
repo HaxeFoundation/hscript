@@ -39,7 +39,7 @@ class Tools {
 		case EDoWhile(c, e): f(c); f(e);
 		case EFor(_, it, e): f(it); f(e);
 		case EBreak,EContinue:
-		case EFunction(_, e, _, _): f(e);
+		case EFunction(_, {expr: e}): f(e);
 		case EReturn(e): if( e != null ) f(e);
 		case EArray(e, i): f(e); f(i);
 		case EArrayDecl(el): for( e in el ) f(e);
@@ -74,7 +74,7 @@ class Tools {
 		case EWhile(c, e): EWhile(f(c),f(e));
 		case EDoWhile(c, e): EDoWhile(f(c),f(e));
 		case EFor(v, it, e): EFor(v, f(it), f(e));
-		case EFunction(args, e, name, t): EFunction(args, f(e), name, t);
+		case EFunction(Tools.getFunctionName(_) => name, {args:args, expr: e, ret: t}): EFunction(getFunctionType(name), {args:args, expr: f(e), ret: t});
 		case EReturn(e): EReturn(if( e != null ) f(e) else null);
 		case EArray(e, i): EArray(f(e),f(i));
 		case EArrayDecl(el): EArrayDecl([for( e in el ) f(e)]);
@@ -100,10 +100,28 @@ class Tools {
 
 	public static inline function mk( e : ExprDef, p : Expr ) {
 		#if hscriptPos
+        if(p == null) p = {pmin: 0, pmax: 0, origin: null, line: 0, e: null}; 
 		return { e : e, pmin : p.pmin, pmax : p.pmax, origin : p.origin, line : p.line };
 		#else
 		return e;
 		#end
 	}
+    static var ANON = '_$$_anon_$$_';
+    static var ARROW = '_$$_arrow_$$_';
 
+	public static function getFunctionName(k:FunctionKind) {
+		return switch k {
+            case FAnonymous: ANON;
+            case FArrow: ARROW;
+            case FNamed(name, _): name;
+        }
+	}
+
+	public static function getFunctionType(name:String):FunctionKind {
+		return switch name {
+            case '$ANON'|null|'': FAnonymous;
+            case '$ARROW': FArrow;
+            case v: FNamed(v, false);
+        }
+	}
 }

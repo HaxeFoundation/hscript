@@ -48,6 +48,9 @@ class Printer {
 
 	function type( t : CType ) {
 		switch( t ) {
+        case null: 'Void';
+        case CTParam(p, _):
+            add(p);
 		case CTOpt(t):
 			add('?');
 			type(t);
@@ -207,7 +210,7 @@ class Printer {
 			add("break");
 		case EContinue:
 			add("continue");
-		case EFunction(params, e, name, ret):
+		case EFunction(Tools.getFunctionName(_) => name, {args: params, expr: e, ret:ret}):
 			add("function");
 			if( name != null )
 				add(" " + name);

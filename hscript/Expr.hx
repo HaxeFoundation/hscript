@@ -57,7 +57,7 @@ enum Expr {
 	EFor( v : String, it : Expr, e : Expr );
 	EBreak;
 	EContinue;
-	EFunction( args : Array<Argument>, e : Expr, ?name : String, ?ret : CType );
+	EFunction( k:FunctionKind, f:FunctionDecl );
 	EReturn( ?e : Expr );
 	EArray( e : Expr, index : Expr );
 	EArrayDecl( e : Array<Expr> );
@@ -72,7 +72,7 @@ enum Expr {
 	ECheckType( e : Expr, t : CType );
 }
 
-typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
+typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr, ?meta:Metadata };
 
 typedef Metadata = Array<{ name : String, params : Array<Expr> }>;
 
@@ -83,6 +83,8 @@ enum CType {
 	CTParent( t : CType );
 	CTOpt( t : CType );
 	CTNamed( n : String, t : CType );
+
+    CTParam(p:String, index:Int);
 }
 
 #if hscriptPos
@@ -125,25 +127,42 @@ enum ModuleDecl {
 	DImport( path : Array<String>, ?everything : Bool );
 	DClass( c : ClassDecl );
 	DTypedef( c : TypeDecl );
-}
+    DAbstract(a:AbstractDecl);
+    DEnum(e:EnumDecl);
+    DInterface(i:InterfaceDecl);
 
+}
+typedef Params = Array<TypeParamDecl>;
 typedef ModuleType = {
 	var name : String;
-	var params : {}; // TODO : not yet parsed
+	var params : Params; // TODO : not yet parsed
 	var meta : Metadata;
 	var isPrivate : Bool;
+    @:optional var doc : String;
+}
+typedef InstancedType = {>ModuleType,
+    var fields : Array<FieldDecl>;
+	var isExtern : Bool;
 }
 
-typedef ClassDecl = {> ModuleType,
+typedef ClassDecl = {> InstancedType,
 	var extend : Null<CType>;
 	var implement : Array<CType>;
-	var fields : Array<FieldDecl>;
-	var isExtern : Bool;
+}
+typedef InterfaceDecl = {>InstancedType,
+    var extend : Array<CType>;
 }
 
 typedef TypeDecl = {> ModuleType,
 	var t : CType;
 }
+typedef AbstractDecl = {>InstancedType,
+    var t:CType;
+    var to:Array<CType>;
+    var from:Array<CType>;
+}
+typedef EnumDecl = InstancedType;
+
 
 typedef FieldDecl = {
 	var name : String;
@@ -155,8 +174,8 @@ typedef FieldDecl = {
 enum FieldAccess {
 	APublic;
 	APrivate;
-	AInline;
 	AOverride;
+    AInline;
 	AStatic;
 	AMacro;
 }
@@ -166,12 +185,24 @@ enum FieldKind {
 	KVar( v : VarDecl );
 }
 
-typedef FunctionDecl = {
-	var args : Array<Argument>;
-	var expr : Expr;
-	var ret : Null<CType>;
+typedef TypeParamDecl = {
+    @:optional var params : Params; // what even..
+    var name:String;
+    @:optional var meta:Metadata;
+    @:optional var constraints:Array<CType>; // probably not right
+}
+enum FunctionKind {
+    FAnonymous;
+    FNamed(name:String, inlined:Bool);
+    FArrow;
 }
 
+typedef FunctionDecl = {
+	var args : Array<Argument>;
+    @:optional var params : Params;
+	var expr : Expr;
+	@:optional var ret : Null<CType>;
+}
 typedef VarDecl = {
 	var get : Null<String>;
 	var set : Null<String>;

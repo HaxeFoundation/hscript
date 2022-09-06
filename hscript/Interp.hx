@@ -403,7 +403,7 @@ class Interp {
 		case EReturn(e):
 			returnValue = e == null ? null : expr(e);
 			throw SReturn;
-		case EFunction(params,fexpr,name,_):
+		case EFunction(Tools.getFunctionName(_) => name,{args: params,expr: fexpr}):
 			var capturedLocals = duplicate(locals);
 			var me = this;
 			var hasOpt = false, minParams = 0;
