@@ -219,7 +219,7 @@ class Macro {
 						opt : false,
 						value : null,
 					});
-				EFunction(#if haxe4 FNamed(name,false) #else name #end, {
+				EFunction(#if haxe4 name != null ? FNamed(name,false) : FAnonymous #else name #end, {
 					params : [],
 					args : targs,
 					expr : convert(e),
