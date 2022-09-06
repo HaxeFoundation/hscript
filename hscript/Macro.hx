@@ -198,10 +198,10 @@ class Macro {
 				EWhile(convert(c), convert(e), false);
 			case EFor(v, it, efor):
 				#if (haxe_ver >= 4)
-					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
 					EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
 				#elseif (haxe_211 || haxe3)
-					var p = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+					var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
 					EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
 				#else
 					EFor(v, convert(it), convert(efor));
@@ -219,7 +219,7 @@ class Macro {
 						opt : false,
 						value : null,
 					});
-				EFunction(#if haxe4 FNamed(name,false) #else name #end, {
+				EFunction(#if haxe4 name != null ? FNamed(name,false) : FAnonymous #else name #end, {
 					params : [],
 					args : targs,
 					expr : convert(e),
@@ -248,11 +248,11 @@ class Macro {
 			case ESwitch(e, cases, edef):
 				ESwitch(convert(e), [for( c in cases ) { values : [for( v in c.values ) convert(v)], expr : convert(c.expr) } ], edef == null ? null : convert(edef));
 			case EMeta(m, params, esub):
-				var mpos = #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+				var mpos = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
 				EMeta({ name : m, params : params == null ? [] : [for( p in params ) convert(p)], pos : mpos }, convert(esub));
 			case ECheckType(e, t):
 				ECheckType(convert(e), convertType(t));
-		}, pos : #if hscriptPos { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
+		}, pos : #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
 	}
 
 }
