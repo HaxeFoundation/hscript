@@ -151,7 +151,7 @@ class Interp {
 				setMapValue(arr, index, v);
 			}
 			else {
-				arr[index] = v;
+				(arr:Array<Int>)[index] = v;
 			}
 
 		default:
@@ -187,8 +187,8 @@ class Interp {
 				setMapValue(arr, index, v);
 			}
 			else {
-				v = fop(arr[index],expr(e2));
-				arr[index] = v;
+				v = fop((arr:Array<Int>)[index],expr(e2));
+				(arr:Array<Int>)[index] = v;
 			}
 		default:
 			return error(EInvalidOp(op));
@@ -235,12 +235,12 @@ class Interp {
 				return v;
 			}
 			else {
-				var v = arr[index];
+				var v = (arr:Array<Int>)[index];
 				if( prefix ) {
 					v += delta;
-					arr[index] = v;
+					(arr:Array<Int>)[index] = v;
 				} else
-					arr[index] = v + delta;
+					(arr:Array<Int>)[index] = v + delta;
 				return v;
 			}
 		default:
@@ -523,7 +523,7 @@ class Interp {
 				return getMapValue(arr, index);
 			}
 			else {
-				return arr[index];
+				return (arr:Array<Int>)[index];
 			}
 		case ENew(cl,params):
 			var a = new Array();
