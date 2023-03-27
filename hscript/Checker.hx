@@ -1064,7 +1064,7 @@ class Checker {
 			this.locals = locals;
 			if( ft == null ) {
 				ft = TFun(targs, tret);
-				locals.set(name, ft);
+				if( name != null ) locals.set(name, ft);
 			}
 			return ft;
 		case EUnop(op, _, e):
