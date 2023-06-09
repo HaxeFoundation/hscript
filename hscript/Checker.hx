@@ -111,6 +111,18 @@ class CheckerTypes {
 		t_string = getType("String");
 	}
 
+	public function defineClass( name : String, ?ct : CClass ) {
+		if( ct == null )
+			ct = {
+				name : name,
+				fields : [],
+				statics : [],
+				params : [],
+			};
+		types.set(name, CTClass(ct));
+		return ct;
+	}
+
 	function addXmlType(x:haxe.rtti.CType.TypeTree,todo:Array<Void->Void>) {
 		switch (x) {
 		case TPackage(name, full, subs):
@@ -344,8 +356,12 @@ class Checker {
 	public function check( expr : Expr, ?withType : WithType, ?isCompletion = false ) {
 		if( withType == null ) withType = NoValue;
 		locals = new Map();
+		if( types.t_string == null )
+			types.t_string = types.getType("String");
 		allowDefine = allowGlobalsDefine;
 		this.isCompletion = isCompletion;
+		if( edef(expr).match(EFunction(_)) )
+			expr = mk(EBlock([expr]), expr); // single function might be self recursive
 		switch( edef(expr) ) {
 		case EBlock(el):
 			var delayed = [];
