@@ -207,6 +207,17 @@ class Printer {
 			add("break");
 		case EContinue:
 			add("continue");
+        case EImport(p, m):
+            add("import "); 
+            // TODO: string together the path n shid
+            switch(m){
+                case IAll:
+                    add(".*");
+                case IAsName(alias):
+                    add("as " + alias);
+                case INormal:
+                    add("");
+            }
 		case EFunction(params, e, name, ret):
 			add("function");
 			if( name != null )
@@ -340,6 +351,10 @@ class Printer {
 			case EInvalidIterator(v): "Invalid iterator: "+v;
 			case EInvalidOp(op): "Invalid operator: "+op;
 			case EInvalidAccess(f): "Invalid access to field " + f;
+			case EInvalidType(f): "Type not found: " + f;
+			case EModuleUpper: "Module name must start with an uppercase letter";
+            case EAliasUpper: "Type aliases must start with an uppercase letter";
+            case EDeclaration: "import and using may not appear after a declaration";
 			case ECustom(msg): msg;
 		};
 		#if hscriptPos

@@ -70,6 +70,13 @@ enum Expr {
 	EDoWhile( cond : Expr, e : Expr);
 	EMeta( name : String, args : Array<Expr>, e : Expr );
 	ECheckType( e : Expr, t : CType );
+    EImport(p:String, m:ImportMode);
+}
+
+enum ImportMode {
+    IAll; // Import Star (import haxe.*)
+    IAsName(alias:String); // Import with alias (import haxe.Json as JsonReader)
+    INormal; // Import normally (import haxe.Json)
 }
 
 typedef Argument = { name : String, ?t : CType, ?opt : Bool, ?value : Expr };
@@ -116,6 +123,10 @@ enum Error {
 	EInvalidIterator( v : String );
 	EInvalidOp( op : String );
 	EInvalidAccess( f : String );
+    EInvalidType(f : String);
+    EDeclaration;
+    EModuleUpper;
+    EAliasUpper;
 	ECustom( msg : String );
 }
 

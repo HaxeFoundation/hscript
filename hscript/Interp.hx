@@ -583,6 +583,115 @@ class Interp {
 			return expr(e);
 		case ECheckType(e,_):
 			return expr(e);
+        case EImport(p, m):
+            // check if import is after a declaration
+            if (declared.length > 0){
+				error(EDeclaration);
+                return null;
+            }
+
+            // grab the package and field data
+
+            // packages can't begin with an uppercase, and modules cant begin with a lowercase. That makes it pppretty easy to split the module and package
+            // So we split it into 2 arrays: Module path and field(s)
+            // Module path is the package + module, and field(s) is just whatever properties to grab from the 
+
+			var module:Array<String> = [];
+            var fields:Array<String> = [];
+
+            // and iterate through the path, adding the first uppercase thing + beyond to the module and the rest to the package
+			var path = p.split(".");
+
+            var navigatingModule:Bool = false;
+            for(file in path){
+				var beginning = file.charAt(0);
+				var uppercase = (beginning >= 'A' && beginning <= 'Z');
+
+                if (navigatingModule)
+                    fields.push(file);
+                else
+                    module.push(file);
+
+                if (uppercase)
+                    navigatingModule = true; // packages can never begin with an uppercase letter so if it begins with an uppercase then we're goin thru the module
+            }
+            
+
+            // now validate it is valid
+            switch(m){
+                case IAll:
+                    // this will never have an issue since the module name is *
+                default:
+                    // however this can be wrong
+					// module needs to start with an uppercase letter, so if it doesnt then we throw an error about it
+
+                    if(fields.length == 0){
+                        var beginning = module[module.length-1]; 
+						if (!(beginning >= 'A' && beginning <= 'Z')){
+                            error(EModuleUpper); // module name has to begin with an uppercase
+                            return null;
+                        }
+                    }
+
+            }
+
+
+            function getImport():Array<Dynamic>{
+                var moduleName = module[module.length - 1];
+                var fullModule:String = module.join(".");
+                if (fields.length == 0) {
+                    // this one's pretty easy, just grab the class
+                    var clEn:Dynamic = Type.resolveClass(fullModule);
+                    if (clEn == null)
+                        clEn = Type.resolveEnum(fullModule);
+
+					if (clEn != null)return [moduleName, clEn, false];
+
+                } else {
+                    if (fields.length > 1) { // This one's a bit trickier, but in the end its just a loop to grab it
+                        var cl:Dynamic = Type.resolveClass(fullModule);
+                        var prop:Dynamic = cl;
+                        var finalField = fields[fields.length - 1];
+                        while (prop != null && fields.length > 0) {
+                            var field = fields.shift();
+                            prop = Reflect.getProperty(prop, field);
+                        }
+                        return [finalField, prop, true];
+
+                    } else {
+                        var cl:Dynamic = Type.resolveClass(fullModule);
+                        var prop:Dynamic = Reflect.getProperty(cl, fields[0]);
+                        return [prop, cl, true];
+                    }
+                }
+                return [fullModule, null, false];
+
+            }
+            // And now we can get the thing(s) to be imported, and import it
+            switch(m){
+                case IAll:
+                    
+                case INormal:
+                    var importStuff = getImport();
+					if (importStuff.contains(null)){
+                        if(importStuff[2] == true)
+                            error(ECustom("no field or subtype " + importStuff[0]));
+                        else 
+							error(EInvalidType(importStuff[0]));
+                    }else
+					    variables.set(importStuff[0], importStuff[1]);
+                    
+					
+                case IAsName(alias):
+                    var importStuff = getImport();
+                    if (importStuff.contains(null)) {
+                        if (importStuff[2] == true)
+                            error(ECustom("no field or subtype " + importStuff[0]));
+                        else
+                            error(EInvalidType(importStuff[0]));
+                    } else variables.set(alias, importStuff[1]);
+            }
+            return null;
 		}
 		return null;
 	}
@@ -624,7 +733,7 @@ class Interp {
 		#if ((flash && !flash9) || (php && !php7 && haxe_ver < '4.0.0'))
 		if ( v.iterator != null ) v = v.iterator();
 		#else
-		try v = v.iterator() catch( e : Dynamic ) {};
+		if(v.iterator != null) try v = v.iterator() catch( e : Dynamic ) {};
 		#end
 		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));
 		return v;

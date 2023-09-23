@@ -57,12 +57,13 @@ class Tools {
 			if( def != null ) f(def);
 		case EMeta(name, args, e): if( args != null ) for( a in args ) f(a); f(e);
 		case ECheckType(e,_): f(e);
+        case EImport(p, m):
 		}
 	}
 
 	public static function map( e : Expr, f : Expr -> Expr ) {
 		var edef = switch( expr(e) ) {
-		case EConst(_), EIdent(_), EBreak, EContinue: expr(e);
+		case EConst(_), EIdent(_), EBreak, EContinue, EImport(_, _): expr(e);
 		case EVar(n, t, e): EVar(n, t, if( e != null ) f(e) else null);
 		case EParent(e): EParent(f(e));
 		case EBlock(el): EBlock([for( e in el ) f(e)]);
