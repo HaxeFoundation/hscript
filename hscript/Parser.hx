@@ -84,6 +84,8 @@ class Parser {
 	// implementation
 	var input : String;
 	var readPos : Int;
+	var offset : Int;
+	var currentPos(get,never) : Int;
 
 	var char : Int;
 	var ops : Array<Bool>;
@@ -143,6 +145,8 @@ class Parser {
 			opPriority.set(x, x == "++" || x == "--" ? -1 : -2);
 	}
 
+	inline function get_currentPos() return readPos + offset;
+
 	public inline function error( err, pmin, pmax ) {
 		if( !resumeErrors )
 		#if hscriptPos
@@ -156,20 +160,21 @@ class Parser {
 		error(EInvalidChar(c), readPos-1, readPos-1);
 	}
 
-	function initParser( origin ) {
+	function initParser( origin, pos ) {
 		// line=1 - don't reset line : it might be set manualy
 		preprocStack = [];
 		#if hscriptPos
 		this.origin = origin;
 		readPos = 0;
-		tokenMin = oldTokenMin = 0;
-		tokenMax = oldTokenMax = 0;
+		tokenMin = oldTokenMin = pos;
+		tokenMax = oldTokenMax = pos;
 		tokens = new List();
 		#elseif haxe3
 		tokens = new haxe.ds.GenericStack<Token>();
 		#else
 		tokens = new haxe.FastList<Token>();
 		#end
+		offset = pos;
 		char = -1;
 		ops = new Array();
 		idents = new Array();
@@ -180,8 +185,8 @@ class Parser {
 			idents[identChars.charCodeAt(i)] = true;
 	}
 
-	public function parseString( s : String, ?origin : String = "hscript" ) {
-		initParser(origin);
+	public function parseString( s : String, ?origin : String = "hscript", ?position : Int = 0 ) {
+		initParser(origin, position);
 		input = s;
 		readPos = 0;
 		var a = new Array();
@@ -1053,8 +1058,8 @@ class Parser {
 
 	// ------------------------ module -------------------------------
 
-	public function parseModule( content : String, ?origin : String = "hscript" ) {
-		initParser(origin);
+	public function parseModule( content : String, ?origin : String = "hscript", ?position = 0 ) {
+		initParser(origin, position);
 		input = content;
 		readPos = 0;
 		allowTypes = true;
@@ -1086,7 +1091,7 @@ class Parser {
 
 	function parseParams() {
 		if( maybe(TOp("<")) )
-			error(EInvalidOp("Unsupported class type parameters"), readPos, readPos);
+			error(EInvalidOp("Unsupported class type parameters"), currentPos, currentPos);
 		return {};
 	}
 
@@ -1268,7 +1273,7 @@ class Parser {
 		var old = line;
 		var s = input;
 		#if hscriptPos
-		var p1 = readPos - 1;
+		var p1 = currentPos - 1;
 		#end
 		while( true ) {
 			var c = readChar();
@@ -1331,9 +1336,9 @@ class Parser {
 		}
 		oldTokenMin = tokenMin;
 		oldTokenMax = tokenMax;
-		tokenMin = (this.char < 0) ? readPos : readPos - 1;
+		tokenMin = (this.char < 0) ? currentPos : currentPos - 1;
 		var t = _token();
-		tokenMax = (this.char < 0) ? readPos - 1 : readPos - 2;
+		tokenMax = (this.char < 0) ? currentPos - 1 : currentPos - 2;
 		return t;
 	}
 
@@ -1595,7 +1600,7 @@ class Parser {
 		case EBinop("||", e1, e2):
 			return evalPreproCond(e1) || evalPreproCond(e2);
 		default:
-			error(EInvalidPreprocessor("Can't eval " + expr(e).getName()), readPos, readPos);
+			error(EInvalidPreprocessor("Can't eval " + expr(e).getName()), currentPos, currentPos);
 			return false;
 		}
 	}
@@ -1636,7 +1641,7 @@ class Parser {
 	function skipTokens() {
 		var spos = preprocStack.length - 1;
 		var obj = preprocStack[spos];
-		var pos = readPos;
+		var pos = currentPos;
 		while( true ) {
 			var tk = token();
 			if( tk == TEof )
