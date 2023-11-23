@@ -43,13 +43,14 @@ enum CTypedecl {
 typedef CNamedType = {
 	var name : String;
 	var params : Array<TType>;
+	var ?meta : Array<{ name : String, params : Null<Array<Expr>> }>;
 }
 
 typedef CClass = {> CNamedType,
-	@:optional var superClass : TType;
-	@:optional var constructor : CField;
-	@:optional var interfaces : Array<TType>;
-	@:optional var isInterface : Bool;
+	var ?superClass : TType;
+	var ?constructor : CField;
+	var ?interfaces : Array<TType>;
+	var ?isInterface : Bool;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
 }
@@ -90,6 +91,7 @@ class CheckerTypes {
 	var types : Map<String,CTypedecl> = new Map();
 	var t_string : TType;
 	var localParams : Map<String,TType>;
+	var parser : hscript.Parser;
 
 	public function new() {
 		types = new Map();
@@ -98,6 +100,7 @@ class CheckerTypes {
 		types.set("Float",CTAlias(TFloat));
 		types.set("Bool",CTAlias(TBool));
 		types.set("Dynamic",CTAlias(TDynamic));
+		parser = new hscript.Parser();
 	}
 
 	public function addXmlApi( api : Xml ) {
@@ -135,6 +138,7 @@ class CheckerTypes {
 				fields : new Map(),
 				statics : new Map(),
 			};
+			addMeta(c,cl);
 			if( c.isInterface )
 				cl.isInterface = true;
 			for( p in c.params )
@@ -188,6 +192,7 @@ class CheckerTypes {
 				params : [],
 				constructors: [],
 			};
+			addMeta(e,en);
 			for( p in e.params )
 				en.params.push(TParam(p));
 			todo.push(function() {
@@ -221,6 +226,7 @@ class CheckerTypes {
 				params : [],
 				t : null,
 			};
+			addMeta(a,ta);
 			for( p in a.params )
 				ta.params.push(TParam(p));
 			todo.push(function() {
@@ -230,6 +236,14 @@ class CheckerTypes {
 			});
 			types.set(a.path, CTAbstract(ta));
 		}
+	}
+
+	function addMeta( src : haxe.rtti.CType.TypeInfos, to : CNamedType ) {
+		if( src.meta == null || src.meta.length == 0 )
+			return;
+		to.meta = [];
+		for( m in src.meta )
+			to.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
 	}
 
 	function makeXmlType( t : haxe.rtti.CType.CType ) : TType {
@@ -572,7 +586,7 @@ class Checker {
 		return false;
 	}
 
-	function tryUnify( t1 : TType, t2 : TType ) {
+	public function tryUnify( t1 : TType, t2 : TType ) {
 		if( t1 == t2 )
 			return true;
 		switch( [t1,t2] ) {
@@ -1097,29 +1111,7 @@ class Checker {
 		case EFor(v, it, e):
 			var locals = saveLocals();
 			var itt = typeExpr(it, Value);
-			var vt = switch( follow(itt) ) {
-			case TInst({name:"Array"},[t]):
-				t;
-			default:
-				var ft = getField(itt,"iterator", it);
-				if( ft == null )
-					switch( itt ) {
-					case TAbstract(a, args):
-						// special case : we allow unconditional access
-						// to an abstract iterator() underlying value (eg: ArrayProxy)
-						ft = getField(apply(a.t,a.params,args),"iterator",it);
-					default:
-					}
-				if( ft != null )
-					switch( ft ) {
-					case TFun([],ret): ft = ret;
-					default: ft = null;
-					}
-				var t = makeMono();
-				var iter = makeIterator(t);
-				unify(ft != null ? ft : itt,iter,it);
-				t;
-			}
+			var vt = getIteratorType(it, itt);
 			this.locals.set(v, vt);
 			typeExpr(e, NoValue);
 			this.locals = locals;
@@ -1252,6 +1244,32 @@ class Checker {
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 		return TDynamic;
+	}
+
+	function getIteratorType( it : Expr, itt : TType ) {
+		switch( follow(itt) ) {
+		case TInst({name:"Array"},[t]):
+			return t;
+		default:
+		}
+		var ft = getField(itt,"iterator", it);
+		if( ft == null )
+			switch( itt ) {
+			case TAbstract(a, args):
+				// special case : we allow unconditional access
+				// to an abstract iterator() underlying value (eg: ArrayProxy)
+				ft = getField(apply(a.t,a.params,args),"iterator",it);
+			default:
+			}
+		if( ft != null )
+			switch( ft ) {
+			case TFun([],ret): ft = ret;
+			default: ft = null;
+			}
+		var t = makeMono();
+		var iter = makeIterator(t);
+		unify(ft != null ? ft : itt,iter,it);
+		return t;
 	}
 
 }
