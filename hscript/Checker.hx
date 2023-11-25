@@ -40,10 +40,12 @@ enum CTypedecl {
 	CTAbstract( a : CAbstract );
 }
 
+typedef CMetadata = Array<{ name : String, params : Null<Array<Expr>> }>;
+
 typedef CNamedType = {
 	var name : String;
 	var params : Array<TType>;
-	var ?meta : Array<{ name : String, params : Null<Array<Expr>> }>;
+	var ?meta : CMetadata;
 }
 
 typedef CClass = {> CNamedType,
@@ -62,6 +64,7 @@ typedef CField = {
 	var params : Array<TType>;
 	var name : String;
 	var t : TType;
+	var ?meta : CMetadata;
 }
 
 typedef CEnum = {> CNamedType,
@@ -153,19 +156,15 @@ class CheckerTypes {
 						cl.interfaces.push(getType(i.path, [for( t in i.params ) makeXmlType(t)]));
 				}
 				var pkeys = [];
-				for( f in c.fields ) {
-					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) continue;
-					var skip = false;
+				function initField(f:haxe.rtti.CType.ClassField, fields) {
+					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) return;
 					var complete = !StringTools.startsWith(f.name,"__"); // __uid, etc. (no metadata in such fields)
 					for( m in f.meta ) {
-						if( m.name == ":noScript"  ) {
-							skip = true;
-							break;
-						}
+						if( m.name == ":noScript"  )
+							return;
 						if( m.name == ":noCompletion" )
 							complete = false;
 					}
-					if( skip ) continue;
 					var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
 					for( p in f.params ) {
 						var pt = TParam(p);
@@ -175,13 +174,22 @@ class CheckerTypes {
 						localParams.set(key, pt);
 					}
 					fl.t = makeXmlType(f.type);
+					if( f.meta != null && f.meta.length > 0 ) {
+						fl.meta = [];
+						for( m in f.meta )
+							fl.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+					}
 					while( pkeys.length > 0 )
 						localParams.remove(pkeys.pop());
 					if( fl.name == "new" )
 						cl.constructor = fl;
 					else
-						cl.fields.set(f.name, fl);
+						fields.set(f.name, fl);
 				}
+				for( f in c.fields )
+					initField(f, cl.fields);
+				for( f in c.statics )
+					initField(f, cl.statics);
 				localParams = null;
 			});
 			types.set(cl.name, CTClass(cl));
