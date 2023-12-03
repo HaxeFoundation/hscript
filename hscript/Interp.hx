@@ -445,6 +445,7 @@ class Interp {
 					try {
 						r = me.exprReturn(fexpr);
 					} catch( e : Dynamic ) {
+						restore(oldDecl);
 						me.locals = old;
 						me.depth = depth;
 						#if neko
