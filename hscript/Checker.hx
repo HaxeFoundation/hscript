@@ -484,6 +484,24 @@ class Checker {
 		}
 	}
 
+	public static function typeIter( t : TType, callb : TType -> Void ) {
+		switch( t ) {
+		case TMono(r) if( r.r != null ): callb(r.r);
+		case TNull(t): callb(t);
+		case TInst(_,tl), TAbstract(_,tl), TEnum(_,tl), TType(_,tl):
+			for( t in tl ) callb(t);
+		case TFun(args,ret):
+			for( t in args ) callb(t.t);
+			callb(ret);
+		case TAnon(fl):
+			for( f in fl )
+				callb(f.t);
+		case TLazy(f):
+			callb(f());
+		default:
+		}
+	}
+
 	function linkLoop( a : TType, t : TType ) {
 		if( t == a ) return true;
 		switch( t ) {
