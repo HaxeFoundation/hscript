@@ -24,7 +24,7 @@ import haxe.PosInfos;
 import hscript.Expr;
 import haxe.Constraints.IMap;
 
-private enum Stop {
+enum Stop {
 	SBreak;
 	SContinue;
 	SReturn;
