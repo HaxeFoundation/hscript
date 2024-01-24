@@ -611,7 +611,7 @@ class Interp {
 		#if ((flash && !flash9) || (php && !php7 && haxe_ver < '4.0.0'))
 		if ( v.iterator != null ) v = v.iterator();
 		#else
-		try v = v.iterator() catch( e : Dynamic ) {};
+		if ( v.iterator != null ) try v = v.iterator() catch( e : Dynamic ) {};
 		#end
 		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));
 		return v;
