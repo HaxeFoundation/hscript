@@ -22,6 +22,13 @@ jobs:
     - name: Test interp
       run: |
         haxe bin/build-interp.hxml
+        haxe bin/build-interp.hxml -D hscriptPos
+    - name: Test neko
+      run: |
+        haxe bin/build-neko.hxml         && neko bin/Test.n
+    - name: Test js
+      run: |
+        haxe bin/build-js.hxml           && node bin/Test.js
     - name: Build hashlink from source
       run: |
         git clone https://github.com/HaxeFoundation/hashlink.git
@@ -31,4 +38,6 @@ jobs:
     - name: Test hl
       run: |
         haxe bin/build-hl.hxml           && ./hashlink/hl bin/Test.hl
+        
+
 
