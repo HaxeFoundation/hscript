@@ -815,7 +815,7 @@ class Parser {
 		case TQuestion:
 			if( maybe(TDot) ) {
 				var field = getIdent();
-				return parseExprNext(mk(ETernary(EBinop("==", e1, EIdent("null")),EIdent("null"),EField(e1,field)),pmin(e1)));
+				return parseExprNext(mk(ETernary(EBinop("==",e1,EIdent("null")),EIdent("null"),EField(e1,field)),pmin(e1)));
 			}
 			var e2 = parseExpr();
 			ensure(TDoubleDot);
