@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    # This should disable running the workflow on tags
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: krdlab/setup-haxe@v1
+    - name: Install haxelib hscript
+      run: |
+        haxelib dev hscript .
+    - name: Test interp
+      run: |
+        haxe bin/build-interp.hxml
+    - name: Install hashlink
+      run: |
+        git clone https://github.com/HaxeFoundation/hashlink.git
+        cd hashlink && make hl
+    - name: Test hl
+      run: |
+        haxe bin/build-hl.hxml           && ./hashlink/hl bin/Test.hl
+
