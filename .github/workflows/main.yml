@@ -38,6 +38,3 @@ jobs:
     - name: Test hl
       run: |
         haxe bin/build-hl.hxml           && ./hashlink/hl bin/Test.hl
-        
-
-
