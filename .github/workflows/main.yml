@@ -13,8 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: krdlab/setup-haxe@v1
-    - name: Install haxelib hscript
+    - name: Install haxelib dependencies
       run: |
+        haxelib install hx3compat
         haxelib dev hscript .
     - name: Test interp
       run: |
