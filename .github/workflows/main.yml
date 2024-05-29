@@ -13,6 +13,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: krdlab/setup-haxe@v1
+      with:
+          haxe-version: 4.3.4
     - name: Install haxelib dependencies
       run: |
         haxelib install hx3compat
