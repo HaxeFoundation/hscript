@@ -813,6 +813,10 @@ class Parser {
 			ensure(TBkClose);
 			return parseExprNext(mk(EArray(e1,e2),pmin(e1)));
 		case TQuestion:
+			if( maybe(TDot) ) {
+				var field = getIdent();
+				return parseExprNext(mk(ETernary(EBinop("==", e1, EIdent("null")),EIdent("null"),EField(e1,field)),pmin(e1)));
+			}
 			var e2 = parseExpr();
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
