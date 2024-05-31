@@ -115,6 +115,22 @@ class TestHScript extends TestCase {
 		assertScript("var a = 10; var b = 5; a - b / 2", 7.5);
 	}
 
+	function testNullFieldAccess():Void {
+		var pt = {x : 10};
+		var vars = {
+			ptnull : null,
+			pt: pt,
+			pt2null : {pt : null},
+			pt2: {pt : pt}
+		}
+		assertScript("ptnull?.x", null, vars);
+		assertScript("pt?.x", 10, vars);
+		assertScript("pt2null?.pt", null, vars);
+		assertScript("pt2null?.pt?.x", null, vars);
+		assertScript("pt2?.pt", pt, vars);
+		assertScript("pt2?.pt?.x", 10, vars);
+	}
+
 	function testMap():Void {
 		var objKey = { ok:true };
 		var vars = {
