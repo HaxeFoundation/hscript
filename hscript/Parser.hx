@@ -32,6 +32,7 @@ enum Token {
 	TBrOpen;
 	TBrClose;
 	TDot;
+	TQuestionDot;
 	TComma;
 	TSemicolon;
 	TBkOpen;
@@ -806,6 +807,18 @@ class Parser {
 		case TDot:
 			var field = getIdent();
 			return parseExprNext(mk(EField(e1,field),pmin(e1)));
+		case TQuestionDot:
+			var field = getIdent();
+			var tmp = "__a_" + (uid++);
+			var e = mk(EBlock([
+				mk(EVar(tmp, null, e1), pmin(e1), pmax(e1)),
+				mk(ETernary(
+					mk(EBinop("==", mk(EIdent(tmp),pmin(e1),pmax(e1)), mk(EIdent("null"),pmin(e1),pmax(e1)))),
+					mk(EIdent("null"),pmin(e1),pmax(e1)),
+					mk(EField(mk(EIdent(tmp),pmin(e1),pmax(e1)),field),pmin(e1))
+				))
+			]),pmin(e1));
+			return parseExprNext(e);
 		case TPOpen:
 			return parseExprNext(mk(ECall(e1,parseExprList(TPClose)),pmin(e1)));
 		case TBkOpen:
@@ -813,15 +826,6 @@ class Parser {
 			ensure(TBkClose);
 			return parseExprNext(mk(EArray(e1,e2),pmin(e1)));
 		case TQuestion:
-			if( maybe(TDot) ) {
-				var field = getIdent();
-				return parseExprNext(
-					mk(ETernary(
-						mk(EBinop("==",e1,mk(EIdent("null"),pmin(e1),pmax(e1)))),
-						mk(EIdent("null"),pmin(e1),pmax(e1)),
-						mk(EField(e1,field),pmin(e1))
-					),pmin(e1)));
-			}
 			var e2 = parseExpr();
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
@@ -1498,7 +1502,12 @@ class Parser {
 			case "[".code: return TBkOpen;
 			case "]".code: return TBkClose;
 			case "'".code, '"'.code: return TConst( CString(readString(char)) );
-			case "?".code: return TQuestion;
+			case "?".code:
+				char = readChar();
+				if( char == ".".code )
+					return TQuestionDot;
+				this.char = char;
+				return TQuestion;
 			case ":".code: return TDoubleDot;
 			case '='.code:
 				char = readChar();
@@ -1726,6 +1735,7 @@ class Parser {
 		case TBrOpen: "{";
 		case TBrClose: "}";
 		case TDot: ".";
+		case TQuestionDot: "?.";
 		case TComma: ",";
 		case TSemicolon: ";";
 		case TBkOpen: "[";
