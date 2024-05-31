@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    # This should disable running the workflow on tags
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: krdlab/setup-haxe@v1
+      with:
+          haxe-version: 4.3.4
+    - name: Install haxelib dependencies
+      run: |
+        haxelib install hx3compat
+        haxelib dev hscript .
+    - name: Test interp
+      run: |
+        haxe bin/build-interp.hxml
+        haxe bin/build-interp.hxml -D hscriptPos
+    - name: Test neko
+      run: |
+        haxe bin/build-neko.hxml               && neko bin/Test.n
+        haxe bin/build-neko.hxml -D hscriptPos && neko bin/Test.n
+    - name: Test js
+      run: |
+        haxe bin/build-js.hxml               && node bin/Test.js
+        haxe bin/build-js.hxml -D hscriptPos && node bin/Test.js
+    - name: Build hashlink from source
+      run: |
+        git clone https://github.com/HaxeFoundation/hashlink.git
+        cd hashlink
+        make hl
+        cd ..
+    - name: Test hl
+      run: |
+        haxe bin/build-hl.hxml               && ./hashlink/hl bin/Test.hl
+        haxe bin/build-hl.hxml -D hscriptPos && ./hashlink/hl bin/Test.hl
