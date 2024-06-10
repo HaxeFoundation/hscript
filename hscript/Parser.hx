@@ -830,6 +830,18 @@ class Parser {
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
 			return mk(ETernary(e1,e2,e3),pmin(e1),pmax(e3));
+		case TId("is"):
+			var type = parseExpr();
+			switch( expr(type) ) {
+			case EIdent(_):
+				#if (haxe_ver >= 4.2)
+				return mk(ECall(mk(EField(mk(EIdent("Std")), "isOfType")), [e1, type]));
+				#else
+				return mk(ECall(mk(EField(mk(EIdent("Std")), "is")), [e1, type]));
+				#end
+			default:
+			}
+			return unexpected(tk);
 		default:
 			push(tk);
 			return e1;

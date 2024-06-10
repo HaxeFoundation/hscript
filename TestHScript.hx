@@ -131,6 +131,39 @@ class TestHScript extends TestCase {
 		assertScript("pt2?.pt?.x", 10, vars);
 	}
 
+	function testIsOperator():Void {
+		var vars = {
+			Std: Std,
+			String: String,
+			Bool: Bool,
+			Int: Int,
+			Float: Float,
+			Dynamic: Dynamic
+		}
+		assertScript("10 is Int", true, vars);
+		assertScript("10.0 is Int", true, vars);
+		assertScript("10.1 is Int", false, vars);
+		assertScript("10 is Float", true, vars);
+		assertScript("10.0 is Float", true, vars);
+		assertScript("10.1 is Float", true, vars);
+		assertScript("10 is String", false, vars);
+		assertScript('"hscript" is String', true, vars);
+		assertScript('"" is String', true, vars);
+		assertScript('true is Bool', true, vars);
+		assertScript('false is Bool', true, vars);
+		assertScript('0 is Bool', false, vars);
+		assertScript('1 is Bool', false, vars);
+		assertScript('1 is Bool', false, vars);
+		assertScript("10 is Dynamic", true, vars);
+		assertScript("10.1 is Dynamic", true, vars);
+		assertScript('"hscript" is Dynamic', true, vars);
+		assertScript('null is Int', false, vars);
+		assertScript('null is Float', false, vars);
+		assertScript('null is String', false, vars);
+		assertScript('null is Bool', false, vars);
+		assertScript('null is Dynamic', false, vars);
+	}
+
 	function testMap():Void {
 		var objKey = { ok:true };
 		var vars = {
