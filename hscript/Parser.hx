@@ -609,7 +609,7 @@ class Parser {
 				if( semic ) push(TSemicolon);
 			}
 			mk(EIf(cond,e1,e2),p1,(e2 == null) ? tokenMax : pmax(e2));
-		case "var":
+		case "var", "final":
 			var ident = getIdent();
 			var tk = token();
 			var t = null;
@@ -998,7 +998,7 @@ class Parser {
 				t = token();
 				switch( t ) {
 				case TBrClose: break;
-				case TId("var"):
+				case TId("var"), TId("final"):
 					var name = getIdent();
 					ensure(TDoubleDot);
 					fields.push( { name : name, t : parseType(), meta : meta } );
@@ -1232,7 +1232,7 @@ class Parser {
 						ret : inf.ret,
 					}),
 				};
-			case "var":
+			case "var", "final":
 				var name = getIdent();
 				var get = null, set = null;
 				if( maybe(TPOpen) ) {
