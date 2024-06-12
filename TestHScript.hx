@@ -133,7 +133,6 @@ class TestHScript extends TestCase {
 
 	function testIsOperator():Void {
 		var vars = {
-			Std: Std,
 			String: String,
 			Bool: Bool,
 			Int: Int,
