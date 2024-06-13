@@ -804,6 +804,8 @@ class Parser {
 				return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
 			}
 			return makeBinop(op,e1,parseExpr());
+		case TId(op) if ( op == 'is' ):
+			return makeBinop(op,e1,parseExpr());
 		case TDot:
 			var field = getIdent();
 			return parseExprNext(mk(EField(e1,field),pmin(e1)));
@@ -1569,8 +1571,6 @@ class Parser {
 					var id = String.fromCharCode(char);
 					while( true ) {
 						char = readChar();
-						if( id == 'i' && char == 's'.code )
-							return TOp('is');
 						if( StringTools.isEof(char) ) char = 0;
 						if( !idents[char] ) {
 							this.char = char;
