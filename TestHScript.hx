@@ -113,6 +113,9 @@ class TestHScript extends TestCase {
 		assertScript("var f:(x:Int)->(Int, Int)->Int = (x:Int) -> (y:Int, z:Int) -> x + y + z; f(3)(1, 2)", 6, null, true);
 		assertScript("var a = 10; var b = 5; a - -b", 15);
 		assertScript("var a = 10; var b = 5; a - b / 2", 7.5);
+		assertScript("final a = 10; a", 10);
+		assertScript("final a, b; a", null);
+		assertScript("final a, b; b", null);
 	}
 
 	function testNullFieldAccess():Void {
