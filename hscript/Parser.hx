@@ -804,6 +804,8 @@ class Parser {
 				return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
 			}
 			return makeBinop(op,e1,parseExpr());
+		case TId(op) if ( op == 'is' ):
+			return makeBinop(op,e1,parseExpr());
 		case TDot:
 			var field = getIdent();
 			return parseExprNext(mk(EField(e1,field),pmin(e1)));
