@@ -131,6 +131,22 @@ class TestHScript extends TestCase {
 		assertScript("pt2?.pt?.x", 10, vars);
 	}
 
+	function testNullCoalescing():Void {
+		var pt = {x: 10};
+		var vars = {
+			ptnull: null,
+			pt: pt,
+			pt2null: {pt: null},
+			pt2: {pt: pt}
+		}
+		assertScript("ptnull?.x ?? 5", 5, vars);
+		assertScript("pt?.x ?? 5", 10, vars);
+		assertScript("pt2null?.pt ?? 5", 5, vars);
+		assertScript("pt2null?.pt?.x ?? 5", 5, vars);
+		assertScript("pt2?.pt ?? 5", pt, vars);
+		assertScript("pt2?.pt?.x ?? 5", 10, vars);
+	}
+
 	function testIsOperator():Void {
 		var vars = {
 			String: String,
