@@ -137,7 +137,9 @@ class TestHScript extends TestCase {
 			ptnull: null,
 			pt: pt,
 			pt2null: {pt: null},
-			pt2: {pt: pt}
+			pt2: {pt: pt},
+			valuenull: null,
+			value: 10
 		}
 		assertScript("ptnull?.x ?? 5", 5, vars);
 		assertScript("pt?.x ?? 5", 10, vars);
@@ -145,6 +147,8 @@ class TestHScript extends TestCase {
 		assertScript("pt2null?.pt?.x ?? 5", 5, vars);
 		assertScript("pt2?.pt ?? 5", pt, vars);
 		assertScript("pt2?.pt?.x ?? 5", 10, vars);
+		assertScript("valuenull ??= 5; valuenull", 5, vars);
+		assertScript("value ??= 5; value", 10, vars);
 	}
 
 	function testIsOperator():Void {
