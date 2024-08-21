@@ -128,7 +128,7 @@ class Parser {
 			["..."],
 			["&&"],
 			["||"],
-			["=","+=","-=","*=","/=","%=","??=","<<=",">>=",">>>=","|=","&=","^=","=>"],
+			["=","+=","-=","*=","/=","%=",#if cpp "??"+"=" #else "??=" #end,"<<=",">>=",">>>=","|=","&=","^=","=>"],
 			["->"]
 		];
 		#if haxe3
@@ -1524,7 +1524,7 @@ class Parser {
 				else if ( char == "?".code ) {
 					char = readChar();
 					if ( char == "=".code )
-						return TOp("??=");
+						return TOp(#if cpp "??"+"=" #else "??=" #end);
 					return TQuestionQuestion;
 				}
 				this.char = char;
