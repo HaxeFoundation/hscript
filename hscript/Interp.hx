@@ -32,15 +32,9 @@ private enum Stop {
 
 class Interp {
 
-	#if haxe3
 	public var variables : Map<String,Dynamic>;
 	var locals : Map<String,{ r : Dynamic }>;
 	var binops : Map<String, Expr -> Expr -> Dynamic >;
-	#else
-	public var variables : Hash<Dynamic>;
-	var locals : Hash<{ r : Dynamic }>;
-	var binops : Hash< Expr -> Expr -> Dynamic >;
-	#end
 
 	var depth : Int;
 	var inTry : Bool;
@@ -52,23 +46,14 @@ class Interp {
 	#end
 
 	public function new() {
-		#if haxe3
 		locals = new Map();
-		#else
-		locals = new Hash();
-		#end
 		declared = new Array();
 		resetVariables();
 		initOps();
 	}
 
 	private function resetVariables(){
-		#if haxe3
 		variables = new Map<String,Dynamic>();
-		#else
-		variables = new Hash();
-		#end
-
 		variables.set("null",null);
 		variables.set("true",true);
 		variables.set("false",false);
@@ -90,11 +75,7 @@ class Interp {
 
 	function initOps() {
 		var me = this;
-		#if haxe3
 		binops = new Map();
-		#else
-		binops = new Hash();
-		#end
 		binops.set("+",function(e1,e2) return me.expr(e1) + me.expr(e2));
 		binops.set("-",function(e1,e2) return me.expr(e1) - me.expr(e2));
 		binops.set("*",function(e1,e2) return me.expr(e1) * me.expr(e2));
@@ -115,7 +96,7 @@ class Interp {
 		binops.set("||",function(e1,e2) return me.expr(e1) == true || me.expr(e2) == true);
 		binops.set("&&",function(e1,e2) return me.expr(e1) == true && me.expr(e2) == true);
 		binops.set("=",assign);
-		binops.set("...",function(e1,e2) return new #if (haxe_211 || haxe3) IntIterator #else IntIter #end(me.expr(e1),me.expr(e2)));
+		binops.set("...",function(e1,e2) return new IntIterator(me.expr(e1),me.expr(e2)));
 		binops.set("is",function(e1,e2) return #if (haxe_ver >= 4.2) Std.isOfType #else Std.is #end (me.expr(e1), me.expr(e2)));
 		assignOp("+=",function(v1:Dynamic,v2:Dynamic) return v1 + v2);
 		assignOp("-=",function(v1:Float,v2:Float) return v1 - v2);
@@ -251,11 +232,7 @@ class Interp {
 
 	public function execute( expr : Expr ) : Dynamic {
 		depth = 0;
-		#if haxe3
 		locals = new Map();
-		#else
-		locals = new Hash();
-		#end
 		declared = new Array();
 		return exprReturn(expr);
 	}
@@ -276,12 +253,8 @@ class Interp {
 		return null;
 	}
 
-	function duplicate<T>( h : #if haxe3 Map < String, T > #else Hash<T> #end ) {
-		#if haxe3
+	function duplicate<T>( h : Map<String,T> ) {
 		var h2 = new Map();
-		#else
-		var h2 = new Hash();
-		#end
 		for( k in h.keys() )
 			h2.set(k,h.get(k));
 		return h2;
@@ -329,9 +302,6 @@ class Interp {
 			case CInt(v): return v;
 			case CFloat(f): return f;
 			case CString(s): return s;
-			#if !haxe3
-			case CInt32(v): return v;
-			#end
 			}
 		case EIdent(id):
 			return resolve(id);
@@ -365,11 +335,7 @@ class Interp {
 			case "--":
 				return increment(e,prefix,-1);
 			case "~":
-				#if (neko && !haxe3)
-				return haxe.Int32.complement(expr(e));
-				#else
 				return ~expr(e);
-				#end
 			default:
 				error(EInvalidOp(op));
 			}
