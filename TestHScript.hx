@@ -8,6 +8,14 @@ import hscript.Checker;
 import haxe.unit.*;
 
 class TestHScript extends TestCase {
+
+	var optimize : Bool;
+
+	function new(optimize=false) {
+		this.optimize = optimize;
+		super();
+	}
+
 	function assertScript(x,v:Dynamic,?vars : Dynamic, allowTypes=false, ?pos:haxe.PosInfos) {
 		var p = new hscript.Parser();
 		p.allowTypes = allowTypes;
@@ -15,6 +23,9 @@ class TestHScript extends TestCase {
 		var bytes = hscript.Bytes.encode(program);
 		program = hscript.Bytes.decode(bytes);
 		var interp = new hscript.Interp();
+		#if js
+		if( optimize ) interp = new hscript.JsInterp();
+		#end
 		if( vars != null )
 			for( v in Reflect.fields(vars) )
 				interp.variables.set(v,Reflect.field(vars,v));
@@ -81,11 +92,7 @@ class TestHScript extends TestCase {
 		assertScript("var a = [1,[2,[3,[4,null]]]]; var t = 0; while( a != null ) { t += a[0]; a = a[1]; }; t",10);
 		assertScript("var a = false; do { a = true; } while (!a); a;",true);
 		assertScript("var t = 0; for( x in 1...10 ) t += x; t", 45);
-		#if haxe3
 		assertScript("var t = 0; for( x in new IntIterator(1,10) ) t +=x; t", 45);
-		#else
-		assertScript("var t = 0; for( x in new IntIter(1,10) ) t +=x; t", 45);
-		#end
 		assertScript("var x = 1; try { var x = 66; throw 789; } catch( e : Dynamic ) e + x",790);
 		assertScript("var x = 1; var f = function(x) throw x; try f(55) catch( e : Dynamic ) e + x",56);
 		assertScript("var i=2; if( true ) --i; i",1);
@@ -93,7 +100,7 @@ class TestHScript extends TestCase {
 		assertScript("var a = 5/2; a",2.5);
 		assertScript("{ x = 3; x; }", 3);
 		assertScript("{ x : 3, y : {} }.x", 3);
-		assertScript("function bug(){ \n }\nbug().x", null);
+		assertScript("function bug() return { \n }\nbug().x", null);
 		assertScript("1 + 2 == 3", true);
 		assertScript("-2 == 3 - 5", true);
 		assertScript("var x=-3; x", -3);
@@ -113,6 +120,9 @@ class TestHScript extends TestCase {
 		assertScript("var f:(x:Int)->(Int, Int)->Int = (x:Int) -> (y:Int, z:Int) -> x + y + z; f(3)(1, 2)", 6, null, true);
 		assertScript("var a = 10; var b = 5; a - -b", 15);
 		assertScript("var a = 10; var b = 5; a - b / 2", 7.5);
+		assertScript("false && xxx", false);
+		assertScript("true || xxx", true);
+		assertScript("[for( x in arr ) switch( x ) { case 1: 55; case 3: 66; default: 0; }].join(':')",'55:0:66',{ arr : [1,2,3] });
 	}
 
 	function testNullFieldAccess():Void {
@@ -222,6 +232,7 @@ class TestHScript extends TestCase {
 
 		var runner = new TestRunner();
 		runner.add(new TestHScript());
+		runner.add(new TestHScript(true));
 		var succeed = runner.run();
 
 		#if sys
