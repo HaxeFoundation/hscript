@@ -556,6 +556,11 @@ class Interp {
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
 		#if ((flash && !flash9) || (php && !php7 && haxe_ver < '4.0.0'))
 		if ( v.iterator != null ) v = v.iterator();
+		#elseif js
+		// don't use try/catch (very slow)
+		if( v is Array )
+			return (v : Array<Dynamic>).iterator();
+		if( v.iterator != null ) v = v.iterator();
 		#else
 		try v = v.iterator() catch( e : Dynamic ) {};
 		#end
