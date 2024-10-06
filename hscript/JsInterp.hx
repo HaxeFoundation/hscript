@@ -90,6 +90,20 @@ class JsInterp extends Interp {
 		return properties == null || properties.get(f);
 	}
 
+	function exprCond( e : Expr ) {
+		return switch( Tools.expr(e) ) {
+		case EBinop("=="|"!="|">="|">"|"<="|"<"|"&&"|"||",_): exprValue(e);
+		default: '(${exprOp(e)} == true)';
+		}
+	}
+
+	function exprOp( e : Expr ) {
+		return switch( Tools.expr(e) ) {
+		case EBinop(_), EUnop(_): '(${exprValue(e)})';
+		default: exprValue(e);
+		}
+	}
+
 	function exprJS( expr : Expr ) : String {
 		#if hscriptPos
 		curExpr = expr;
@@ -141,9 +155,9 @@ class JsInterp extends Interp {
 		case EBinop(op, e1, e2):
 			switch( op ) {
 			case "+","-","*","/","%","&","|","^",">>","<<",">>>","==","!=",">=","<=",">","<":
-				return '((${exprValue(e1)}) $op (${exprValue(e2)}))';
+				return '${exprOp(e1)} $op ${exprOp(e2)}';
 			case "||","&&":
-				return '((${exprValue(e1)}) == true $op (${exprValue(e2)}) == true)';
+				return '(${exprCond(e1)} $op ${exprCond(e2)})';
 			case "=":
 				switch( Tools.expr(e1) ) {
 				case EIdent(id) if( locals.exists(id) ):
@@ -187,7 +201,7 @@ class JsInterp extends Interp {
 			case "!":
 				return '${exprValue(e)} != true';
 			case "-","~":
-				return op+exprValue(e);
+				return op+exprOp(e);
 			case "++", "--":
 				switch( Tools.expr(e) ) {
 				case EIdent(id) if( locals.exists(id) ):
@@ -235,11 +249,11 @@ class JsInterp extends Interp {
 				return '$$i.call(null,${exprValue(e)},[${args.join(',')}])';
 			}
 		case EIf(cond,e1,e2):
-			return 'if( ${exprValue(cond)} == true ) ${exprJS(e1)}'+(e2 == null ? "" : 'else ${exprJS(e2)}');
+			return 'if( ${exprCond(cond)} ) ${exprJS(e1)}'+(e2 == null ? "" : 'else ${exprJS(e2)}');
 		case ETernary(cond, e1, e2):
-			return '((${exprValue(cond)} == true) ? ${exprValue(e1)} : ${exprValue(e2)})';
+			return '(${exprCond(cond)} ? ${exprValue(e1)} : ${exprValue(e2)})';
 		case EWhile(cond, e):
-			return 'while( ${exprValue(cond)} == true ) ${exprJS(e)}';
+			return 'while( ${exprValue(cond)} ) ${exprJS(e)}';
 		case EFor(v, it, e):
 			var prev = locals.exists(v);
 			locals.set(v, null);
@@ -290,7 +304,7 @@ class JsInterp extends Interp {
 			var fields = [for( f in fl ) f.name+":"+exprValue(f.e)];
 			return '{${fields.join(',')}}'; // do not use 'set' here
 		case EDoWhile(cond, e):
-			return 'do ${exprBlock(e)} while( ${exprValue(cond)} == true )';
+			return 'do ${exprBlock(e)} while( ${exprCond(cond)} )';
 		case EMeta(_, _, e), ECheckType(e,_):
 			return exprJS(e);
 		case EFunction(args, e, name, ret):
