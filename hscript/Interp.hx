@@ -282,9 +282,6 @@ class Interp {
 	}
 
 	function resolve( id : String ) : Dynamic {
-		var l = locals.get(id);
-		if( l != null )
-			return l.r;
 		var v = variables.get(id);
 		if( v == null && !variables.exists(id) )
 			error(EUnknownVariable(id));
@@ -304,6 +301,9 @@ class Interp {
 			case CString(s): return s;
 			}
 		case EIdent(id):
+			var l = locals.get(id);
+			if( l != null )
+				return l.r;
 			return resolve(id);
 		case EVar(n,_,e):
 			declared.push({ n : n, old : locals.get(n) });
