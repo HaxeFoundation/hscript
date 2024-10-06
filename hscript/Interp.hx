@@ -113,6 +113,7 @@ class Interp {
 
 	function setVar( name : String, v : Dynamic ) {
 		variables.set(name, v);
+		return v;
 	}
 
 	function assign( e1 : Expr, e2 : Expr ) : Dynamic {
@@ -443,56 +444,34 @@ class Interp {
 			}
 			return f;
 		case EArrayDecl(arr):
-			if (arr.length > 0 && Tools.expr(arr[0]).match(EBinop("=>", _))) {
-				var isAllString:Bool = true;
-				var isAllInt:Bool = true;
-				var isAllObject:Bool = true;
-				var isAllEnum:Bool = true;
-				var keys:Array<Dynamic> = [];
-				var values:Array<Dynamic> = [];
-				for (e in arr) {
+			if( arr.length > 0 && Tools.expr(arr[0]).match(EBinop("=>", _)) ) {
+				var keys = [];
+				var values = [];
+				for( e in arr ) {
 					switch(Tools.expr(e)) {
-						case EBinop("=>", eKey, eValue): {
-							var key:Dynamic = expr(eKey);
-							var value:Dynamic = expr(eValue);
-							isAllString = isAllString && (key is String);
-							isAllInt = isAllInt && (key is Int);
-							isAllObject = isAllObject && Reflect.isObject(key);
-							isAllEnum = isAllEnum && Reflect.isEnumValue(key);
-							keys.push(key);
-							values.push(value);
-						}
-						default: throw("=> expected");
+					case EBinop("=>", eKey, eValue):
+						keys.push(expr(eKey));
+						values.push(expr(eValue));
+					default:
+						#if hscriptPos
+						curExpr = e;
+						#end
+						error(ECustom("Invalid map key=>value expression"));
 					}
 				}
-				var map:Dynamic = {
-					if (isAllInt) new haxe.ds.IntMap<Dynamic>();
-					else if (isAllString) new haxe.ds.StringMap<Dynamic>();
-					else if (isAllEnum) new haxe.ds.EnumValueMap<Dynamic, Dynamic>();
-					else if (isAllObject) new haxe.ds.ObjectMap<Dynamic, Dynamic>();
-					else throw 'Inconsistent key types';
-				}
-				for (n in 0...keys.length) {
-					setMapValue(map, keys[n], values[n]);
-				}
-				return map;
-			}
-			else {
+				return makeMap(keys,values);
+			} else {
 				var a = new Array();
-				for ( e in arr ) {
+				for( e in arr )
 					a.push(expr(e));
-				}
 				return a;
 			}
 		case EArray(e, index):
 			var arr:Dynamic = expr(e);
 			var index:Dynamic = expr(index);
-			if (isMap(arr)) {
+			if( isMap(arr) )
 				return getMapValue(arr, index);
-			}
-			else {
-				return arr[index];
-			}
+			return arr[index];
 		case ENew(cl,params):
 			var a = new Array();
 			for( e in params )
@@ -622,6 +601,45 @@ class Interp {
 
 	inline function setMapValue(map:Dynamic, key:Dynamic, value:Dynamic):Void {
 		cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).set(key, value);
+	}
+
+	function makeMap( keys : Array<Dynamic>, values : Array<Dynamic> ) : Dynamic {
+		var isAllString:Bool = true;
+		var isAllInt:Bool = true;
+		var isAllObject:Bool = true;
+		var isAllEnum:Bool = true;
+		for( key in keys ) {
+			isAllString = isAllString && (key is String);
+			isAllInt = isAllInt && (key is Int);
+			isAllObject = isAllObject && Reflect.isObject(key);
+			isAllEnum = isAllEnum && Reflect.isEnumValue(key);
+		}
+		if( isAllInt ) {
+			var m = new Map<Int,Dynamic>();
+			for( i => key in keys )
+				m.set(key, values[i]);
+			return m;
+		}
+		if( isAllString ) {
+			var m = new Map<String,Dynamic>();
+			for( i => key in keys )
+				m.set(key, values[i]);
+			return m;
+		}
+		if( isAllEnum ) {
+			var m = new haxe.ds.EnumValueMap<Dynamic,Dynamic>();
+			for( i => key in keys )
+				m.set(key, values[i]);
+			return m;
+		}
+		if( isAllObject ) {
+			var m = new Map<{},Dynamic>();
+			for( i => key in keys )
+				m.set(key, values[i]);
+			return m;
+		}
+		error(ECustom("Invalid map keys "+keys));
+		return null;
 	}
 
 	function get( o : Dynamic, f : String ) : Dynamic {
