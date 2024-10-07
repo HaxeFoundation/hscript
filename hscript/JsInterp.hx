@@ -13,9 +13,11 @@ class JsInterp extends Interp {
 	public var properties : Map<String,Bool>;
 
 
+	var localNames : Map<String,String>;
+
 	override function execute( expr : Expr ) : Dynamic {
 		depth = 0;
-		locals = new Map();
+		localNames = new Map();
 		var str = '(($$i) => ${exprValue(expr)})';
 		var f : Dynamic -> Dynamic = js.Lib.eval(str);
 		return f(this);
@@ -58,6 +60,8 @@ class JsInterp extends Interp {
 			return '(() => {${exprJS(expr)}})()';
 		case EMeta(_,_,e), ECheckType(e,_):
 			return exprValue(e);
+		case EFunction(_,_,name,_) if( name != null ):
+			return '(() => {${exprJS(expr)}})()';
 		default:
 			return exprJS(expr);
 		}
@@ -104,6 +108,17 @@ class JsInterp extends Interp {
 		}
 	}
 
+	function declLocal( n : String ) {
+		if( !localNames.exists(n) ) {
+			localNames.set(n, n);
+			return n;
+		}
+		var c = 2;
+		while( localNames.exists(n+c) ) c++;
+		localNames.set(n, n+c);
+		return n+c;
+	}
+
 	function exprJS( expr : Expr ) : String {
 		#if hscriptPos
 		curExpr = expr;
@@ -117,8 +132,9 @@ class JsInterp extends Interp {
 			case CString(s): '"'+escapeString(s)+'"';
 			}
 		case EIdent(v):
-			if( locals.exists(v) )
-				return v;
+			var v2 = localNames.get(v);
+			if( v2 != null )
+				return v2;
 			if( isContext(v) )
 				return '$$i.ctx.$v';
 			switch( v ) {
@@ -127,16 +143,16 @@ class JsInterp extends Interp {
 			}
 			return '$$i.resolve("$v")';
 		case EVar(n, t, e):
-			locals.set(n, null);
+			n = declLocal(n);
 			return e == null ? 'let $n' : 'let $n = ${exprValue(e)}';
 		case EParent(e):
 			return '(${exprValue(e)})';
 		case EBlock(el):
-			var old = locals.copy();
+			var old = localNames.copy();
 			// pre define name functions
 			for( e in el )
 				switch( Tools.expr(e) ) {
-				case EFunction(_,_,name,_): locals.set(name,null);
+				case EFunction(_,_,name,_): declLocal(name);
 				default:
 				}
 			var buf = new StringBuf();
@@ -146,7 +162,7 @@ class JsInterp extends Interp {
 				buf.add(";");
 			}
 			buf.add('}');
-			locals = old;
+			localNames = old;
 			return buf.toString();
 		case EField(e,f) if( !isProperty(f) ):
 			return exprValue(e)+"."+f;
@@ -160,8 +176,8 @@ class JsInterp extends Interp {
 				return '(${exprCond(e1)} $op ${exprCond(e2)})';
 			case "=":
 				switch( Tools.expr(e1) ) {
-				case EIdent(id) if( locals.exists(id) ):
-					return id+" = "+exprValue(e2);
+				case EIdent(id) if( localNames.exists(id) ):
+					return localNames.get(id)+" = "+exprValue(e2);
 				case EIdent(id) if( isContext(id) ):
 					return '$$i.ctx.$id = ${exprValue(e2)}';
 				case EIdent(id):
@@ -176,8 +192,8 @@ class JsInterp extends Interp {
 			case "+=","-=","*=","/=","%=","|=","&=","^=","<<=",">>=",">>>=":
 				var aop = op.substr(0, op.length - 1);
 				switch( Tools.expr(e1) ) {
-				case EIdent(id) if( locals.exists(id) ):
-					return id+" "+op+" "+exprValue(e2);
+				case EIdent(id) if( localNames.exists(id) ):
+					return localNames.get(id)+" "+op+" "+exprValue(e2);
 				case EIdent(id) if( isContext(id) ):
 					return '$$i.ctx.$id $op ${exprValue(e2)}';
 				case EIdent(id):
@@ -204,7 +220,8 @@ class JsInterp extends Interp {
 				return op+exprOp(e);
 			case "++", "--":
 				switch( Tools.expr(e) ) {
-				case EIdent(id) if( locals.exists(id) ):
+				case EIdent(id) if( localNames.exists(id) ):
+					id = localNames.get(id);
 					return prefix ? op + id : id + op;
 				case EIdent(id) if( isContext(id) ):
 					return prefix ? op + "$i.ctx."+id : "$i.ctx."+id + op;
@@ -216,9 +233,15 @@ class JsInterp extends Interp {
 					return '(($$v) => ($$i.setVar("$id",$$v $op 1),$$v))($$i.resolve("$id"))';
 				case EArray(e, index):
 					var op = op.charAt(0);
-					return '(($$a,$$idx) => { var $$v = $$i.getArray($$a,$$idx); $$i.setArray($$a,$$idx,$$v $op 1); return $$v; })(${exprValue(e)},${exprValue(index)})';
+					var v = declLocal("$v");
+					var str = '(($$a,$$idx) => { let $v = $$i.getArray($$a,$$idx); $$i.setArray($$a,$$idx,$v $op 1); return $v; })(${exprValue(e)},${exprValue(index)})';
+					localNames.remove(v);
+					return str;
 				case EField(e, f):
-					return '(($$o) => { var $$v = $$i.get($$o,"$f"); $$i.set($$o,"$f",$$v $op 1); return $$v; })(${exprValue(e)})';
+					var v = declLocal("$v");
+					var str = '(($$o) => { let $v = $$i.get($$o,"$f"); $$i.set($$o,"$f",$$v $op 1); return $v; })(${exprValue(e)})';
+					localNames.remove(v);
+					return str;
 				default:
 					error(EInvalidOp(op));
 				}
@@ -241,7 +264,8 @@ class JsInterp extends Interp {
 				if( isCtx )
 					return '${exprValue(e)}(${args.join(',')})';
 				return addPos('$$i.fcall2(${exprValue(eobj)},"$f",[${args.join(',')}])');
-			case EIdent(id) if( locals.exists(id) ):
+			case EIdent(id) if( localNames.exists(id) ):
+				id = localNames.get(id);
 				return '$id(${args.join(',')})';
 			case EIdent(id) if( isContext(id) ):
 				return '$$i.ctx.$id(${args.join(',')})';
@@ -255,12 +279,14 @@ class JsInterp extends Interp {
 		case EWhile(cond, e):
 			return 'while( ${exprValue(cond)} ) ${exprJS(e)}';
 		case EFor(v, it, e):
-			var prev = locals.exists(v);
-			locals.set(v, null);
+			v = declLocal(v);
 			var block = exprJS(e);
-			if( !prev ) locals.remove(v);
+			localNames.remove(v);
 			var iter = '$$i.makeIterator(${exprValue(it)})';
-			return '{ var $$it = ${addPos(iter)}; while( $$it.hasNext() ) { var $v = $$it.next(); $block; } }';
+			var it = declLocal("$it");
+			var str = '{ let $it = ${addPos(iter)}; while( $it.hasNext() ) { let $v = $it.next(); $block; } }';
+			localNames.remove(it);
+			return str;
 		case EBreak:
 			return 'break';
 		case EContinue:
@@ -295,10 +321,9 @@ class JsInterp extends Interp {
 		case EThrow(e):
 			return "throw "+exprValue(e);
 		case ETry(e, v, t, ecatch):
-			var prev = locals.exists(v);
-			locals.set(v, null);
+			v = declLocal(v);
 			var ec = exprBlock(ecatch);
-			if( !prev ) locals.remove(v);
+			localNames.remove(v);
 			return 'try ${exprBlock(e)} catch( $v ) $ec';
 		case EObject(fl):
 			var fields = [for( f in fl ) f.name+":"+exprValue(f.e)];
@@ -308,16 +333,16 @@ class JsInterp extends Interp {
 		case EMeta(_, _, e), ECheckType(e,_):
 			return exprJS(e);
 		case EFunction(args, e, name, ret):
+			var prev = localNames.copy();
 			if( name != null )
-				locals.set(name, null);
-			var prev = locals.copy();
+				declLocal(name);
 			for( a in args )
-				locals.set(a.name, null);
+				localNames.set(a.name, a.name);
 			var bl = exprBlock(e);
-			locals = prev;
+			localNames = prev;
 			var fstr = 'function(${[for( a in args ) a.name].join(",")}) $bl';
 			if( name != null )
-				fstr = 'var $name = $$i.setVar("$name",$fstr)';
+				fstr = 'let $name = $$i.setVar("$name",$fstr)';
 			return fstr;
 		case ESwitch(e, cases, defaultExpr):
 			var checks = [for( c in cases ) 'if( ${[for( v in c.values ) '$$v == ${exprValue(v)}'].join(" || ")} ) return ${exprValue(handleRBC(c.expr))};'];
