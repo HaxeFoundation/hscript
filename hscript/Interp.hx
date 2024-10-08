@@ -562,7 +562,7 @@ class Interp {
 			return (v : Array<Dynamic>).iterator();
 		if( v.iterator != null ) v = v.iterator();
 		#else
-		try v = v.iterator() catch( e : Dynamic ) {};
+		if ( v.iterator != null ) try v = v.iterator() catch( e : Dynamic ) {};
 		#end
 		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));
 		return v;
