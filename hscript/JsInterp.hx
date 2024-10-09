@@ -334,7 +334,7 @@ class JsInterp extends Interp {
 			return exprJS(e);
 		case EFunction(args, e, name, ret):
 			var prev = localNames.copy();
-			if( name != null )
+			if( name != null && !localNames.exists(name) )
 				declLocal(name);
 			for( a in args )
 				localNames.set(a.name, a.name);
