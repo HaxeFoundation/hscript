@@ -33,6 +33,7 @@ enum Token {
 	TBrClose;
 	TDot;
 	TQuestionDot;
+	TQuestionQuestion;
 	TComma;
 	TSemicolon;
 	TBkOpen;
@@ -117,7 +118,7 @@ class Parser {
 			["..."],
 			["&&"],
 			["||"],
-			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
+			["=","+=","-=","*=","/=","%=",#if cpp "??"+"=" #else "??=" #end,"<<=",">>=",">>>=","|=","&=","^=","=>"],
 			["->"]
 		];
 		opPriority = new Map();
@@ -804,6 +805,18 @@ class Parser {
 				))
 			]),pmin(e1));
 			return parseExprNext(e);
+		case TQuestionQuestion:
+			var e2 = parseExpr();
+			var tmp = "__a_" + (uid++);
+			var e = mk(EBlock([
+				mk(EVar(tmp, null, e1), pmin(e1), pmax(e1)),
+				mk(ETernary(
+					mk(EBinop("==", mk(EIdent(tmp),pmin(e1),pmax(e1)), mk(EIdent("null"),pmin(e1),pmax(e1)))),
+					e2,
+					mk(EIdent(tmp),pmin(e1),pmax(e1))
+				))
+			]),pmin(e1));
+			return parseExprNext(e);
 		case TPOpen:
 			return parseExprNext(mk(ECall(e1,parseExprList(TPClose)),pmin(e1)));
 		case TBkOpen:
@@ -1469,6 +1482,12 @@ class Parser {
 				char = readChar();
 				if( char == ".".code )
 					return TQuestionDot;
+				else if ( char == "?".code ) {
+					char = readChar();
+					if ( char == "=".code )
+						return TOp(#if cpp "??"+"=" #else "??=" #end);
+					return TQuestionQuestion;
+				}
 				this.char = char;
 				return TQuestion;
 			case ":".code: return TDoubleDot;
@@ -1696,6 +1715,7 @@ class Parser {
 		case TBrClose: "}";
 		case TDot: ".";
 		case TQuestionDot: "?.";
+		case TQuestionQuestion: "??";
 		case TComma: ",";
 		case TSemicolon: ";";
 		case TBkOpen: "[";
