@@ -49,6 +49,10 @@ class TestHScript extends TestCase {
 		assertScript("- 123",-123);
 		assertScript("1.546",1.546);
 		assertScript(".545",.545);
+		assertScript("1e5",100000);
+		assertScript("1.2e2",120);
+		assertScript("100e-2",1);
+		assertScript("1.2e-1",0.12);
 		assertScript("'bla'","bla");
 		assertScript("null",null);
 		assertScript("true",true);
