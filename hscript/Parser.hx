@@ -1393,6 +1393,8 @@ class Parser {
 						}
 						if( pow == null )
 							invalidChar(char);
+						if( exp == 0 )
+							exp = 10;
 						return TConst(CFloat((Math.pow(10, pow) / exp) * n * 10));
 					case ".".code:
 						if( exp > 0 ) {
