@@ -80,7 +80,7 @@ class JsInterp extends Interp {
 		#if hscriptPos
 		var expr = curExpr;
 		var p = '{pmin:,pmax:,origin:"",line:}';
-		return '($$i._p(${expr.pmin},${expr.pmax},${expr.origin},${expr.line}),$estr)';
+		return '($$i._p(${expr.pmin},${expr.pmax},"${expr.origin}",${expr.line}),$estr)';
 		#else
 		return estr;
 		#end
