@@ -772,6 +772,25 @@ class Interp {
 
 	function get( o : Dynamic, f : String ) : Dynamic {
 		if ( o == null ) error(EInvalidAccess(f));
+		var c = Type.getClass(o);
+		var hasExtraData:Bool = false;
+		var extraData:Map<String, Dynamic> = null;
+
+		for(field in (c == null ? Reflect.fields(o) : Type.getInstanceFields(c))){
+			if(field == 'extraData'){
+				hasExtraData = true;
+				extraData = Reflect.field(o, 'extraData');
+				break;
+			}
+		}
+
+		if (hasExtraData){
+			if (extraData.exists('get_$f'))
+				return extraData.get('get_$f')();
+			else if(extraData.exists(f))
+				return extraData.get(f);
+		}
+
 		return {
 			#if php
 				// https://github.com/HaxeFoundation/haxe/issues/4915
@@ -788,6 +807,27 @@ class Interp {
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
+		var c = Type.getClass(o);
+		var hasExtraData:Bool = false;
+		var extraData:Map<String, Dynamic> = null;
+
+		for (field in (c == null ? Reflect.fields(o) : Type.getInstanceFields(c))) {
+			if (field == 'extraData') {
+				hasExtraData = true;
+				extraData = Reflect.field(o, 'extraData');
+				break;
+			}
+		}
+
+		if (hasExtraData) {
+			if (extraData.exists('set_$f'))
+				return extraData.get('set_$f')(v);
+			else if (extraData.exists(f)){
+				extraData.set(f, v);
+				return v;
+			}
+		}
+
 		Reflect.setProperty(o,f,v);
 		return v;
 	}
