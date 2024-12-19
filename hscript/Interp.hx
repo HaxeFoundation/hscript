@@ -770,26 +770,32 @@ class Interp {
 		cast(map, haxe.Constraints.IMap<Dynamic, Dynamic>).set(key, value);
 	}
 
-	var extraDataCache:Map<String, Map<String, Dynamic>> = [];
+	var extraDataCache:Map<String, Dynamic> = [];
 
-	function get( o : Dynamic, f : String ) : Dynamic {
-		if ( o == null ) error(EInvalidAccess(f));
-		var hasExtraData:Bool = false;
-		var extraData:Map<String, Dynamic> = null;
-		var c = Type.getClass(o);
-		var n = Type.getClassName(c);
+	function getExtraData(o:Dynamic, n:String):Null<Map<String, Dynamic>>{
+		var extraData:Dynamic;
 		if (extraDataCache.exists(n)) {
-			hasExtraData = true;
 			extraData = extraDataCache.get(n);
+			if(extraData == -1)
+				return null;
 		} else {
 			extraData = Reflect.field(o, 'extraData');
 			if (extraData != null) {
 				extraDataCache.set(n, extraData);
-				hasExtraData = true;
-			}
+			} else
+				extraDataCache.set(n, -1);
 		}
+		return cast extraData;
+	}
 
-		if (hasExtraData){
+	function get( o : Dynamic, f : String ) : Dynamic {
+		if ( o == null ) error(EInvalidAccess(f));
+		var c = Type.getClass(o);
+		var n = Type.getClassName(c);
+
+		var extraData:Null<Map<String, Dynamic>> = getExtraData(o, n);
+
+		if (extraData != null){
 			if (extraData.exists('get_$f'))
 				return extraData.get('get_$f')();
 			else if(extraData.exists(f))
@@ -812,22 +818,13 @@ class Interp {
 
 	function set( o : Dynamic, f : String, v : Dynamic ) : Dynamic {
 		if( o == null ) error(EInvalidAccess(f));
-		var hasExtraData:Bool = false;
-		var extraData:Map<String, Dynamic> = null;
+
 		var c = Type.getClass(o);
 		var n = Type.getClassName(c);
-		if (extraDataCache.exists(n)){
-			hasExtraData = true;
-			extraData = extraDataCache.get(n);
-		}else{
-			extraData = Reflect.field(o, 'extraData');
-			if (extraData != null){
-				extraDataCache.set(n, extraData);
-				hasExtraData = true;
-			}
-		}
 
-		if (hasExtraData) {
+		var extraData:Null<Map<String, Dynamic>> = getExtraData(o, n);
+
+		if (extraData != null) {
 			if (extraData.exists('set_$f'))
 				return extraData.get('set_$f')(v);
 			else if (extraData.exists(f)){
