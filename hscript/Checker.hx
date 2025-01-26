@@ -367,6 +367,10 @@ class Checker {
 		return globals;
 	}
 
+	public dynamic function onTopDownEnum( en : CEnum, field : String ) {
+		return false;
+	}
+
 	function typeArgs( args : Array<Argument>, pos : Expr ) {
 		return [for( i in 0...args.length ) {
 			var a = args[i];
@@ -956,7 +960,19 @@ class Checker {
 			case "trace":
 				return TDynamic;
 			default:
-				if( isCompletion) return TDynamic;
+				switch( withType ) {
+				case WithType(et = TEnum(e, args)):
+					for( c in e.constructors )
+						if( c.name == v ) {
+							if( onTopDownEnum(e,v) ) {
+								var ct = c.args == null ? et : TFun(c.args, et);
+								return apply(ct, e.params, args);
+							}
+							break;
+						}
+				default:
+				}
+				if( isCompletion ) return TDynamic;
 				error("Unknown identifier "+v, expr);
 			}
 		case EBlock(el):
@@ -977,7 +993,10 @@ class Checker {
 		case EParent(e):
 			return typeExpr(e,withType);
 		case ECall(e, params):
-			var ft = typeExpr(e, Value);
+			var ft = typeExpr(e, switch( [edef(e),withType] ) {
+				case [EIdent(_),WithType(TEnum(_))]: withType;
+				default: Value;
+			});
 			switch( follow(ft) ) {
 			case TFun(args, ret):
 				for( i in 0...params.length ) {
