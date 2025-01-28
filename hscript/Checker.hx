@@ -819,6 +819,9 @@ class Checker {
 		case TAnon(fl):
 			for( f in fl )
 				fields.push({ name : f.name, t : f.t });
+		case TFun(args, ret):
+			if( isCompletion )
+				fields.push({ name : "bind", t : TFun(args,TVoid) });
 		default:
 		}
 		return fields;
@@ -993,6 +996,25 @@ class Checker {
 		case EParent(e):
 			return typeExpr(e,withType);
 		case ECall(e, params):
+			switch( edef(e) ) {
+			case EField(val, "bind"):
+				var ft = typeExpr(val, Value);
+				switch( ft ) {
+				case TFun(args,ret):
+					var remainArgs = args.copy();
+					for( p in params ) {
+						var a = remainArgs.shift();
+						if( a == null ) {
+							error("Too many arguments", p);
+							return TFun([], ret);
+						}
+						typeExprWith(p, a.t);
+					}
+					return TFun(remainArgs, ret);
+				default:
+				}
+			default:
+			}
 			var ft = typeExpr(e, switch( [edef(e),withType] ) {
 				case [EIdent(_),WithType(TEnum(_))]: withType;
 				default: Value;
