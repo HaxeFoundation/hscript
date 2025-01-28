@@ -337,10 +337,10 @@ class Checker {
 		this.types = types;
 	}
 
-	public function setGlobals( cl : CClass ) {
+	public function setGlobals( cl : CClass, allowPrivate = false ) {
 		while( true ) {
 			for( f in cl.fields )
-				if( f.isPublic )
+				if( f.isPublic || allowPrivate )
 					setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() return apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
 			if( cl.superClass == null )
 				break;
