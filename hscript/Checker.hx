@@ -327,6 +327,7 @@ class Checker {
 	var currentFunType : TType;
 	var isCompletion : Bool;
 	var allowDefine : Bool;
+	var hasReturn : Bool;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
@@ -1088,6 +1089,7 @@ class Checker {
 			return TVoid;
 		case EReturn(v):
 			var et = v == null ? TVoid : typeExpr(v, allowReturn == null ? Value : WithType(allowReturn));
+			hasReturn = true;
 			if( allowReturn == null )
 				error("Return not allowed here", expr);
 			else
@@ -1130,8 +1132,10 @@ class Checker {
 			var locals = saveLocals();
 			var oldRet = allowReturn;
 			var oldGDef = allowDefine;
+			var oldHasRet = hasReturn;
 			allowReturn = tret;
 			allowDefine = false;
+			hasReturn = false;
 			var withArgs = null;
 			if( name != null && !withType.match(WithType(follow(_) => TFun(_))) ) {
 				var ev = events.get(name);
@@ -1156,8 +1160,11 @@ class Checker {
 			if( withArgs != null && targs.length < withArgs.length )
 				error("Missing "+(withArgs.length - targs.length)+" arguments ("+[for( i in targs.length...withArgs.length ) typeStr(withArgs[i].t)].join(",")+")", expr);
 			typeExpr(body,NoValue);
+			if( !hasReturn && !tryUnify(tret, TVoid) )
+				error("Missing return "+typeStr(tret), expr);
 			allowDefine = oldGDef;
 			allowReturn = oldRet;
+			hasReturn = oldHasRet;
 			this.locals = locals;
 			if( ft == null ) {
 				ft = TFun(targs, tret);
