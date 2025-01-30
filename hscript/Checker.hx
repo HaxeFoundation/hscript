@@ -714,7 +714,7 @@ class Checker {
 					default: throw "assert";
 					}
 				}
-				if( !typeEq(f1.t,f2.t) )
+				if( !typeEq(apply(f1.t,cl1.params,pl1),f2.t) )
 					return false;
 			}
 			return true;
@@ -1332,7 +1332,8 @@ class Checker {
 			case TAbstract(a, args):
 				// special case : we allow unconditional access
 				// to an abstract iterator() underlying value (eg: ArrayProxy)
-				ft = getField(apply(a.t,a.params,args),"iterator",it);
+				var at = apply(a.t,a.params,args);
+				return getIteratorType(it, at);
 			default:
 			}
 		if( ft != null )
