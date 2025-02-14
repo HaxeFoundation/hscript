@@ -605,7 +605,10 @@ class Parser {
 			switch (tk)
 			{
 				case TOp("="): e = parseExpr();
+				case TOp(_): unexpected(tk);
 				case TComma | TSemicolon: push(tk);
+				// Above case should be enough but semicolon is not mandatory after }
+				case _ if (t != null): push(tk);
 				default: unexpected(tk);
 			}
 
