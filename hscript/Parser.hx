@@ -606,8 +606,10 @@ class Parser {
 			{
 				case TOp("="): e = parseExpr();
 				case TOp(_): unexpected(tk);
-				// TComma | TSemicolon | TMeta should be enough? but would need more testing
-				default: push(tk);
+				case TComma | TSemicolon: push(tk);
+				// Above case should be enough but semicolon is not mandatory after }
+				case _ if (t != null): push(tk);
+				default: unexpected(tk);
 			}
 
 			mk(EVar(ident,t,e),p1,(e == null) ? tokenMax : pmax(e));
