@@ -605,8 +605,9 @@ class Parser {
 			switch (tk)
 			{
 				case TOp("="): e = parseExpr();
-				case TComma | TSemicolon: push(tk);
-				default: unexpected(tk);
+				case TOp(_): unexpected(tk);
+				// TComma | TSemicolon | TMeta should be enough? but would need more testing
+				default: push(tk);
 			}
 
 			mk(EVar(ident,t,e),p1,(e == null) ? tokenMax : pmax(e));
