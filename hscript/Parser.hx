@@ -1139,8 +1139,8 @@ class Parser {
 					unexpected(t);
 				}
 			}
-			var name = path[path.length - 1];
-			if ( maybe(TId("as")) ) {
+			var name = null;
+			if ( maybe(TId("as")) && !star) {
 				var t = token();
 				switch( t ) {
 				case TId(id):
