@@ -810,6 +810,18 @@ class Parser {
 					mk(EField(mk(EIdent(tmp),pmin(e1),pmax(e1)),field),pmin(e1))
 				))
 			]),pmin(e1));
+
+			if ( maybe(TPOpen) ) {
+				e = mk(EBlock([
+					mk(EVar(tmp, null, e1), pmin(e1), pmax(e1)),
+					mk(ETernary(
+						mk(EBinop("==", mk(EIdent(tmp),pmin(e1),pmax(e1)), mk(EIdent("null"),pmin(e1),pmax(e1)))),
+						mk(EIdent("null"),pmin(e1),pmax(e1)),
+						mk(ECall(mk(EField(mk(EIdent(tmp),pmin(e1),pmax(e1)),field),pmin(e1)),parseExprList(TPClose)),pmin(e1))
+					))
+				]),pmin(e1));
+			}
+
 			return parseExprNext(e);
 		case TPOpen:
 			return parseExprNext(mk(ECall(e1,parseExprList(TPClose)),pmin(e1)));
