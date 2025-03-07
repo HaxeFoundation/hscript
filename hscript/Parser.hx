@@ -446,12 +446,18 @@ class Parser {
 		case TBkOpen:
 			var a = new Array();
 			tk = token();
+			var first = true;
 			while( tk != TBkClose && (!resumeErrors || tk != TEof) ) {
+				if (!first) {
+					if (tk != TComma)
+						unexpected(tk);
+					else
+						tk = token();
+				}
+				first = false;
 				push(tk);
 				a.push(parseExpr());
 				tk = token();
-				if( tk == TComma )
-					tk = token();
 			}
 			if( a.length == 1 && a[0] != null )
 				switch( expr(a[0]) ) {
