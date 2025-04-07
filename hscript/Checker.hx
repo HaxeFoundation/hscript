@@ -77,6 +77,8 @@ typedef CTypedef = {> CNamedType,
 
 typedef CAbstract = {> CNamedType,
 	var t : TType;
+	var from : Array<TType>;
+	var to : Array<TType>;
 }
 
 class Completion {
@@ -233,6 +235,8 @@ class CheckerTypes {
 				name : a.path,
 				params : [],
 				t : null,
+				from : [],
+				to : [],
 			};
 			addMeta(a,ta);
 			for( p in a.params )
@@ -240,6 +244,12 @@ class CheckerTypes {
 			todo.push(function() {
 				localParams = [for( t in ta.params ) a.path+"."+Checker.typeStr(t) => t];
 				ta.t = makeXmlType(a.athis);
+				for( f in a.from )
+					if( f.field == null )
+						ta.from.push(makeXmlType(f.t));
+				for( t in a.to )
+					if( t.field == null )
+						ta.to.push(makeXmlType(t.t));
 				localParams = null;
 			});
 			types.set(a.path, CTAbstract(ta));
@@ -722,6 +732,18 @@ class Checker {
 			return true;
 		case [TFun(_), TAbstract({ name : "haxe.Function" },_)]:
 			return true;
+		case [_, TAbstract(a, args)]:
+			for( ft in a.from ) {
+				var t = apply(ft,a.params,args);
+				if( tryUnify(t1,t) )
+					return true;
+			}
+		case [TAbstract(a, args), _]:
+			for( tt in a.to ) {
+				var t = apply(tt,a.params,args);
+				if( tryUnify(t,t2) )
+					return true;
+			}
 		default:
 		}
 		return typeEq(t1,t2);
