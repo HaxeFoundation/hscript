@@ -73,6 +73,7 @@ class TestHScript extends TestCase {
 		assertScript("3 * 2 // + 5 \n + 6",12);
 		assertScript("3 /* 2\n */ + 5",8);
 		assertScript("[55,66,77][1]",66);
+		assertScript("[11,22,33,][2]", 33);
 		assertScript("var a = [55]; a[0] *= 2; a[0]",110);
 		assertScript("x",55,{ x : 55 });
 		assertScript("var y = 33; y",33);
