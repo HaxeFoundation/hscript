@@ -90,7 +90,7 @@ class Macro {
 		}
 	}
 
-	function map < T, R > ( a : Array<T>, f : T -> R ) : Array<R> {
+	function map<T,R>( a : Array<T>, f : T -> R ) : Array<R> {
 		var b = new Array();
 		for( x in a )
 			b.push(f(x));
@@ -102,9 +102,13 @@ class Macro {
 		case CTOpt(t): TOptional(convertType(t));
 		case CTPath(pack, args):
 			var params = [];
-			if( args != null )
+			if( args != null ) {
 				for( t in args )
-					params.push(TPType(convertType(t)));
+					params.push(switch( t ) {
+					case CTExpr(e): TPExpr(convert(e));
+					default: TPType(convertType(t));
+					});
+			}
 			TPath({
 				pack : pack,
 				name : pack.pop(),
@@ -127,6 +131,8 @@ class Macro {
 				tf.push( { name : f.name, meta : meta, doc : null, access : [], kind : FVar(convertType(f.t), null), pos : p } );
 			}
 			TAnonymous(tf);
+		case CTExpr(_):
+			throw "assert";
 		};
 	}
 
