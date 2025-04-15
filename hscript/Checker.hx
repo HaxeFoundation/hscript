@@ -475,6 +475,9 @@ class Checker {
 			return makeType(t,e);
 		case CTOpt(t):
 			return makeType(t,e);
+		case CTExpr(_):
+			error("Unsupported expr type parameter", e);
+			return null;
 		}
 	}
 
