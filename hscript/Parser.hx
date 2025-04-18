@@ -451,8 +451,11 @@ class Parser {
 				if (!first) {
 					if (tk != TComma)
 						unexpected(tk);
-					else
+					else {
 						tk = token();
+						if (tk == TBkClose)
+							break;
+					}
 				}
 				first = false;
 				push(tk);
