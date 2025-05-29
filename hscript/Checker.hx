@@ -348,15 +348,22 @@ class Checker {
 		this.types = types;
 	}
 
-	public function setGlobals( cl : CClass, allowPrivate = false ) {
+	public function setGlobals( cl : CClass, ?params : Array<TType>, allowPrivate = false ) {
+		if( params == null )
+			params = [for( p in cl.params ) makeMono()];
 		while( true ) {
 			for( f in cl.fields )
 				if( f.isPublic || allowPrivate )
-					setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() return apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()])));
+					setGlobal(f.name, f.params.length == 0 ? f.t : TLazy(function() {
+						var t = apply(f.t,f.params,[for( i in 0...f.params.length) makeMono()]);
+						return apply(t, cl.params, params);
+					}));
 			if( cl.superClass == null )
 				break;
 			cl = switch( cl.superClass ) {
-			case TInst(c,_): c;
+			case TInst(csup,pl):
+				params = [for( p in pl ) apply(p,cl.params,params)];
+				csup;
 			default: throw "assert";
 			}
 		}
