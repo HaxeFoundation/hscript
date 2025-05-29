@@ -103,6 +103,7 @@ class Interp {
 		assignOp("*=",function(v1:Float,v2:Float) return v1 * v2);
 		assignOp("/=",function(v1:Float,v2:Float) return v1 / v2);
 		assignOp("%=",function(v1:Float,v2:Float) return v1 % v2);
+		assignOp(#if cpp "??"+"=" #else "??=" #end,function(v1:Dynamic,v2:Dynamic) if ( v1 == null ) return v1 = v2 else return v1);
 		assignOp("&=",function(v1,v2) return v1 & v2);
 		assignOp("|=",function(v1,v2) return v1 | v2);
 		assignOp("^=",function(v1,v2) return v1 ^ v2);
