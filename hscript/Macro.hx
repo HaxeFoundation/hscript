@@ -171,13 +171,10 @@ class Macro {
 			case EDoWhile(c, e):
 				EWhile(convert(c), convert(e), false);
 			case EFor(v, it, efor):
-				#if (haxe_ver >= 4)
-					var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
-					EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
-				#else
-					var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
-					EFor({ expr : EIn({ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
-				#end
+				var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+				EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
+			case EForGen(it, efor):
+				EFor(convert(it), convert(efor));
 			case EBreak:
 				EBreak;
 			case EContinue:

@@ -364,6 +364,18 @@ class Interp {
 		case EFor(v,it,e):
 			forLoop(v,it,e);
 			return null;
+		case EForGen(it,e):
+			Tools.getKeyIterator(it, function(vk,vv,it) {
+				if( vk == null ) {
+					#if hscriptPos
+					curExpr = it;
+					#end
+					error(ECustom("Invalid for expression"));
+					return;
+				}
+				forKeyValueLoop(vk,vv,it,e);
+			});
+			return null;
 		case EBreak:
 			throw SBreak;
 		case EContinue:
@@ -554,9 +566,7 @@ class Interp {
 	}
 
 	function makeIterator( v : Dynamic ) : Iterator<Dynamic> {
-		#if ((flash && !flash9) || (php && !php7 && haxe_ver < '4.0.0'))
-		if ( v.iterator != null ) v = v.iterator();
-		#elseif js
+		#if js
 		// don't use try/catch (very slow)
 		if( v is Array )
 			return (v : Array<Dynamic>).iterator();
@@ -568,12 +578,40 @@ class Interp {
 		return v;
 	}
 
+	function makeKeyValueIterator( v : Dynamic ) : KeyValueIterator<Dynamic,Dynamic> {
+		#if js
+		// don't use try/catch (very slow)
+		if( v is Array )
+			return (v : Array<Dynamic>).keyValueIterator();
+		if( v.keyValueIterator != null ) v = v.keyValueIterator();
+		#else
+		try v = v.keyValueIterator() catch( e : Dynamic ) {};
+		#end
+		if( v.hasNext == null || v.next == null ) error(EInvalidIterator(v));
+		return v;
+	}
+
 	function forLoop(n,it,e) {
 		var old = declared.length;
 		declared.push({ n : n, old : locals.get(n) });
 		var it = makeIterator(expr(it));
 		while( it.hasNext() ) {
 			locals.set(n,{ r : it.next() });
+			if( !loopRun(() -> expr(e)) )
+				break;
+		}
+		restore(old);
+	}
+
+	function forKeyValueLoop(vk,vv,it,e) {
+		var old = declared.length;
+		declared.push({ n : vk, old : locals.get(vk) });
+		declared.push({ n : vv, old : locals.get(vv) });
+		var it = makeKeyValueIterator(expr(it));
+		while( it.hasNext() ) {
+			var v = it.next();
+			locals.set(vk,{ r : v.key });
+			locals.set(vv,{ r : v.value });
 			if( !loopRun(() -> expr(e)) )
 				break;
 		}

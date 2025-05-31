@@ -118,7 +118,8 @@ class Parser {
 			["&&"],
 			["||"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
-			["->"]
+			["->"],
+			["in","is"]
 		];
 		opPriority = new Map();
 		opRightAssoc = new Map();
@@ -532,6 +533,8 @@ class Parser {
 		var edef = switch( expr(e) ) {
 		case EFor(v, it, e2):
 			EFor(v, it, mapCompr(tmp, e2));
+		case EForGen(it, e2):
+			EForGen(it, mapCompr(tmp, e2));
 		case EWhile(cond, e2):
 			EWhile(cond, mapCompr(tmp, e2));
 		case EDoWhile(cond, e2):
@@ -563,7 +566,8 @@ class Parser {
 			return mk(EBinop(op,e1,e),pmin(e1),pmax(e1));
 		return switch( expr(e) ) {
 		case EBinop(op2,e2,e3):
-			if( opPriority.get(op) <= opPriority.get(op2) && !opRightAssoc.exists(op) )
+			var delta = opPriority.get(op) - opPriority.get(op2);
+			if( delta < 0 || (delta == 0 && !opRightAssoc.exists(op)) )
 				mk(EBinop(op2,makeBinop(op,e1,e2),e3),pmin(e1),pmax(e3));
 			else
 				mk(EBinop(op, e1, e), pmin(e1), pmax(e));
@@ -638,12 +642,19 @@ class Parser {
 			mk(EDoWhile(econd,e),p1,pmax(econd));
 		case "for":
 			ensure(TPOpen);
-			var vname = getIdent();
-			ensureToken(TId("in"));
-			var eiter = parseExpr();
+			var eit = parseExpr();
 			ensure(TPClose);
 			var e = parseExpr();
-			mk(EFor(vname,eiter,e),p1,pmax(e));
+			switch( expr(eit) ) {
+			case EBinop("in",ev,eit):
+				switch( expr(ev) ) {
+				case EIdent(v):
+					return mk(EFor(v,eit,e),p1,pmax(e));
+				default:
+				}
+			default:
+			}
+			mk(EForGen(eit,e),p1,pmax(e));
 		case "break": mk(EBreak);
 		case "continue": mk(EContinue);
 		case "else": unexpected(TId(id));
@@ -803,8 +814,8 @@ class Parser {
 				return parseExprNext(mk(EUnop(op,false,e1),pmin(e1)));
 			}
 			return makeBinop(op,e1,parseExpr());
-		case TId(op) if ( op == 'is' ):
-			return makeBinop(op,e1,parseExpr());
+		case TId(op) if( opPriority.exists(op) ):
+			return parseExprNext(makeBinop(op,e1,parseExpr()));
 		case TDot:
 			var field = getIdent();
 			return parseExprNext(mk(EField(e1,field),pmin(e1)));

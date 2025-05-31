@@ -173,6 +173,9 @@ class Bytes {
 			doEncodeString(v);
 			doEncode(it);
 			doEncode(e);
+		case EForGen(it,e):
+			doEncode(it);
+			doEncode(e);
 		case EBreak, EContinue:
 		case EFunction(params,e,name,_):
 			bout.addByte(params.length);
@@ -362,6 +365,8 @@ class Bytes {
 			EMeta(name, args, doDecode());
 		case 26:
 			ECheckType(doDecode(), CTPath(["Void"]));
+		case 27:
+			EForGen(doDecode(), doDecode());
 		case 255:
 			null;
 		default:

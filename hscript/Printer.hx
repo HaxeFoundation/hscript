@@ -208,6 +208,11 @@ class Printer {
 			expr(it);
 			add(" ) ");
 			expr(e);
+		case EForGen(it, e):
+			add("for( ");
+			expr(it);
+			add(" ) ");
+			expr(e);
 		case EBreak:
 			add("break");
 		case EContinue:
