@@ -273,7 +273,7 @@ class Parser {
 		case EUnop(_,prefix,e): !prefix && isBlock(e);
 		case EWhile(_,e): isBlock(e);
 		case EDoWhile(_,e): isBlock(e);
-		case EFor(_,_,e): isBlock(e);
+		case EFor(_,_,e), EForGen(_, e): isBlock(e);
 		case EReturn(e): e != null && isBlock(e);
 		case ETry(_, _, _, e): isBlock(e);
 		case EMeta(_, _, e): isBlock(e);
