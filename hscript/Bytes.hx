@@ -238,10 +238,7 @@ class Bytes {
 		}
 	}
 
-	function exprIndex(e:Expr):Int {
-		#if hscriptPos
-		var e = e.e;
-		#end
+	function exprIndex(e):Int {
 		return switch (e) {
 			case EConst(_): 0;
 			case EIdent(_): 1;
