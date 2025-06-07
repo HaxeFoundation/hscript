@@ -122,7 +122,7 @@ class Bytes {
 		doEncodeInt(e.line);
 		var e = e.e;
 		#end
-		bout.addByte(Type.enumIndex(e));
+		bout.addByte(exprIndex(e));
 		switch( e ) {
 		case EConst(c):
 			doEncodeConst(c);
@@ -235,6 +235,39 @@ class Bytes {
 			doEncode(e);
 		case ECheckType(e,_):
 			doEncode(e);
+		}
+	}
+
+	function exprIndex(e):Int {
+		return switch (e) {
+			case EConst(_): 0;
+			case EIdent(_): 1;
+			case EVar(_): 2;
+			case EParent(_): 3;
+			case EBlock(_): 4;
+			case EField(_): 5;
+			case EBinop(_): 6;
+			case EUnop(_): 7;
+			case ECall(_): 8;
+			case EIf(_): 9;
+			case EWhile(_): 10;
+			case EFor(_): 11;
+			case EBreak: 12;
+			case EContinue: 13;
+			case EFunction(_): 14;
+			case EReturn(_): 15;
+			case EArray(_): 16;
+			case EArrayDecl(_): 17;
+			case ENew(_): 18;
+			case EThrow(_): 19;
+			case ETry(_): 20;
+			case EObject(_): 21;
+			case ETernary(_): 22;
+			case ESwitch(_): 23;
+			case EDoWhile(_): 24;
+			case EMeta(_): 25;
+			case ECheckType(_): 26;
+			case EForGen(_): 27;
 		}
 	}
 
