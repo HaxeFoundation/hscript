@@ -1169,8 +1169,18 @@ class Parser {
 					unexpected(t);
 				}
 			}
+			var name = null;
+			if ( maybe(TId("as")) && !star) {
+				var t = token();
+				switch( t ) {
+				case TId(id):
+					name = id;
+				default:
+					unexpected(t);
+				}
+			}
 			ensure(TSemicolon);
-			return DImport(path, star);
+			return DImport(path, star, name);
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
