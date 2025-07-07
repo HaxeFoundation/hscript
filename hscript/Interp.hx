@@ -542,7 +542,10 @@ class Interp {
 			return expr(e);
 		case ECheckType(e,_):
 			return expr(e);
+		#if hscript_extraExprs
 		default:
+			throw '$e is unknown';
+		#end
 		}
 		return null;
 	}

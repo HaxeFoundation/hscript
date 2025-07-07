@@ -332,8 +332,10 @@ class Printer {
 			add(" : ");
 			addType(t);
 			add(")");
+		#if hscript_extraExprs
 		default:
-			add("???");
+			throw '${#if hscriptPos e.e #else e #end} is unknown';
+		#end
 		}
 	}
 
