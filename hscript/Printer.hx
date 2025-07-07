@@ -332,6 +332,8 @@ class Printer {
 			add(" : ");
 			addType(t);
 			add(")");
+		default:
+			add("???");
 		}
 	}
 

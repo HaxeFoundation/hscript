@@ -542,6 +542,7 @@ class Interp {
 			return expr(e);
 		case ECheckType(e,_):
 			return expr(e);
+		default:
 		}
 		return null;
 	}
