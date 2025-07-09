@@ -79,6 +79,7 @@ typedef CAbstract = {> CNamedType,
 	var t : TType;
 	var from : Array<TType>;
 	var to : Array<TType>;
+	var forwards : Map<String,Bool>;
 }
 
 class Completion {
@@ -237,6 +238,7 @@ class CheckerTypes {
 				t : null,
 				from : [],
 				to : [],
+				forwards : new Map(),
 			};
 			addMeta(a,ta);
 			for( p in a.params )
@@ -250,6 +252,11 @@ class CheckerTypes {
 				for( t in a.to )
 					if( t.field == null )
 						ta.to.push(makeXmlType(t.t));
+				for( m in a.meta )
+					if( m.name == ":forward" && m.params != null ) {
+						for( i in m.params )
+							ta.forwards.set(i, true);
+					}
 				localParams = null;
 			});
 			types.set(a.path, CTAbstract(ta));
@@ -855,6 +862,11 @@ class Checker {
 		case TFun(args, ret):
 			if( isCompletion )
 				fields.push({ name : "bind", t : TFun(args,TVoid) });
+		case TAbstract(a,pl):
+			for( v in a.forwards.keys() ) {
+				var t = getField(apply(a.t, a.params, pl), v, null, false);
+				fields.push({ name : v, t : t});
+			}
 		default:
 		}
 		return fields;
@@ -899,6 +911,8 @@ class Checker {
 				if( af.name == f )
 					return af.t;
 			return null;
+		case TAbstract(a,pl) if( a.forwards.exists(f) ):
+			return getField(apply(a.t, a.params, pl), f, e, forWrite);
 		default:
 			return null;
 		}
