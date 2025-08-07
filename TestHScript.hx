@@ -134,6 +134,10 @@ class TestHScript extends TestCase {
 		assertScript("false && xxx", false);
 		assertScript("true || xxx", true);
 		assertScript("[for( x in arr ) switch( x ) { case 1: 55; case 3: 66; default: 0; }].join(':')",'55:0:66',{ arr : [1,2,3] });
+		assertScript("switch( x ) { case 1: 55; case 3: 66; default: 0; }",66 ,{ x : 3 });
+		assertScript("var a = 1; switch( b ) { default: a = 2; }; a", 2, { b : 2 });
+		assertScript("var a = 1; switch( b ) { case 2: a = 100; default: a = 2; }; a", 100, { b : 2 });
+		assertScript("var a = 3; switch( b ) { case 2: if (a == 1) { a = 100; } else { a = 99; }; default: a = 2; }; a", 99, { b : 2 });
 	}
 
 	function testNullFieldAccess():Void {
