@@ -80,6 +80,7 @@ typedef CAbstract = {> CNamedType,
 	var from : Array<TType>;
 	var to : Array<TType>;
 	var forwards : Map<String,Bool>;
+	var ?impl : CClass;
 }
 
 class Completion {
@@ -258,6 +259,28 @@ class CheckerTypes {
 							ta.forwards.set(i, true);
 					}
 				localParams = null;
+
+				if( a.impl != null ) {
+					var implClass : CClass = {
+						name : a.impl.path,
+						fields : new Map(),
+						statics : new Map(),
+						params : [],
+					};
+					
+					for( f in a.impl.statics ) {
+						var fl : CField = { 
+							isPublic : f.isPublic, 
+							canWrite : f.set.match(RNormal | RCall(_) | RDynamic), 
+							complete : true, 
+							params : [], 
+							name : f.name, 
+							t : makeXmlType(f.type) 
+						};
+						implClass.statics.set(f.name, fl);
+					}
+					ta.impl = implClass;
+				}
 			});
 			types.set(a.path, CTAbstract(ta));
 		}
@@ -867,6 +890,15 @@ class Checker {
 				var t = getField(apply(a.t, a.params, pl), v, null, false);
 				fields.push({ name : v, t : t});
 			}
+
+			if( a.impl != null ) {
+				var map = (t) -> apply(t, a.params, pl);
+				for( fname in a.impl.statics.keys() ) {
+					var f = a.impl.statics.get(fname);
+					if( !f.isPublic || !f.complete ) continue;
+					fields.push({ name : f.name, t : map(f.t) });
+				}
+			}
 		default:
 		}
 		return fields;
@@ -911,8 +943,24 @@ class Checker {
 				if( af.name == f )
 					return af.t;
 			return null;
-		case TAbstract(a,pl) if( a.forwards.exists(f) ):
-			return getField(apply(a.t, a.params, pl), f, e, forWrite);
+		case TAbstract(a,pl):
+			if( a.forwards.exists(f) )
+				return getField(apply(a.t, a.params, pl), f, e, forWrite);
+			if( a.impl != null ) {
+				var implField = a.impl.statics.get(f);
+				if( implField != null ) {
+					if( !implField.isPublic )
+						error("Can't access private field " + f + " on " + a.name, e);
+					if( forWrite && !implField.canWrite )
+						error("Can't write readonly field " + f + " on " + a.name, e);
+					
+					var t = implField.t;
+					if( implField.params != null ) 
+						t = apply(t, implField.params, [for( i in 0...implField.params.length ) makeMono()]);
+					return apply(t, a.params, pl);
+				}
+			}
+			return null;
 		default:
 			return null;
 		}
