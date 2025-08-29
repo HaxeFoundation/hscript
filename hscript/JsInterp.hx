@@ -275,7 +275,7 @@ class JsInterp extends Interp {
 		case EIf(cond,e1,e2):
 			return 'if( ${exprCond(cond)} ) ${exprJS(e1)}'+(e2 == null ? "" : 'else ${exprJS(e2)}');
 		case ETernary(cond, e1, e2):
-			return '(${exprCond(cond)} ? ${exprValue(e1)} : ${exprValue(e2)})';
+			return '(${exprCond(cond)} ? ${exprValue(e1)} : ${e2 == null ? 'undefined' : exprValue(e2)})';
 		case EWhile(cond, e):
 			return 'while( ${exprValue(cond)} ) ${exprJS(e)}';
 		case EFor(v, it, e):
