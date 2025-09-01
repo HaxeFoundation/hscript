@@ -14,6 +14,8 @@ class JsInterp extends Interp {
 
 
 	var localNames : Map<String,String>;
+	var hasBreakContinue : Int = 0;
+	var hasReturn : Bool;
 
 	override function execute( expr : Expr ) : Dynamic {
 		depth = 0;
@@ -28,8 +30,32 @@ class JsInterp extends Interp {
 	}
 
 	function handleRBC( e : Expr ) {
-		// todo : return/break/continue inside expr here won't work !
-		return e;
+		function mkRBC(code:Int,?value) {
+			var fields = [{ name : "$", e : Tools.mk(EConst(CInt(code)),e) }];
+			if( value != null ) fields.push({name:"$val",e:value});
+			return Tools.mk(EThrow(Tools.mk(EObject(fields),e)),e);
+		}
+		switch( Tools.expr(e) ) {
+		case EReturn(v):
+			hasReturn = true;
+			return mkRBC(1,v);
+		case EBreak if( hasBreakContinue >= 0 ):
+			hasBreakContinue |= 1;
+			return mkRBC(2);
+		case EContinue if( hasBreakContinue >= 0 ):
+			hasBreakContinue |= 2;
+			return mkRBC(3);
+		case EWhile(_), EFor(_), EDoWhile(_):
+			var prev = hasBreakContinue;
+			hasBreakContinue = -1;
+			e = Tools.map(e, handleRBC);
+			hasBreakContinue = prev;
+			return e;
+		case EFunction(_):
+			return e;
+		default:
+			return Tools.map(e, handleRBC);
+		}
 	}
 
 	function exprValue( expr : Expr ) {
@@ -117,6 +143,24 @@ class JsInterp extends Interp {
 		while( localNames.exists(n+c) ) c++;
 		localNames.set(n, n+c);
 		return n+c;
+	}
+
+	function exprBreakContinue( e, needBlock=true ) {
+		var prevBC = hasBreakContinue;
+		hasBreakContinue = 0;
+		var estr = needBlock ? exprBlock(e) : exprJS(e);
+		if( hasBreakContinue != 0 ) {
+			var checks = [];
+			if( hasBreakContinue & 1 != 0 )
+				checks.push("if( $e.$ == 2 ) break;");
+			if( hasBreakContinue & 2 != 0 )
+				checks.push("if( $e.$ == 3 ) continue;");
+			if( !needBlock && !Tools.expr(e).match(EBlock(_)) )
+				estr = '{$estr;}';
+			estr = 'try $estr catch( $$e ) { ${checks.join('')} throw $$e; }';
+		}
+		hasBreakContinue = prevBC;
+		return estr;
 	}
 
 	function exprJS( expr : Expr ) : String {
@@ -277,10 +321,12 @@ class JsInterp extends Interp {
 		case ETernary(cond, e1, e2):
 			return '(${exprCond(cond)} ? ${exprValue(e1)} : ${e2 == null ? 'undefined' : exprValue(e2)})';
 		case EWhile(cond, e):
-			return 'while( ${exprValue(cond)} ) ${exprJS(e)}';
+			return 'while( ${exprValue(cond)} ) ${exprBreakContinue(e)}';
+		case EDoWhile(cond, e):
+			return 'do ${exprBreakContinue(e)} while( ${exprCond(cond)} )';
 		case EFor(v, it, e):
 			v = declLocal(v);
-			var block = exprJS(e);
+			var block = exprBreakContinue(e,false);
 			localNames.remove(v);
 			var iter = '$$i.makeIterator(${exprValue(it)})';
 			var it = declLocal("$it");
@@ -328,8 +374,6 @@ class JsInterp extends Interp {
 		case EObject(fl):
 			var fields = [for( f in fl ) f.name+":"+exprValue(f.e)];
 			return '{${fields.join(',')}}'; // do not use 'set' here
-		case EDoWhile(cond, e):
-			return 'do ${exprBlock(e)} while( ${exprCond(cond)} )';
 		case EMeta(_, _, e), ECheckType(e,_):
 			return exprJS(e);
 		case EFunction(args, e, name, ret):
@@ -338,16 +382,21 @@ class JsInterp extends Interp {
 				declLocal(name);
 			for( a in args )
 				localNames.set(a.name, a.name);
+			var prevReturn = hasReturn;
+			hasReturn = false;
 			var bl = exprBlock(e);
+			if( hasReturn )
+				bl = '{ try { $bl } catch( $$e ) { if( $$e.$$ == 1 ) return $$e.$$val; throw $$e; }}';
+			hasReturn = prevReturn;
 			localNames = prev;
 			var fstr = 'function(${[for( a in args ) a.name].join(",")}) $bl';
 			if( name != null )
 				fstr = 'let $name = $$i.setVar("$name",$fstr)';
 			return fstr;
 		case ESwitch(e, cases, defaultExpr):
-			var checks = [for( c in cases ) 'if( ${[for( v in c.values ) '$$v == ${exprValue(v)}'].join(" || ")} ) return ${exprValue(handleRBC(c.expr))};'];
+			var checks = [for( c in cases ) 'if( ${[for( v in c.values ) '$$v == ${exprValue(handleRBC(v))}'].join(" || ")} ) return ${exprValue(handleRBC(c.expr))};'];
 			if( defaultExpr != null )
-				checks.push('return '+exprValue(defaultExpr));
+				checks.push('return '+exprValue(handleRBC(defaultExpr)));
 			return '(($$v) => { ${[for( c in checks ) c+";"].join(" ")} })(${exprValue(e)})';
 		default:
 			throw "TODO";
