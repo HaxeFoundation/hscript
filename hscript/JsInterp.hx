@@ -25,6 +25,14 @@ class JsInterp extends Interp {
 		return f(this);
 	}
 
+	public static function defineArrayExtensions() {
+		var arr : Dynamic = Array;
+		arr.prototype.copy = function() { var v : Array<Dynamic> = js.Lib.nativeThis; return [for( v in v ) v]; };
+		arr.prototype.contains = function(i) return js.Lib.nativeThis.indexOf(i) >= 0;
+		arr.prototype.remove = function(x) return @:privateAccess HxOverrides.remove(js.Lib.nativeThis, x);
+		arr.prototype.resize = function(len) js.Lib.nativeThis.length = len;
+	}
+
 	function escapeString(s:String) {
 		return s.split("\\").join("\\\\").split("\r").join("\\r").split("\n").join("\\n").split('"').join('\\"');
 	}
