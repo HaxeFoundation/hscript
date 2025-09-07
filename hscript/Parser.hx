@@ -446,7 +446,7 @@ class Parser {
 			if( op == "<" ) {
 				var start = tokenMax + 1;
 				var ident = getIdent();
-				if( tokens.length != 0 )
+				if( #if hscriptPos tokens.length != 0 #else !tokens.isEmpty() #end )
 					throw "assert";
 				if( tokenMin == start ) {
 					var endTag = "</"+ident+">";
@@ -458,9 +458,13 @@ class Parser {
 					if( end >= 0 ) {
 						readPos = end + endTag.length;
 						char = -1;
-						tokenMin = start - 1;
-						tokenMax = readPos + offset - 1;
-						var str = input.substr(tokenMin - offset,tokenMax - tokenMin + 1);
+						start--;
+						var end = readPos + offset - 1;
+						#if hscriptPos
+						tokenMin = start;
+						tokenMax = end;
+						#end
+						var str = input.substr(start - offset,end - tokenMin + 1);
 						return mk(EMeta(":markup",[],mk(EConst(CString(str)))));
 					}
 				}
