@@ -80,6 +80,7 @@ typedef CAbstract = {> CNamedType,
 	var from : Array<TType>;
 	var to : Array<TType>;
 	var forwards : Map<String,Bool>;
+	var impl : CClass;
 }
 
 class Completion {
@@ -239,6 +240,7 @@ class CheckerTypes {
 				from : [],
 				to : [],
 				forwards : new Map(),
+				impl : null,
 			};
 			addMeta(a,ta);
 			for( p in a.params )
@@ -257,6 +259,14 @@ class CheckerTypes {
 						for( i in m.params )
 							ta.forwards.set(i, true);
 					}
+				if( a.impl != null ) {
+					var t = resolve(a.impl.path);
+					if( t != null )
+						switch( t ) {
+						case TInst(c,_): ta.impl = c;
+						default:
+						}
+				}
 				localParams = null;
 			});
 			types.set(a.path, CTAbstract(ta));
@@ -345,6 +355,7 @@ class Checker {
 	var isCompletion : Bool;
 	var allowDefine : Bool;
 	var hasReturn : Bool;
+	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
@@ -908,7 +919,7 @@ class Checker {
 				if( ft != null ) ft = apply(ft, c.params, args);
 				return ft;
 			}
-			if( !cf.isPublic )
+			if( !cf.isPublic && checkPrivate )
 				error("Can't access private field "+f+" on "+c.name, e);
 			if( forWrite && !cf.canWrite )
 				error("Can't write readonly field "+f+" on "+c.name, e);
@@ -985,6 +996,13 @@ class Checker {
 		return ft;
 	}
 
+	function hasMeta( meta : Metadata, name : String ) {
+		for( m in meta )
+			if( m.name == name )
+				return true;
+		return false;
+	}
+
 	function resolveGlobal( name : String, expr : Expr, withType : WithType ) : TType {
 		var g = globals.get(name);
 		if( g != null ) {
@@ -1006,19 +1024,84 @@ class Checker {
 		case "trace":
 			return TDynamic;
 		default:
+			#if hscriptPos
 			switch( withType ) {
+			// enum constructor resolution
 			case WithType(et = TEnum(e, args)):
 				for( c in e.constructors )
 					if( c.name == name ) {
-						if( onTopDownEnum(e,name) ) {
+						if( onTopDownEnum(e,name) ) { // deprecated
+							var ct = c.args == null ? et : TFun(c.args, et);
+							return apply(ct, e.params, args);
+						}
+						var acc = getTypeAccess(et, expr, name);
+						if( acc != null ) {
+							expr.e = acc;
 							var ct = c.args == null ? et : TFun(c.args, et);
 							return apply(ct, e.params, args);
 						}
 						break;
 					}
+			// abstract enum resolution
+			case WithType(at = TAbstract(a, args)) if( hasMeta(a.meta,":enum") ):
+				var f = a.impl.statics.get(name);
+				if( f != null && hasMeta(f.meta,":enum") ) {
+					var acc = getTypeAccess(TInst(a.impl,[]),expr,name);
+					if( acc != null ) {
+						expr.e = acc;
+						return at;
+					}
+				}
 			default:
 			}
+			// this variable resolution
+			var g = locals.get("this");
+			if( g != null ) {
+				// local this resolution
+				var prev = checkPrivate;
+				checkPrivate = false;
+				var t = getField(g, name, expr);
+				checkPrivate = prev;
+				if( t != null ) {
+					expr.e = EField(mk(EIdent("this"),expr),name);
+					return t;
+				}
+				// static resolution
+				switch( g ) {
+				case TInst(c, _):
+					var f = c.statics.get(name);
+					if( f != null ) {
+						var acc = getTypeAccess(g, expr, name);
+						if( acc != null ) {
+							expr.e = acc;
+							return apply(f.t, f.params, [for( a in f.params ) makeMono()]);
+						}
+					}
+				default:
+				}
+			}
+			// type path resolution
+			var t = types.getType(name);
+			if( !t.match(TUnresolved(_)) ) {
+				var acc = getTypeAccess(t, expr);
+				if( acc != null ) {
+					expr.e = acc;
+					switch( t ) {
+					case TInst(c,_):
+						return TAnon([for( f in c.statics ) { name : f.name, t : f.t, opt : false }]);
+					case TEnum(e,_):
+						return TAnon([for( f in e.constructors ) { name : f.name, t : f.args == null ? t : TFun(f.args,t), opt : false }]);
+					default:
+						throw "assert";
+					}
+				}
+			}
+			#end
 		}
+		return null;
+	}
+
+	function getTypeAccess( t : TType, expr : Expr, ?field : String ) : ExprDef {
 		return null;
 	}
 
