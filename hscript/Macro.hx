@@ -109,6 +109,7 @@ class Macro {
 					default: TPType(convertType(t));
 					});
 			}
+			var pack = pack.copy();
 			TPath({
 				pack : pack,
 				name : pack.pop(),
@@ -222,6 +223,34 @@ class Macro {
 			case ECheckType(e, t):
 				ECheckType(convert(e), convertType(t));
 		}, pos : #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end }
+	}
+
+	public function typeEncode( t : ComplexType ) : Expr.CType {
+		switch( t ) {
+		case TPath(p):
+			var path = p.pack.copy();
+			path.push(p.name);
+			if( p.sub != null ) path.push(p.sub);
+			var params : Array<Expr.CType> = null;
+			if( p.params != null && p.params.length > 0 )
+				params = [for( p in p.params ) switch( p ) {
+					case TPType(t): typeEncode(t);
+					case TPExpr(e): CTExpr(null); // TODO : macro expr to hscript expr
+				}];
+			return CTPath(path,params);
+		case TFunction(args, ret):
+			return CTFun([for( a in args ) typeEncode(a)], typeEncode(ret));
+		case TAnonymous(fields):
+			return CTAnon([for( f in fields ) { name : f.name, t : switch( f.kind ) { case FVar(t): typeEncode(t); default: throw "assert"; }}]);
+		case TParent(t):
+			return CTParent(typeEncode(t));
+		case TOptional(t):
+			return CTOpt(typeEncode(t));
+		case TNamed(n, t):
+			return CTNamed(n,typeEncode(t));
+		case TIntersection(_), TExtend(_):
+			throw "assert";
+		}
 	}
 
 }
