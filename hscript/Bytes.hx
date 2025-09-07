@@ -335,10 +335,9 @@ class Bytes {
 
 	function doDecode() : Expr {
 	#if hscriptPos
-		if( getByte() == 255 ) {
-			pin++;
+		if( getByte() == 255 )
 			return null;
-		}
+		pin--;
 		var origin = doDecodeString();
 		var line = doDecodeInt();
 		return { e : _doDecode(), pmin : 0, pmax : 0, origin : origin, line : line };
