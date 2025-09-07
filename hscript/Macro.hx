@@ -241,7 +241,11 @@ class Macro {
 		case TFunction(args, ret):
 			return CTFun([for( a in args ) typeEncode(a)], typeEncode(ret));
 		case TAnonymous(fields):
-			return CTAnon([for( f in fields ) { name : f.name, t : switch( f.kind ) { case FVar(t): typeEncode(t); default: throw "assert"; }}]);
+			return CTAnon([for( f in fields ) { name : f.name, t : switch( f.kind ) {
+				case FVar(t): typeEncode(t);
+				case FProp(get,set,t,_): typeEncode(t);
+				case FFun(f): CTFun([for( a in f.args ) typeEncode(a.type)],typeEncode(f.ret));
+			}}]);
 		case TParent(t):
 			return CTParent(typeEncode(t));
 		case TOptional(t):
