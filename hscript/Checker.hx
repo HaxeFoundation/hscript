@@ -472,7 +472,18 @@ class Checker {
 	function makeType( t : CType, e : Expr ) : TType {
 		return switch (t) {
 		case CTPath(path, params):
-			var ct = types.resolve(path.join("."),params == null ? [] : [for( p in params ) makeType(p,e)]);
+			var params = params == null ? [] : [for( p in params ) makeType(p,e)];
+			var ct = types.resolve(path.join("."),params);
+			if( ct == null ) {
+				// maybe a subtype that is public ?
+				var pack = path.copy();
+				var name = pack.pop();
+				if( pack.length > 0 && pack[pack.length-1].charCodeAt(0) >= 'A'.code && pack[pack.length-1].charCodeAt(0) <= 'Z'.code ) {
+					pack.pop();
+					pack.push(name);
+					ct = types.resolve(pack.join("."), params);
+				}
+			}
 			if( ct == null ) {
 				error("Unknown type "+path, e);
 				ct = TDynamic;
@@ -974,6 +985,43 @@ class Checker {
 		return ft;
 	}
 
+	function resolveGlobal( name : String, expr : Expr, withType : WithType ) : TType {
+		var g = globals.get(name);
+		if( g != null ) {
+			return switch( g ) {
+			case TLazy(f): f();
+			default: g;
+			}
+		}
+		if( allowAsync ) {
+			g = globals.get("a_"+name);
+			if( g != null ) g = unasync(g);
+			if( g != null ) return g;
+		}
+		switch( name ) {
+		case "null":
+			return makeMono();
+		case "true", "false":
+			return TBool;
+		case "trace":
+			return TDynamic;
+		default:
+			switch( withType ) {
+			case WithType(et = TEnum(e, args)):
+				for( c in e.constructors )
+					if( c.name == name ) {
+						if( onTopDownEnum(e,name) ) {
+							var ct = c.args == null ? et : TFun(c.args, et);
+							return apply(ct, e.params, args);
+						}
+						break;
+					}
+			default:
+			}
+		}
+		return null;
+	}
+
 	function typeExpr( expr : Expr, withType : WithType ) : TType {
 		if( expr == null && isCompletion )
 			return switch( withType ) {
@@ -990,41 +1038,12 @@ class Checker {
 		case EIdent(v):
 			var l = locals.get(v);
 			if( l != null ) return l;
-			var g = globals.get(v);
-			if( g != null ) {
-				return switch( g ) {
-				case TLazy(f): f();
-				default: g;
-				}
-			}
-			if( allowAsync ) {
-				g = globals.get("a_"+v);
-				if( g != null ) g = unasync(g);
-				if( g != null ) return g;
-			}
-			switch( v ) {
-			case "null":
-				return makeMono();
-			case "true", "false":
-				return TBool;
-			case "trace":
-				return TDynamic;
-			default:
-				switch( withType ) {
-				case WithType(et = TEnum(e, args)):
-					for( c in e.constructors )
-						if( c.name == v ) {
-							if( onTopDownEnum(e,v) ) {
-								var ct = c.args == null ? et : TFun(c.args, et);
-								return apply(ct, e.params, args);
-							}
-							break;
-						}
-				default:
-				}
+			var t = resolveGlobal(v,expr,withType);
+			if( t == null ) {
 				if( isCompletion ) return TDynamic;
 				error("Unknown identifier "+v, expr);
 			}
+			return t;
 		case EBlock(el):
 			var t = TVoid;
 			var locals = saveLocals();
@@ -1095,10 +1114,8 @@ class Checker {
 			var vt = typeExpr(v, WithType(ct));
 			unify(vt, ct, v);
 			return ct;
-		case EMeta(m, _, e):
-			if( m == ":untyped" && allowUntypedMeta )
-				return makeMono();
-			return typeExpr(e, withType);
+		case EMeta(m, args, e):
+			return checkMeta(m,args,e,expr,withType);
 		case EIf(cond, e1, e2), ETernary(cond, e1, e2):
 			typeExprWith(cond, TBool);
 			var t1 = typeExpr(e1, withType);
@@ -1379,6 +1396,12 @@ class Checker {
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 		return TDynamic;
+	}
+
+	function checkMeta( m : String, args : Array<Expr>, next : Expr, expr : Expr, withType ) {
+		if( m == ":untyped" && allowUntypedMeta )
+			return makeMono();
+		return typeExpr(next, withType);
 	}
 
 	function getIteratorType( itt : TType, it : Expr ) {
