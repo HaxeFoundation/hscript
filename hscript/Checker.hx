@@ -1475,6 +1475,9 @@ class Checker {
 			if( defaultExpr != null )
 				mergeType( typeExpr(defaultExpr, withType), defaultExpr);
 			return withType == NoValue ? TVoid : tmin == null ? makeMono() : tmin;
+		case ECast(e,t):
+			var et = typeExpr(e, Value);
+			return t == null ? makeMono() : makeType(t,expr);
 		case ENew(cl, params):
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);

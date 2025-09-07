@@ -332,6 +332,17 @@ class Printer {
 			add(" : ");
 			addType(t);
 			add(")");
+		case ECast(e,t):
+			if( t == null ) {
+				add("cast ");
+				expr(e);
+			} else {
+				add("cast(");
+				expr(e);
+				add(",");
+				addType(t);
+				add(")");
+			}
 		}
 	}
 

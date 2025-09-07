@@ -808,6 +808,18 @@ class Parser {
 				}
 			}
 			mk(ESwitch(e, cases, def), p1, tokenMax);
+		case "cast":
+			var tk = token();
+			if( tk == TPOpen ) {
+				var e = parseExpr();
+				ensure(TComma);
+				var t = parseType();
+				mk(ECast(e,t), p1, tokenMax);
+			} else {
+				push(tk);
+				var e = parseExpr();
+				mk(ECast(e,null), p1, tokenMax);
+			}
 		default:
 			null;
 		}

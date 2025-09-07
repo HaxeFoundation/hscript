@@ -540,7 +540,7 @@ class Interp {
 			return val;
 		case EMeta(meta, args, e):
 			return exprMeta(meta, args, e);
-		case ECheckType(e,_):
+		case ECheckType(e,_), ECast(e,_):
 			return expr(e);
 		}
 		return null;
@@ -662,7 +662,7 @@ class Interp {
 			isAllObject = isAllObject && Reflect.isObject(key);
 			isAllEnum = isAllEnum && Reflect.isEnumValue(key);
 		}
-		
+
 		#if (haxe_ver >= 4.1)
 		if( isAllInt ) {
 			var m = new Map<Int,Dynamic>();
