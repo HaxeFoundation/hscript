@@ -444,11 +444,11 @@ class Parser {
 			if( opPriority.get(op) < 0 )
 				return makeUnop(op,parseExpr());
 			if( op == "<" ) {
-				var start = tokenMax + 1;
+				var start = readPos - 1;
 				var ident = getIdent();
 				if( #if hscriptPos tokens.length != 0 #else !tokens.isEmpty() #end )
 					throw "assert";
-				if( tokenMin == start ) {
+				if( readPos == start + ident.length + 1 ) {
 					var endTag = "</"+ident+">";
 					var end = input.indexOf(endTag, readPos);
 					if( end < 0 ) {
@@ -459,12 +459,12 @@ class Parser {
 						readPos = end + endTag.length;
 						char = -1;
 						start--;
-						var end = readPos + offset - 1;
+						var end = readPos - 1;
 						#if hscriptPos
-						tokenMin = start;
-						tokenMax = end;
+						tokenMin = start + offset;
+						tokenMax = end + offset;
 						#end
-						var str = input.substr(start - offset,end - tokenMin + 1);
+						var str = input.substr(start,end - start + 1);
 						return mk(EMeta(":markup",[],mk(EConst(CString(str)))));
 					}
 				}
