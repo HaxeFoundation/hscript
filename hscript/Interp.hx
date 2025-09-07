@@ -538,12 +538,16 @@ class Interp {
 			if( !match )
 				val = def == null ? null : expr(def);
 			return val;
-		case EMeta(_, _, e):
-			return expr(e);
+		case EMeta(meta, args, e):
+			return exprMeta(meta, args, e);
 		case ECheckType(e,_):
 			return expr(e);
 		}
 		return null;
+	}
+
+	function exprMeta(meta,args,e) : Dynamic {
+		return expr(e);
 	}
 
 	function doWhileLoop(econd,e) {

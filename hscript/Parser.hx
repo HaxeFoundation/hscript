@@ -251,11 +251,11 @@ class Parser {
 		#end
 	}
 
-	inline function mk(e,?pmin,?pmax) : Expr {
+	inline function mk(e,pmin=-1,pmax=-1) : Expr {
 		#if hscriptPos
 		if( e == null ) return null;
-		if( pmin == null ) pmin = tokenMin;
-		if( pmax == null ) pmax = tokenMax;
+		if( pmin < 0 ) pmin = tokenMin;
+		if( pmax < 0 ) pmax = tokenMax;
 		return { e : e, pmin : pmin, pmax : pmax, origin : origin, line : line };
 		#else
 		return e;
@@ -443,6 +443,28 @@ class Parser {
 			}
 			if( opPriority.get(op) < 0 )
 				return makeUnop(op,parseExpr());
+			if( op == "<" ) {
+				var start = tokenMax + 1;
+				var ident = getIdent();
+				if( tokens.length != 0 )
+					throw "assert";
+				if( tokenMin == start ) {
+					var endTag = "</"+ident+">";
+					var end = input.indexOf(endTag, readPos);
+					if( end < 0 ) {
+						endTag = '/>';
+						end = input.indexOf(endTag, readPos);
+					}
+					if( end >= 0 ) {
+						readPos = end + endTag.length;
+						char = -1;
+						tokenMin = start - 1;
+						tokenMax = readPos + offset - 1;
+						var str = input.substr(tokenMin - offset,tokenMax - tokenMin + 1);
+						return mk(EMeta(":markup",[],mk(EConst(CString(str)))));
+					}
+				}
+			}
 			return unexpected(tk);
 		case TBkOpen:
 			var a = new Array();
