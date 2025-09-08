@@ -354,7 +354,7 @@ class Parser {
 			if( tk == TPClose ) {
 				ensureToken(TOp("->"));
 				var eret = parseExpr();
-				return mk(EFunction([], mk(EReturn(eret),p1)), p1);
+				return mkLambda([],eret,p1);
 			}
 			push(tk);
 			var e = parseExpr();
@@ -527,7 +527,11 @@ class Parser {
 		}
 		ensureToken(TOp("->"));
 		var eret = parseExpr();
-		return mk(EFunction(args, mk(EReturn(eret),pmin)), pmin);
+		return mkLambda(args,eret,pmin);
+	}
+
+	function mkLambda(args,eret,p) {
+		return mk(EFunction(args, mk(EMeta(":lambda",[],mk(EReturn(eret),pmin(eret))),p)),p);
 	}
 
 	function parseMetaArgs() {
@@ -835,10 +839,10 @@ class Parser {
 				switch( expr(e1) ) {
 				case EIdent(i), EParent(expr(_) => EIdent(i)):
 					var eret = parseExpr();
-					return mk(EFunction([{ name : i }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+					return mkLambda([{ name : i }], eret, pmin(e1));
 				case ECheckType(expr(_) => EIdent(i), t):
 					var eret = parseExpr();
-					return mk(EFunction([{ name : i, t : t }], mk(EReturn(eret),pmin(eret))), pmin(e1));
+					return mkLambda([{ name : i, t : t }], eret, pmin(e1));
 				default:
 				}
 				unexpected(tk);
