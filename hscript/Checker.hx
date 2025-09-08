@@ -470,6 +470,20 @@ class Checker {
 		#end
 	}
 
+	function punion( e1 : Expr, e2 : Expr ) : Expr {
+		#if hscriptPos
+		return {
+			pmin : e1.pmin < e2.pmin ? e1.pmin : e2.pmin,
+			pmax : e1.pmax > e2.pmax ? e1.pmax : e2.pmax,
+			origin : e1.origin,
+			line : e1.line < e2.line ? e1.line : e2.line,
+			e : null,
+		};
+		#else
+		return e1;
+		#end
+	}
+
 	inline function error( msg : String, curExpr : Expr ) {
 		var e = ECustom(msg);
 		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
@@ -701,6 +715,8 @@ class Checker {
 				if( a2.opt && !a1.opt ) return false;
 				if( !tryUnify(a2.t, a1.t) ) return false;
 			}
+			if( follow(r2) == TVoid )
+				return true;
 			return tryUnify(r1,r2);
 		case [_, TDynamic]:
 			return true;
@@ -984,16 +1000,68 @@ class Checker {
 		if( isCompletion ) throw new Completion(expr, t);
 	}
 
-	function typeField( o : Expr, f : String, expr : Expr, forWrite : Bool ) {
-		var ot = typeExpr(o, Value);
-		if( f == null )
-			onCompletion(expr, ot);
-		var ft = getField(ot, f, expr, forWrite);
-		if( ft == null ) {
-			error(typeStr(ot)+" has no field "+f, expr);
-			ft = TDynamic;
+	function typeField( o : Expr, f : String, expr : Expr, withType, forWrite : Bool ) {
+		if( f == null && isCompletion ) {
+			var ot = typeExpr(o, Value);
+			onCompletion(expr,ot);
+			return TDynamic;
 		}
-		return ft;
+		var path = [{ f : f, e : expr }];
+		while( true ) {
+			switch( edef(o) ) {
+			case EField(e,f) if( f != null ):
+				path.unshift({ f : f, e : o });
+				o = e;
+			case EIdent(i):
+				path.unshift({ f : i, e : o });
+				return typePath(path, withType, forWrite);
+			default:
+				break;
+			}
+		}
+		return readPath(typeExpr(o, Value), path, forWrite);
+	}
+
+	function readPath( ot : TType, path : Array<{ f : String, e : Expr }>, forWrite ) {
+		for( p in path ) {
+			var ft = getField(ot, p.f, p.e, p == path[path.length-1] ? forWrite : false);
+			if( ft == null ) {
+				error(typeStr(ot)+" has no field "+p.f, p.e);
+				return TDynamic;
+			}
+			ot = ft;
+		}
+		return ot;
+	}
+
+	function typePath( path : Array<{ f : String, e : Expr }>, withType, forWrite : Bool ) {
+		var root = path[0];
+		var l = locals.get(root.f);
+		if( l != null ) {
+			path.shift();
+			return readPath(l,path,forWrite);
+		}
+		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value);
+		if( t != null ) {
+			path.shift();
+			return readPath(t,path,forWrite);
+		}
+		var fields = [];
+		while( path.length > 1 ) {
+			var name = [for( p in path ) p.f].join(".");
+			var union = punion(path[0].e,path[path.length-1].e);
+			var t = resolveGlobal(name, union, Value);
+			if( t != null ) {
+				#if hscriptPos
+				if( union.e != null ) path[path.length-1].e.e = union.e;
+				#end
+				return readPath(t,fields,forWrite);
+			}
+			fields.unshift(path.pop());
+		}
+		if( !isCompletion )
+			error("Unknown identifier "+root.f, root.e);
+		return TDynamic;
 	}
 
 	function hasMeta( meta : Metadata, name : String ) {
@@ -1119,14 +1187,7 @@ class Checker {
 			case CString(_): types.t_string;
 			}
 		case EIdent(v):
-			var l = locals.get(v);
-			if( l != null ) return l;
-			var t = resolveGlobal(v,expr,withType);
-			if( t == null ) {
-				if( isCompletion ) return TDynamic;
-				error("Unknown identifier "+v, expr);
-			}
-			return t;
+			return typePath([{ f : v, e : expr }],withType,false);
 		case EBlock(el):
 			var t = TVoid;
 			var locals = saveLocals();
@@ -1191,7 +1252,7 @@ class Checker {
 				return makeMono();
 			}
 		case EField(o, f):
-			return typeField(o,f,expr,false);
+			return typeField(o,f,expr,withType,false);
 		case ECheckType(v, t):
 			var ct = makeType(t, expr);
 			var vt = typeExpr(v, WithType(ct));
@@ -1287,8 +1348,14 @@ class Checker {
 				var ev = events.get(name);
 				if( ev != null ) withType = WithType(ev);
 			}
+			var isShortFun = switch( edef(body) ) {
+			case EMeta(":lambda",_): true;
+			default: false;
+			}
 			switch( withType ) {
-			case WithType(follow(_) => TFun(args,ret)): withArgs = args; unify(tret,ret,expr);
+			case WithType(follow(_) => TFun(args,ret)):
+				withArgs = args;
+				if( !isShortFun || follow(ret) != TVoid ) unify(tret,ret,expr);
 			default:
 			}
 			if( targs == null )
@@ -1368,7 +1435,8 @@ class Checker {
 					}
 				}
 				var vt = switch( edef(e1) ) {
-				case EField(o,f): typeField(o, f, e1, true);
+				case EIdent(v): typePath([{f:v,e:e1}],withType,true);
+				case EField(o,f): typeField(o, f, e1, withType, true);
 				default: typeExpr(e1,Value);
 				}
 				typeExprWith(e2,vt);
