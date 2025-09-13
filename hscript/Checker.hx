@@ -61,6 +61,7 @@ typedef CField = {
 	var isPublic : Bool;
 	var canWrite : Bool;
 	var complete : Bool;
+	var ?isMethod : Bool;
 	var params : Array<TType>;
 	var name : String;
 	var t : TType;
@@ -133,6 +134,44 @@ class CheckerTypes {
 		return ct;
 	}
 
+	function addField(f:haxe.rtti.CType.ClassField) {
+		if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" )
+			return null;
+		var complete = !StringTools.startsWith(f.name,"__"); // __uid, etc. (no metadata in such fields)
+		for( m in f.meta ) {
+			if( m.name == ":noScript"  )
+				return null;
+			if( m.name == ":noCompletion" )
+				complete = false;
+		}
+		var pkeys = [];
+		var fl : CField = {
+			isPublic : f.isPublic,
+			canWrite : f.set.match(RNormal | RCall(_) | RDynamic),
+			isMethod : f.set == RMethod || f.set == RDynamic,
+			complete : complete,
+			params : [],
+			name : f.name,
+			t : null
+		};
+		for( p in f.params ) {
+			var pt = TParam(p);
+			var key = f.name+"."+p;
+			pkeys.push(key);
+			fl.params.push(pt);
+			localParams.set(key, pt);
+		}
+		fl.t = makeXmlType(f.type);
+		if( f.meta != null && f.meta.length > 0 ) {
+			fl.meta = [];
+			for( m in f.meta )
+				fl.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+		}
+		while( pkeys.length > 0 )
+			localParams.remove(pkeys.pop());
+		return fl;
+	}
+
 	function addXmlType(x:haxe.rtti.CType.TypeTree,todo:Array<Void->Void>) {
 		switch (x) {
 		case TPackage(name, full, subs):
@@ -151,7 +190,18 @@ class CheckerTypes {
 			for( p in c.params )
 				cl.params.push(TParam(p));
 			todo.push(function() {
+				var params = cl.params;
 				localParams = [for( t in cl.params ) c.path+"."+Checker.typeStr(t) => t];
+				if( StringTools.endsWith(cl.name,"_Impl_") ) {
+					for( a in types )
+						switch( a ) {
+						case CTAbstract(a) if( a.impl == cl ):
+							for( t in a.params )
+								localParams.set(a.name+"."+Checker.typeStr(t), t);
+							break;
+						default:
+						}
+				}
 				if( c.superClass != null )
 					cl.superClass = getType(c.superClass.path, [for( t in c.superClass.params ) makeXmlType(t)]);
 				if( c.interfaces != null ) {
@@ -159,41 +209,19 @@ class CheckerTypes {
 					for( i in c.interfaces )
 						cl.interfaces.push(getType(i.path, [for( t in i.params ) makeXmlType(t)]));
 				}
-				var pkeys = [];
-				function initField(f:haxe.rtti.CType.ClassField, fields) {
-					if( f.isOverride || f.name.substr(0,4) == "get_" || f.name.substr(0,4) == "set_" ) return;
-					var complete = !StringTools.startsWith(f.name,"__"); // __uid, etc. (no metadata in such fields)
-					for( m in f.meta ) {
-						if( m.name == ":noScript"  )
-							return;
-						if( m.name == ":noCompletion" )
-							complete = false;
+				for( f in c.fields ) {
+					var f = addField(f);
+					if( f != null ) {
+						if( f.name == "new" )
+							cl.constructor = f;
+						else
+							cl.fields.set(f.name, f);
 					}
-					var fl : CField = { isPublic : f.isPublic, canWrite : f.set.match(RNormal | RCall(_) | RDynamic), complete : complete, params : [], name : f.name, t : null };
-					for( p in f.params ) {
-						var pt = TParam(p);
-						var key = f.name+"."+p;
-						pkeys.push(key);
-						fl.params.push(pt);
-						localParams.set(key, pt);
-					}
-					fl.t = makeXmlType(f.type);
-					if( f.meta != null && f.meta.length > 0 ) {
-						fl.meta = [];
-						for( m in f.meta )
-							fl.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
-					}
-					while( pkeys.length > 0 )
-						localParams.remove(pkeys.pop());
-					if( fl.name == "new" )
-						cl.constructor = fl;
-					else
-						fields.set(f.name, fl);
 				}
-				for( f in c.fields )
-					initField(f, cl.fields);
-				for( f in c.statics )
-					initField(f, cl.statics);
+				for( f in c.statics ) {
+					var f = addField(f);
+					if( f != null ) cl.statics.set(f.name, f);
+				}
 				localParams = null;
 			});
 			types.set(cl.name, CTClass(cl));
@@ -259,6 +287,9 @@ class CheckerTypes {
 						for( i in m.params )
 							ta.forwards.set(i, true);
 					}
+				localParams = null;
+			});
+			todo.unshift(function() {
 				if( a.impl != null ) {
 					var t = resolve(a.impl.path);
 					if( t != null )
@@ -267,7 +298,6 @@ class CheckerTypes {
 						default:
 						}
 				}
-				localParams = null;
 			});
 			types.set(a.path, CTAbstract(ta));
 		}
@@ -355,6 +385,7 @@ class Checker {
 	var isCompletion : Bool;
 	var allowDefine : Bool;
 	var hasReturn : Bool;
+	var callExpr : Expr;
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
@@ -805,9 +836,50 @@ class Checker {
 	}
 
 	public function unify( t1 : TType, t2 : TType, e : Expr ) {
-		if( !tryUnify(t1,t2) )
+		if( !tryUnify(t1,t2) && !abstractCast(t1,t2,e) )
 			error(typeStr(t1)+" should be "+typeStr(t2),e);
 	}
+
+	public function abstractCast( t1 : TType, t2 : TType, e : Expr ) {
+		#if !hscriptPos
+		return false;
+		#else
+		var tf1 = follow(t1);
+		var tf2 = follow(t2);
+		return getAbstractCast(tf1,tf2,e,false) || getAbstractCast(tf2,tf1,e,true);
+		#end
+	}
+
+	#if hscriptPos
+	function getAbstractCast( from : TType, to : TType, e : Expr, isFrom : Bool ) {
+		switch( from ) {
+		case TAbstract(a, args) if( a.impl != null ):
+			for( s in a.impl.statics ) {
+				if( s.meta == null ) continue;
+				var found = false;
+				for( m in s.meta )
+					if( m.name == (isFrom?":from":":to") ) {
+						found = true;
+						break;
+					}
+				if( !found ) continue;
+				switch( s.t ) {
+				case TFun([arg], _):
+					var at = apply(arg.t, s.params, [for( _ in s.params ) makeMono()]);
+					at = apply(at,a.params,args);
+					var acc = mk(null,e);
+					if( tryUnify(to,at) && resolveGlobal(a.impl.name,acc,Value) != null ) {
+						e.e = ECall(mk(EField(acc,s.name),e),[mk(e.e,e)]);
+						return true;
+					}
+				default:
+				}
+			}
+		default:
+		}
+		return false;
+	}
+	#end
 
 	public function apply( t : TType, params : Array<TType>, args : Array<TType> ) {
 		if( args.length != params.length ) throw "Invalid number of type parameters";
@@ -910,6 +982,16 @@ class Checker {
 		return fields;
 	}
 
+	function checkField( cf : CField, ct : CNamedType, args, forWrite, e ) {
+		if( !cf.isPublic && checkPrivate )
+			error("Can't access private field "+cf.name+" on "+ct.name, e);
+		if( forWrite && !cf.canWrite )
+			error("Can't write readonly field "+cf.name+" on "+ct.name, e);
+		var t = cf.t;
+		if( cf.params != null ) t = apply(t, cf.params, [for( i in 0...cf.params.length ) makeMono()]);
+		return apply(t, ct.params, args);
+	}
+
 	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
 		switch( follow(t) ) {
 		case TInst(c, args):
@@ -935,13 +1017,7 @@ class Checker {
 				if( ft != null ) ft = apply(ft, c.params, args);
 				return ft;
 			}
-			if( !cf.isPublic && checkPrivate )
-				error("Can't access private field "+f+" on "+c.name, e);
-			if( forWrite && !cf.canWrite )
-				error("Can't write readonly field "+f+" on "+c.name, e);
-			var t = cf.t;
-			if( cf.params != null ) t = apply(t, cf.params, [for( i in 0...cf.params.length ) makeMono()]);
-			return apply(t, c.params, args);
+			return checkField(cf,c,args,forWrite,e);
 		case TDynamic:
 			return makeMono();
 		case TAnon(fields):
@@ -951,6 +1027,35 @@ class Checker {
 			return null;
 		case TAbstract(a,pl) if( a.forwards.exists(f) ):
 			return getField(apply(a.t, a.params, pl), f, e, forWrite);
+		#if hscriptPos
+		case TAbstract(a, pl) if( a.impl != null ):
+			var cf = a.impl.statics.get(f);
+			if( cf == null )
+				return null;
+			var acc = mk(null,e);
+			var impl = resolveGlobal(a.impl.name,acc,Value);
+			if( impl == null )
+				return null;
+			var t = checkField(cf,a,pl,forWrite,e);
+			switch( e.e ) {
+			case EField(obj, f):
+				if( cf.isMethod ) {
+					switch( callExpr?.e ) {
+					case null:
+					case ECall(ec,params) if( ec == e ):
+						e.e = EField(acc,f);
+						params.unshift(mk(ECast(obj),obj));
+						return t;
+					default:
+					}
+				} else {
+					e.e = ECall(mk(EField(acc,"get_"+f),e),[obj]);
+					return t;
+				}
+			default:
+			}
+			return null;
+		#end
 		default:
 			return null;
 		}
@@ -1225,10 +1330,13 @@ class Checker {
 				}
 			default:
 			}
+			var prev = callExpr;
+			callExpr = expr;
 			var ft = typeExpr(e, switch( [edef(e),withType] ) {
 				case [EIdent(_),WithType(TEnum(_))]: withType;
 				default: Value;
 			});
+			callExpr = prev;
 			switch( follow(ft) ) {
 			case TFun(args, ret):
 				for( i in 0...params.length ) {
