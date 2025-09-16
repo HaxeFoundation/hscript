@@ -381,6 +381,8 @@ class Parser {
 				case EIdent(v): return parseLambda([{name:v}], pmin(e));
 				default:
 				}
+			case TEof if( resumeErrors ):
+				return e;
 			default:
 			}
 			return unexpected(tk);
