@@ -141,7 +141,10 @@ class TestHScript extends TestCase {
 	}
 
 	function testNullFieldAccess():Void {
-		var pt = {x : 10};
+		var pt = {
+			x : 10,
+			call : function() { return 11; }
+		};
 		var vars = {
 			ptnull : null,
 			pt: pt,
@@ -149,11 +152,16 @@ class TestHScript extends TestCase {
 			pt2: {pt : pt}
 		}
 		assertScript("ptnull?.x", null, vars);
+		assertScript("ptnull?.pt.x", null, vars);
+		assertScript("ptnull?.call()", null, vars);
 		assertScript("pt?.x", 10, vars);
+		assertScript("pt?.call()", 11, vars);
 		assertScript("pt2null?.pt", null, vars);
 		assertScript("pt2null?.pt?.x", null, vars);
+		assertScript("pt2null?.pt?.call()", null, vars);
 		assertScript("pt2?.pt", pt, vars);
 		assertScript("pt2?.pt?.x", 10, vars);
+		assertScript("pt2?.pt?.call()", 11, vars);
 	}
 
 	function testIsOperator():Void {
