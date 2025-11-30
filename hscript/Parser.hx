@@ -33,6 +33,7 @@ enum Token {
 	TBrClose;
 	TDot;
 	TQuestionDot;
+	TQuestionDouble;
 	TComma;
 	TSemicolon;
 	TBkOpen;
@@ -113,9 +114,9 @@ class Parser {
 			["+", "-"],
 			["<<", ">>", ">>>"],
 			["|", "&", "^"],
+			["&&"],
 			["==", "!=", ">", "<", ">=", "<="],
 			["..."],
-			["&&"],
 			["||"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
 			["->"],
@@ -888,6 +889,9 @@ class Parser {
 			ensure(TDoubleDot);
 			var e3 = parseExpr();
 			return mk(ETernary(e1,e2,e3),pmin(e1),pmax(e3));
+		case TQuestionDouble:
+			var e2 = parseExpr();
+			return makeBinop("??",e1,e2);
 		default:
 			push(tk);
 			return e1;
@@ -1564,6 +1568,8 @@ class Parser {
 				char = readChar();
 				if( char == ".".code )
 					return TQuestionDot;
+				if( char == "?".code )
+					return TQuestionDouble;
 				this.char = char;
 				return TQuestion;
 			case ":".code: return TDoubleDot;
@@ -1791,6 +1797,7 @@ class Parser {
 		case TBrClose: "}";
 		case TDot: ".";
 		case TQuestionDot: "?.";
+		case TQuestionDouble: "??";
 		case TComma: ",";
 		case TSemicolon: ";";
 		case TBkOpen: "[";

@@ -434,10 +434,6 @@ class Checker {
 		return globals;
 	}
 
-	public dynamic function onTopDownEnum( en : CEnum, field : String ) {
-		return false;
-	}
-
 	function typeArgs( args : Array<Argument>, pos : Expr ) {
 		return [for( i in 0...args.length ) {
 			var a = args[i];
@@ -1209,31 +1205,29 @@ class Checker {
 			return TDynamic;
 		default:
 			#if hscriptPos
-			switch( withType ) {
+			var wt = switch( withType ) { case WithType(t): follow(t); default: null; };
+			switch( wt ) {
+			case null:
 			// enum constructor resolution
-			case WithType(et = TEnum(e, args)):
+			case TEnum(e, args):
 				for( c in e.constructors )
 					if( c.name == name ) {
-						if( onTopDownEnum(e,name) ) { // deprecated
-							var ct = c.args == null ? et : TFun(c.args, et);
-							return apply(ct, e.params, args);
-						}
-						var acc = getTypeAccess(et, expr, name);
+						var acc = getTypeAccess(wt, expr, name);
 						if( acc != null ) {
 							expr.e = acc;
-							var ct = c.args == null ? et : TFun(c.args, et);
+							var ct = c.args == null ? wt : TFun(c.args, wt);
 							return apply(ct, e.params, args);
 						}
 						break;
 					}
 			// abstract enum resolution
-			case WithType(at = TAbstract(a, args)) if( hasMeta(a.meta,":enum") ):
+			case TAbstract(a, args) if( hasMeta(a.meta,":enum") ):
 				var f = a.impl.statics.get(name);
 				if( f != null && hasMeta(f.meta,":enum") ) {
 					var acc = getTypeAccess(TInst(a.impl,[]),expr,name);
 					if( acc != null ) {
 						expr.e = acc;
-						return at;
+						return wt;
 					}
 				}
 			default:
@@ -1617,6 +1611,14 @@ class Checker {
 					error("Cannot compare "+typeStr(t1), expr);
 				}
 				return TBool;
+			case "??":
+				var t1 = typeExpr(e1,withType);
+				var t2 = typeExpr(e2,WithType(t1));
+				if( tryUnify(t2,t1) )
+					return t1;
+				if( tryUnify(t1,t2) )
+					return t2;
+				unify(t2,t1,e2); // error
 			default:
 				if( op.charCodeAt(op.length-1) == "=".code ) {
 					var t = typeExpr(mk(EBinop(op.substr(0,op.length-1),e1,e2),expr),withType);
