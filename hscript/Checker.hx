@@ -934,6 +934,17 @@ class Checker {
 		}
 	}
 
+	public function followOnce( t : TType, withAbstracts=false ) {
+		return switch( t ) {
+		case TMono(r): if( r.r != null ) r.r else t;
+		case TType(t,args): apply(t.t, t.params, args);
+		case TLazy(f): f();
+		case TNull(t) if( withAbstracts ): t;
+		case TAbstract(a, args) if( withAbstracts ): apply(a.t,a.params,args);
+		default: t;
+		}
+	}
+
 	public function getFields( t : TType ) : Array<{ name : String, t : TType }> {
 		var fields = [];
 		switch( follow(t) ) {
