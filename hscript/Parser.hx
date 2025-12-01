@@ -148,7 +148,8 @@ class Parser {
 	}
 
 	public function invalidChar(c) {
-		error(EInvalidChar(c), readPos-1, readPos-1);
+		var pos = currentPos - 1;
+		error(EInvalidChar(c), pos, pos);
 	}
 
 	function initParser( origin, pos ) {
@@ -1597,6 +1598,7 @@ class Parser {
 						id += String.fromCharCode(char);
 					}
 				}
+				readPos--;
 				invalidChar(char);
 			case '#'.code:
 				char = readChar();
@@ -1611,6 +1613,7 @@ class Parser {
 						id += String.fromCharCode(char);
 					}
 				}
+				readPos--;
 				invalidChar(char);
 			default:
 				if( ops[char] ) {
