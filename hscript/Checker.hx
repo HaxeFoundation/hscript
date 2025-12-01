@@ -284,6 +284,8 @@ class CheckerTypes {
 						ta.to.push(makeXmlType(t.t));
 				for( m in a.meta )
 					if( m.name == ":forward" && m.params != null ) {
+						if( m.params.length == 0 )
+							ta.forwards.set("*", true);
 						for( i in m.params )
 							ta.forwards.set(i, true);
 					}
@@ -1037,8 +1039,11 @@ class Checker {
 		#if hscriptPos
 		case TAbstract(a, pl) if( a.impl != null ):
 			var cf = a.impl.statics.get(f);
-			if( cf == null )
+			if( cf == null ) {
+				if( a.forwards.exists("*") )
+					return getField(apply(a.t, a.params, pl), f, e, forWrite);
 				return null;
+			}
 			var acc = mk(null,e);
 			var impl = resolveGlobal(a.impl.name,acc,Value);
 			if( impl == null )
@@ -1266,9 +1271,9 @@ class Checker {
 					expr.e = acc;
 					switch( t ) {
 					case TInst(c,_):
-						return TAnon([for( f in c.statics ) { name : f.name, t : f.t, opt : false }]);
+						return TType({ name : "#"+c.name, params : [], t : TAnon([for( f in c.statics ) { name : f.name, t : f.t, opt : false }]) },[]);
 					case TEnum(e,_):
-						return TAnon([for( f in e.constructors ) { name : f.name, t : f.args == null ? t : TFun(f.args,t), opt : false }]);
+						return TType({ name : "#"+e.name, params : [], t : TAnon([for( f in e.constructors ) { name : f.name, t : f.args == null ? t : TFun(f.args,t), opt : false }]) },[]);
 					default:
 						throw "assert";
 					}
@@ -1619,6 +1624,16 @@ class Checker {
 				if( tryUnify(t1,t2) )
 					return t2;
 				unify(t2,t1,e2); // error
+			case "is":
+				typeExpr(e1,Value);
+				var ct = typeExpr(e2,Value);
+				switch( ct ) {
+				case TType(t,_) if( t.name.charCodeAt(0) == "#".code ):
+					// type check
+				default:
+					error("Should be a type",e2);
+				}
+				return TBool;
 			default:
 				if( op.charCodeAt(op.length-1) == "=".code ) {
 					var t = typeExpr(mk(EBinop(op.substr(0,op.length-1),e1,e2),expr),withType);
