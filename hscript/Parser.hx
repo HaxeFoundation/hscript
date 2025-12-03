@@ -878,7 +878,7 @@ class Parser {
 				mk(ETernary(
 					mk(EBinop("==", mk(EIdent(tmp),pmin(e1),pmax(e1)), mk(EIdent("null"),pmin(e1),pmax(e1)))),
 					mk(EIdent("null"),pmin(e1),pmax(e1)),
-					e2,
+					e2
 				))
 			]),pmin(e1));
 			return e;
