@@ -1683,6 +1683,7 @@ class Checker {
 			var et = typeExpr(e, Value);
 			return t == null ? makeMono() : makeType(t,expr);
 		case ENew(cl, params):
+			return types.resolve(cl);
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 		return TDynamic;
