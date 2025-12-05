@@ -222,7 +222,7 @@ class JsInterp extends Interp {
 			return '$$i.get(${exprValue(e)},"$f")';
 		case EBinop(op, e1, e2):
 			switch( op ) {
-			case "+","-","*","/","%","&","|","^",">>","<<",">>>","==","!=",">=","<=",">","<":
+			case "+","-","*","/","%","&","|","^",">>","<<",">>>","==","!=",">=","<=",">","<","??":
 				return '${exprOp(e1)} $op ${exprOp(e2)}';
 			case "||","&&":
 				return '(${exprCond(e1)} $op ${exprCond(e2)})';
