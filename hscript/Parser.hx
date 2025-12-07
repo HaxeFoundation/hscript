@@ -457,24 +457,45 @@ class Parser {
 				if( #if hscriptPos tokens.length != 0 #else !tokens.isEmpty() #end )
 					throw "assert";
 				if( readPos == start + ident.length + 1 ) {
+					var startTag = "<"+ident;
 					var endTag = "</"+ident+">";
-					var end = input.indexOf(endTag, readPos);
-					if( end < 0 ) {
-						endTag = '/>';
-						end = input.indexOf(endTag, readPos);
+					var endTag2 = "/>";
+					var end = -1;
+					var count = 1, curPos = readPos;
+					var r_nextTag = ~/<[A-Za-z0-9_]+/;
+					while( count > 0 ) {
+						end = input.indexOf(endTag, curPos + 1);
+						if( end >= 0 )
+							end += endTag.length;
+						var end2 = input.indexOf(endTag2, curPos + 1);
+						if( end2 > 0 && (end < 0 || end2 < end) ) {
+							var nextTag = -1;
+							if( r_nextTag.matchSub(input, curPos+1) )
+								nextTag = r_nextTag.matchedPos().pos;
+							if( nextTag < 0 || end2 < nextTag )
+								end = end2 + endTag2.length;
+						}
+						if( end < 0 )
+							error(ECustom("Unclosed "+startTag+">"), curPos, curPos + startTag.length + 1);
+						var prev = input.indexOf(startTag, curPos + 1);
+						if( prev < 0 || prev > end ) {
+							count--;
+							curPos = end - 1;
+						} else {
+							count++;
+							curPos = prev;
+						}
 					}
-					if( end >= 0 ) {
-						readPos = end + endTag.length;
-						char = -1;
-						start--;
-						var end = readPos - 1;
-						#if hscriptPos
-						tokenMin = start + offset;
-						tokenMax = end + offset;
-						#end
-						var str = input.substr(start,end - start + 1);
-						return mk(EMeta(":markup",[],mk(EConst(CString(str)))));
-					}
+					readPos = end;
+					char = -1;
+					start--;
+					var end = readPos - 1;
+					#if hscriptPos
+					tokenMin = start + offset;
+					tokenMax = end + offset;
+					#end
+					var str = input.substr(start,end - start + 1);
+					return mk(EMeta(":markup",[],mk(EConst(CString(str)))));
 				}
 			}
 			return unexpected(tk);
