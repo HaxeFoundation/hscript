@@ -412,6 +412,7 @@ class Checker {
 	public var allowGlobalsDefine : Bool;
 	public var allowUntypedMeta : Bool;
 	public var allowPrivateAccess : Bool;
+	public var allowNew : Bool;
 
 	public function new( ?types ) {
 		if( types == null ) types = new CheckerTypes();
@@ -1346,6 +1347,21 @@ class Checker {
 		return null;
 	}
 
+	function unifyCallParams( args : Array<{ name : String, opt : Bool, t : TType }>, params : Array<Expr>, pos : Expr ) {
+		for( i in 0...params.length ) {
+			var a = args[i];
+			if( a == null ) {
+				error("Too many arguments", params[i]);
+				break;
+			}
+			var t = typeExpr(params[i], a == null ? Value : WithType(a.t));
+			unify(t, a.t, params[i]);
+		}
+		for( i in params.length...args.length )
+			if( !args[i].opt )
+				error("Missing argument "+args[i].name+":"+typeStr(args[i].t), pos);
+	}
+
 	function typeExpr( expr : Expr, withType : WithType ) : TType {
 		if( expr == null && isCompletion )
 			return switch( withType ) {
@@ -1407,18 +1423,7 @@ class Checker {
 			callExpr = prev;
 			switch( follow(ft) ) {
 			case TFun(args, ret):
-				for( i in 0...params.length ) {
-					var a = args[i];
-					if( a == null ) {
-						error("Too many arguments", params[i]);
-						break;
-					}
-					var t = typeExpr(params[i], a == null ? Value : WithType(a.t));
-					unify(t, a.t, params[i]);
-				}
-				for( i in params.length...args.length )
-					if( !args[i].opt )
-						error("Missing argument "+args[i].name+":"+typeStr(args[i].t), expr);
+				unifyCallParams(args, params, expr);
 				return ret;
 			case TDynamic:
 				for( p in params ) typeExpr(p,Value);
@@ -1741,6 +1746,24 @@ class Checker {
 			var et = typeExpr(e, Value);
 			return t == null ? makeMono() : makeType(t,expr);
 		case ENew(cl, params):
+			if( !allowNew ) error("'new' is not allowed", expr);
+			var t = types.resolve(cl);
+			if( t == null ) error("Unknown class "+cl, expr);
+			switch( t ) {
+			case TInst(c,_) if( c.constructor != null ):
+				switch( c.constructor.t ) {
+				case TFun(args, _):
+					var ms = [for( c in c.params ) makeMono()];
+					var mf = [for( c in c.constructor.params ) makeMono()];
+					var args = [for( a in args ) { name : a.name, opt : a.opt, t : apply(apply(a.t,c.params,ms),c.constructor.params,mf) }];
+					unifyCallParams(args, params, expr);
+					return TInst(c, ms);
+				default:
+					throw "assert";
+				}
+			default:
+				error(typeStr(t)+" cannot be constructed", expr);
+			}
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 		return TDynamic;
