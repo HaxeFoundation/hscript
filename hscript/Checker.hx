@@ -858,11 +858,16 @@ class Checker {
 	}
 
 	public function abstractCast( t1 : TType, t2 : TType, e : Expr ) {
+		var tf1 = follow(t1);
+		var tf2 = follow(t2);
+		switch( [tf1,tf2] ) {
+		case [TInst(c,[]),TAbstract(a,[ct])] if( a.name == "Class" && c.name.charCodeAt(0) == '#'.code ):
+			return tryUnify(types.resolve(c.name.substr(1)), ct);
+		default:
+		}
 		#if !hscriptPos
 		return false;
 		#else
-		var tf1 = follow(t1);
-		var tf2 = follow(t2);
 		return getAbstractCast(tf1,tf2,e,false) || getAbstractCast(tf2,tf1,e,true);
 		#end
 	}
@@ -1158,10 +1163,44 @@ class Checker {
 		return readPath(typeExpr(o, Value), path, forWrite);
 	}
 
+	function patchStubAccess( ef : Expr ) {
+		#if hscriptPos
+		switch( ef.e ) {
+		case EField(e, f):
+			var g = types.resolve("hscript.Checker",[]);
+			if( g == null ) return false;
+			var acc = getTypeAccess(g, e);
+			if( acc == null ) return false;
+			e.e = acc;
+			ef.e = EField(e,"stub_"+f);
+			return true;
+		default:
+		}
+		#end
+		return false;
+	}
+
 	function readPath( ot : TType, path : Array<{ f : String, e : Expr }>, forWrite ) {
 		for( p in path ) {
 			var ft = getField(ot, p.f, p.e, p == path[path.length-1] ? forWrite : false);
 			if( ft == null ) {
+				switch( ot ) {
+				case TInst(c, _) if( c.name == "#Std" ):
+					// these two methods are extern in HL and we must provide
+					// some stubs so they both type and execute
+					switch( p.f ) {
+					case "int":
+						if( patchStubAccess(p.e) )
+							return TFun([{ name : "value", opt : false, t : TFloat }],TInt);
+					case "downcast":
+						var ct = makeMono();
+						var t = types.resolve("Class",[ct]);
+						if( t != null && patchStubAccess(p.e) )
+							return TFun([{ name : "value", opt : false, t : TDynamic }, { name : "cl", opt : false, t : t }],ct);
+					default:
+					}
+				default:
+				}
 				error(typeStr(ot)+" has no field "+p.f, p.e);
 				return TDynamic;
 			}
@@ -1776,5 +1815,7 @@ class Checker {
 		return { key : key, value : value };
 	}
 
+	static function stub_int( v : Float ) return Std.int(v);
+	static function stub_downcast( v : Dynamic, cl : Dynamic ) return Std.downcast(v, cl);
 
 }
