@@ -55,6 +55,7 @@ typedef CClass = {> CNamedType,
 	var ?isInterface : Bool;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
+	var staticClass : TType;
 }
 
 typedef CField = {
@@ -70,6 +71,7 @@ typedef CField = {
 
 typedef CEnum = {> CNamedType,
 	var constructors : Array<{ name : String, ?args : Array<{ name : String, opt : Bool, t : TType }> }>;
+	var enumClass : TType;
 }
 
 typedef CTypedef = {> CNamedType,
@@ -129,6 +131,7 @@ class CheckerTypes {
 				fields : [],
 				statics : [],
 				params : [],
+				staticClass : null,
 			};
 		types.set(name, CTClass(ct));
 		return ct;
@@ -183,6 +186,7 @@ class CheckerTypes {
 				params : [],
 				fields : new Map(),
 				statics : new Map(),
+				staticClass: null,
 			};
 			addMeta(c,cl);
 			if( c.isInterface )
@@ -218,9 +222,20 @@ class CheckerTypes {
 							cl.fields.set(f.name, f);
 					}
 				}
+				var stc : CClass = {
+					name : "#"+cl.name,
+					fields : [],
+					statics: [],
+					params: [],
+					staticClass : null,
+				};
+				cl.staticClass = TInst(stc,[]);
 				for( f in c.statics ) {
 					var f = addField(f);
-					if( f != null ) cl.statics.set(f.name, f);
+					if( f != null ) {
+						cl.statics.set(f.name, f);
+						stc.fields.set(f.name, f);
+					}
 				}
 				localParams = null;
 			});
@@ -231,6 +246,7 @@ class CheckerTypes {
 				name : e.path,
 				params : [],
 				constructors: [],
+				enumClass: null,
 			};
 			addMeta(e,en);
 			for( p in e.params )
@@ -240,6 +256,8 @@ class CheckerTypes {
 				for( c in e.constructors )
 					en.constructors.push({ name : c.name, args : c.args == null ? null : [for( a in c.args ) { name : a.name, opt : a.opt, t : makeXmlType(a.t) }] });
 				localParams = null;
+				var ent = TEnum(en,en.params);
+				en.enumClass = TType({ name : "#"+en.name, params : [], t : TAnon([for( f in en.constructors ) { name : f.name, t : f.args == null ? ent : TFun(f.args,ent), opt : false }]) },[]);
 			});
 			types.set(en.name, CTEnum(en));
 		case TTypedecl(t):
@@ -393,6 +411,7 @@ class Checker {
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
 	public var allowUntypedMeta : Bool;
+	public var allowPrivateAccess : Bool;
 
 	public function new( ?types ) {
 		if( types == null ) types = new CheckerTypes();
@@ -866,7 +885,7 @@ class Checker {
 					var at = apply(arg.t, s.params, [for( _ in s.params ) makeMono()]);
 					at = apply(at,a.params,args);
 					var acc = mk(null,e);
-					if( tryUnify(to,at) && resolveGlobal(a.impl.name,acc,Value) != null ) {
+					if( tryUnify(to,at) && resolveGlobal(a.impl.name,acc,Value,false) != null ) {
 						e.e = ECall(mk(EField(acc,s.name),e),[mk(e.e,e)]);
 						return true;
 					}
@@ -1045,7 +1064,7 @@ class Checker {
 				return null;
 			}
 			var acc = mk(null,e);
-			var impl = resolveGlobal(a.impl.name,acc,Value);
+			var impl = resolveGlobal(a.impl.name,acc,Value,false);
 			if( impl == null )
 				return null;
 			var t = checkField(cf,a,pl,forWrite,e);
@@ -1158,7 +1177,7 @@ class Checker {
 			path.shift();
 			return readPath(l,path,forWrite);
 		}
-		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value);
+		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value, forWrite && path.length == 1);
 		if( t != null ) {
 			path.shift();
 			return readPath(t,path,forWrite);
@@ -1167,7 +1186,7 @@ class Checker {
 		while( path.length > 1 ) {
 			var name = [for( p in path ) p.f].join(".");
 			var union = punion(path[0].e,path[path.length-1].e);
-			var t = resolveGlobal(name, union, Value);
+			var t = resolveGlobal(name, union, Value, forWrite && fields.length == 0);
 			if( t != null ) {
 				#if hscriptPos
 				if( union.e != null ) path[path.length-1].e.e = union.e;
@@ -1188,7 +1207,7 @@ class Checker {
 		return false;
 	}
 
-	function resolveGlobal( name : String, expr : Expr, withType : WithType ) : TType {
+	function resolveGlobal( name : String, expr : Expr, withType : WithType, forWrite : Bool ) : TType {
 		var g = globals.get(name);
 		if( g != null ) {
 			return switch( g ) {
@@ -1257,7 +1276,7 @@ class Checker {
 						var acc = getTypeAccess(g, expr, name);
 						if( acc != null ) {
 							expr.e = acc;
-							return apply(f.t, f.params, [for( a in f.params ) makeMono()]);
+							return checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
 						}
 					}
 				default:
@@ -1270,10 +1289,10 @@ class Checker {
 				if( acc != null ) {
 					expr.e = acc;
 					switch( t ) {
-					case TInst(c,_):
-						return TType({ name : "#"+c.name, params : [], t : TAnon([for( f in c.statics ) { name : f.name, t : f.t, opt : false }]) },[]);
+					case TInst(c,_) if( c.staticClass != null ):
+						return c.staticClass;
 					case TEnum(e,_):
-						return TType({ name : "#"+e.name, params : [], t : TAnon([for( f in e.constructors ) { name : f.name, t : f.args == null ? t : TFun(f.args,t), opt : false }]) },[]);
+						return e.enumClass;
 					default:
 						throw "assert";
 					}
@@ -1691,6 +1710,13 @@ class Checker {
 	function checkMeta( m : String, args : Array<Expr>, next : Expr, expr : Expr, withType ) {
 		if( m == ":untyped" && allowUntypedMeta )
 			return makeMono();
+		if( m == ":privateAccess" && allowPrivateAccess ) {
+			var prev = checkPrivate;
+			checkPrivate = false;
+			var t = typeExpr(next, withType);
+			checkPrivate = prev;
+			return t;
+		}
 		return typeExpr(next, withType);
 	}
 
