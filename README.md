@@ -1,14 +1,14 @@
 hscript
 =======
 
-Parse and evalutate Haxe expressions.
+Parse and evaluate Haxe expressions.
 
 
-In some projects it's sometimes useful to be able to interpret some code dynamically, without recompilation.
+In some projects, it's sometimes useful to be able to interpret some code dynamically, without recompilation.
 
 Haxe script is a complete subset of the Haxe language.
 
-It is dynamically typed but allows all Haxe expressions apart from type (class,enum,typedef) declarations.
+It is dynamically typed but allows all Haxe expressions apart from type (class, enum, typedef) declarations.
 
 Usage
 -----
@@ -21,9 +21,9 @@ var interp = new hscript.Interp();
 trace(interp.execute(ast));
 ```
 
-In case of a parsing error an `hscript.Expr.Error` is thrown. You can use `parser.line` to check the line number.
+In case of a parsing error, an `hscript.Expr.Error` is thrown. You can use `parser.line` to check the line number.
 
-You can set some globaly accessible identifiers by using `interp.variables.set("name",value)`
+You can set some globally accessible identifiers by using `interp.variables.set("name", value)`
 
 Example
 -------
@@ -46,12 +46,12 @@ trace( interp.execute(program) );
 
 This will calculate the sum of the cosines of the angles given as input.
 
-Haxe Script has not been really optimized, and it's not meant to be very fast. But it's entirely crossplatform since it's pure Haxe code (it doesn't use any platform-specific API).
+Haxe Script has not been really optimized, and it's not meant to be very fast. But it's entirely cross-platform since it's pure Haxe code (it doesn't use any platform-specific API).
 
 Advanced Usage
 --------------
 
-When compiled with `-D hscriptPos` you will get fine error reporting at parsing time.
+When compiled with `-D hscriptPos`, you will get fine error reporting at parsing time.
 
 You can subclass `hscript.Interp` to override behaviors for `get`, `set`, `call`, `fcall` and `cnew`.
 
@@ -61,7 +61,7 @@ You can use `parser.allowJSON` to allow JSON data.
 
 You can use `parser.allowTypes` to parse types for local vars, exceptions, function args and return types. Types are ignored by the interpreter.
 
-You can use `parser.allowMetadata` to parse metadata before expressions on in anonymous types. Metadata are ignored by the interpreter.
+You can use `parser.allowMetadata` to parse metadata before expressions in anonymous types. Metadata is ignored by the interpreter.
 
 You can use `new hscript.Macro(pos).convert(ast)` to convert an hscript AST to a Haxe macros one.
 
@@ -81,20 +81,24 @@ Compared to Haxe, limitations are :
 Install
 -------
 
-In order to install Haxe Script, use `haxelib install hscript` and compile your program with `-lib hscript`.
+
+To install Haxe Script, use
+   - `haxelib install hscript`for the released version
+   - `haxelib git hscript "https://github.com/HaxeFoundation/hscript"` for the latest version
+
+And compile your program with `-lib hscript`.
 
 These are the main required files in hscript :
 
   - `hscript.Expr` : contains enums declarations
   - `hscript.Parser` : a small parser that turns a string into an expression structure (AST)
-  - `hscript.Interp` : a small interpreter that execute the AST and returns the latest evaluated value
+  - `hscript.Interp` : a small interpreter that executes the AST and returns the latest evaluated value
 
 Some other optional files :
   
-  - `hscript.Async` : converts Expr into asynchronous version
+  - `hscript.Async` : converts Expr into an asynchronous version
   - `hscript.Bytes` : Expr serializer/unserializer
   - `hscript.Checker` : type checking and completion for hscript Expr
   - `hscript.Macro` : convert Haxe macro into hscript Expr
   - `hscript.Printer` : convert hscript Expr to String
   - `hscript.Tools` : utility functions (map/iter)
- 
