@@ -55,7 +55,7 @@ typedef CClass = {> CNamedType,
 	var ?isInterface : Bool;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
-	var staticClass : TType;
+	var ?staticClass : TType;
 }
 
 typedef CField = {
@@ -71,7 +71,7 @@ typedef CField = {
 
 typedef CEnum = {> CNamedType,
 	var constructors : Array<{ name : String, ?args : Array<{ name : String, opt : Bool, t : TType }> }>;
-	var enumClass : TType;
+	var ?enumClass : TType;
 }
 
 typedef CTypedef = {> CNamedType,
@@ -131,7 +131,6 @@ class CheckerTypes {
 				fields : [],
 				statics : [],
 				params : [],
-				staticClass : null,
 			};
 		types.set(name, CTClass(ct));
 		return ct;
@@ -186,7 +185,6 @@ class CheckerTypes {
 				params : [],
 				fields : new Map(),
 				statics : new Map(),
-				staticClass: null,
 			};
 			addMeta(c,cl);
 			if( c.isInterface )
@@ -227,7 +225,6 @@ class CheckerTypes {
 					fields : [],
 					statics: [],
 					params: [],
-					staticClass : null,
 				};
 				cl.staticClass = TInst(stc,[]);
 				for( f in c.statics ) {
