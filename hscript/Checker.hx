@@ -1297,6 +1297,7 @@ class Checker {
 			}
 			// this variable resolution
 			var g = locals.get("this");
+			if( g == null ) g = globals.get("this");
 			if( g != null ) {
 				// local this resolution
 				var prev = checkPrivate;
