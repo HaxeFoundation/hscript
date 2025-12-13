@@ -10,6 +10,10 @@ import haxe.macro.Expr;
 class LiveClass {
 
 	@:persistent static var CONFIG : { api : String, srcPath : Array<String> } #if !macro = getMacroConfig() #end;
+	
+	public static function isEnable() {
+	   return CONFIG != null;
+	}
 
 	static macro function getMacroConfig() {
 		return macro $v{CONFIG};
@@ -66,7 +70,7 @@ class LiveClass {
 		var noCompletion : Metadata = [{ name : ":noCompletion", pos : pos }];
 		var cl = Context.getLocalClass().get();
 		var className = cl.name;
-		var classFile = getClassFile(pos);
+		var classFile = getFilePath(pos);
 		fields.push({
 			name : "__interp_inst",
 			pos : pos,
@@ -91,7 +95,7 @@ class LiveClass {
 		return fields;
 	}
 
-	static function getClassFile( pos : Position ) {
+	public static function getFilePath( pos : Position ) {
 		var filePath = Context.getPosInfos(pos).file.split("\\").join("/");
 		var classPath = Context.getClassPath();
 		classPath.push(Sys.getCwd());
