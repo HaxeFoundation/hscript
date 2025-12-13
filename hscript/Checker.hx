@@ -1238,6 +1238,8 @@ class Checker {
 	}
 
 	function hasMeta( meta : Metadata, name : String ) {
+		if( meta == null )
+			return false;
 		for( m in meta )
 			if( m.name == name )
 				return true;
