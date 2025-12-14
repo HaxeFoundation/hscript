@@ -324,13 +324,18 @@ class CheckerTypes {
 					}
 					if( f.meta == null ) continue;
 					for( m in f.meta ) {
-						if( m.name == ":op" && m.params != null && m.params.length == 1 ) {
-							var op = switch( Tools.expr(m.params[0]) ) {
+						var op = null;
+						if( m.name == ":op" && m.params != null && m.params.length == 1 && m.params[0] != null ) {
+							op = switch( Tools.expr(m.params[0]) ) {
 							case EField(_): ".";
 							case EBinop(op,_,_): op;
 							case EArrayDecl([]): "[]";
-							default: continue;
+							default: null;
 							}
+						}
+						if( m.name == ":arrayAccess" )
+							op = "[]";
+						if( op != null ) {
 							var ops = ta.ops.get(op);
 							if( ops == null ) {
 								ops = [];
