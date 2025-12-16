@@ -58,7 +58,7 @@ enum Expr {
 	EReturn( ?e : Expr );
 	EArray( e : Expr, index : Expr );
 	EArrayDecl( e : Array<Expr> );
-	ENew( cl : String, params : Array<Expr> );
+	ENew( cl : String, params : Array<Expr>, ?args : Array<CType> );
 	EThrow( e : Expr );
 	ETry( e : Expr, v : String, t : Null<CType>, ecatch : Expr );
 	EObject( fl : Array<{ name : String, e : Expr }> );

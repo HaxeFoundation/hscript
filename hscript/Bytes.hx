@@ -200,11 +200,20 @@ class Bytes {
 			bout.addByte(el.length);
 			for( e in el )
 				doEncode(e);
-		case ENew(cl,params):
+		case ENew(cl,params, args):
 			doEncodeString(cl);
 			bout.addByte(params.length);
 			for( e in params )
 				doEncode(e);
+			if( storeTypes ) {
+				if( args == null )
+					bout.addByte(0);
+				else {
+					bout.addByte(args.length);
+					for( a in args )
+						encodeType(a);
+				}
+			}
 		case EThrow(e):
 			doEncode(e);
 		case ETry(e,v,t,ecatch):
@@ -413,7 +422,13 @@ class Bytes {
 			var el = new Array();
 			for( i in 0...getByte() )
 				el.push(doDecode());
-			ENew(cl,el);
+			var targs = null;
+			if( storeTypes ) {
+				var len = getByte();
+				if( len > 0 )
+					targs = [for( i in 0...len ) decodeType()];
+			}
+			ENew(cl,el,targs);
 		case 19:
 			EThrow(doDecode());
 		case 20:
