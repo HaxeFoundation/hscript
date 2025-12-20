@@ -422,12 +422,21 @@ class CheckerTypes {
 		}
 		var t = types.get(name);
 		if( t == null ) return null;
-		if( args == null ) args = [];
+		inline function makeArgs(targs) {
+			if( args == null )
+				return targs;
+			if( args.length != targs.length ) throw "Invalid type params for "+name;
+			return args;
+		}
 		return switch( t ) {
-		case CTClass(c): TInst(c,args);
-		case CTEnum(e): TEnum(e,args);
-		case CTTypedef(t): TType(t,args);
-		case CTAbstract(a): TAbstract(a, args);
+		case CTClass(c):
+			TInst(c,makeArgs(c.params));
+		case CTEnum(e):
+			TEnum(e,makeArgs(e.params));
+		case CTTypedef(t):
+			TType(t,makeArgs(t.params));
+		case CTAbstract(a):
+			TAbstract(a,makeArgs(a.params));
 		case CTAlias(t): t;
 		}
 	}
@@ -586,7 +595,7 @@ class Checker {
 		return switch (t) {
 		case CTPath(path, params):
 			var params = params == null ? [] : [for( p in params ) makeType(p,e)];
-			var ct = types.resolve(path.join("."),params);
+			var ct = resolve(path.join("."),params,e);
 			if( ct == null ) {
 				// maybe a subtype that is public ?
 				var pack = path.copy();
@@ -594,7 +603,7 @@ class Checker {
 				if( pack.length > 0 && pack[pack.length-1].charCodeAt(0) >= 'A'.code && pack[pack.length-1].charCodeAt(0) <= 'Z'.code ) {
 					pack.pop();
 					pack.push(name);
-					ct = types.resolve(pack.join("."), params);
+					ct = resolve(pack.join("."), params,e);
 				}
 			}
 			if( ct == null ) {
@@ -890,6 +899,15 @@ class Checker {
 		default:
 		}
 		return typeEq(t1,t2);
+	}
+
+	function resolve(name,params,pos:Expr) {
+		try {
+			return types.resolve(name,params);
+		} catch( msg : String ) {
+			error(msg, pos);
+			return null;
+		}
 	}
 
 	public function unify( t1 : TType, t2 : TType, e : Expr ) {
@@ -1871,20 +1889,24 @@ class Checker {
 		case ENew(cl, params, targs):
 			if( !allowNew ) error("'new' is not allowed", expr);
 			var targs = targs == null ? null : [for( t in targs ) makeType(t,expr)];
-			var t = types.resolve(cl, targs);
+			var t = resolve(cl, targs, expr);
 			if( t == null ) error("Unknown class "+cl, expr);
 			var tparams = null, cst = null;
 			switch( t ) {
-			case TInst(c,args): targs = args; tparams = c.params; cst = c.constructor;
+			case TInst(c,args): tparams = c.params; cst = c.constructor;
 			#if hscriptPos
 			case TAbstract(a, args) if( a.constructor != null && patchAbstractAccess(expr,a,a.constructor.name,params) ):
-				targs = args; tparams = a.params;
+				tparams = a.params;
 				cst = a.constructor;
 			#end
 			default:
 			}
 			if( cst == null )
 				error(typeStr(t)+" cannot be constructed", expr);
+			if( targs == null ) {
+				targs = [for( i in 0...tparams.length ) makeMono()];
+				t = apply(t,tparams,targs);
+			}
 			switch( cst.t ) {
 			case TFun(args, _):
 				var mf = [for( c in cst.params ) makeMono()];
