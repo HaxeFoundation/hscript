@@ -153,7 +153,7 @@ class CheckerTypes {
 		var fl : CField = {
 			isPublic : f.isPublic,
 			canWrite : f.set.match(RNormal | RCall(_) | RDynamic),
-			isMethod : f.set == RMethod || f.set == RDynamic,
+			isMethod : f.set == RMethod || f.set == RDynamic || f.get == RInline,
 			complete : complete,
 			params : [],
 			name : f.name,
@@ -1609,6 +1609,16 @@ class Checker {
 				var t = abstractOp(expr,a,args,arr,"[]",index);
 				if( t != null )
 					return t;
+				// the operator can have been DCE'ed but hscript Interp supports maps
+				if( a.name == "haxe.ds.Map" )
+					return args[1];
+				// if we implicit cast to an Array, allow it
+				for( t in a.to )
+					switch( follow(t) ) {
+					case TInst({ name : "Array" },[et]):
+						return apply(et,a.params,args);
+					default:
+					}
 				error("Invalid array accessor", arr);
 			default:
 				error(typeStr(at)+" is not an Array", arr);
