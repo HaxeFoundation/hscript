@@ -352,7 +352,7 @@ class Parser {
 			var e = parseStructure(id);
 			if( e == null )
 				e = mk(EIdent(id));
-			return parseExprNext(e);
+			return isBlock(e) ? e : parseExprNext(e);
 		case TConst(c):
 			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
