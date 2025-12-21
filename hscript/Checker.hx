@@ -454,6 +454,7 @@ class Checker {
 	var allowDefine : Bool;
 	var hasReturn : Bool;
 	var callExpr : Expr;
+	public var imports : Array<String> = [];
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
@@ -831,7 +832,7 @@ class Checker {
 					if( f2.opt ) continue;
 					return false;
 				}
-				if( !typeEq(f1.t,f2.t) )
+				if( !typeEq(f1.t,f2.t) && follow(f1.t) != TDynamic && follow(f2.t) != TDynamic )
 					return false;
 			}
 			return true;
@@ -1420,7 +1421,11 @@ class Checker {
 						var acc = getTypeAccess(g, expr, name);
 						if( acc != null ) {
 							expr.e = acc;
-							return checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
+							var prev = checkPrivate;
+							checkPrivate = false;
+							var t = checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
+							checkPrivate = prev;
+							return t;
 						}
 					}
 				default:
@@ -1428,6 +1433,13 @@ class Checker {
 			}
 			// type path resolution
 			var t = types.getType(name);
+			if( t.match(TUnresolved(_)) && name.indexOf('.') < 0 ) {
+				for( i in imports ) {
+					t = types.getType(i+"."+name);
+					if( !t.match(TUnresolved(_)) )
+						break;
+				}
+			}
 			if( !t.match(TUnresolved(_)) ) {
 				var acc = getTypeAccess(t, expr);
 				if( acc != null ) {
@@ -1832,8 +1844,8 @@ class Checker {
 				typeExpr(e1,Value);
 				var ct = typeExpr(e2,Value);
 				switch( ct ) {
-				case TType(t,_) if( t.name.charCodeAt(0) == "#".code ):
-					// type check
+				case TInst(c,_) if( c.name.charCodeAt(0) == "#".code ): // class
+				case TType(t,_) if( t.name.charCodeAt(0) == "#".code ): // enum
 				default:
 					error("Should be a type",e2);
 				}
