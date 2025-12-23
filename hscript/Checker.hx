@@ -1132,7 +1132,7 @@ class Checker {
 			switch( e.e ) {
 			case EField(obj, f):
 				if( cf.isMethod ) {
-					switch( callExpr?.e ) {
+					switch( callExpr == null ? null : callExpr.e ) {
 					case null:
 					case ECall(ec,params) if( ec == e ):
 						e.e = EField(acc,f);
