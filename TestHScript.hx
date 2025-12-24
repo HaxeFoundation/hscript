@@ -154,6 +154,7 @@ class TestHScript extends TestCase {
 		assertScript("ptnull?.x", null, vars);
 		assertScript("ptnull?.pt.x", null, vars);
 		assertScript("ptnull?.call()", null, vars);
+		assertScript("ptnull?.pt.call()", null, vars);
 		assertScript("pt?.x", 10, vars);
 		assertScript("pt?.call()", 11, vars);
 		assertScript("pt2null?.pt", null, vars);
@@ -162,6 +163,11 @@ class TestHScript extends TestCase {
 		assertScript("pt2?.pt", pt, vars);
 		assertScript("pt2?.pt?.x", 10, vars);
 		assertScript("pt2?.pt?.call()", 11, vars);
+		assertScript("ptnull ?? 12", 12, vars);
+		assertScript("pt2null.pt ?? 12", 12, vars);
+		assertScript("ptnull?.x ?? 12", 12, vars);
+		assertScript("pt?.x ?? 12", 10, vars);
+		assertScript("pt.y ?? 12", 12, vars);
 	}
 
 	function testIsOperator():Void {
