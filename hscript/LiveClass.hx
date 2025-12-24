@@ -235,6 +235,7 @@ class LiveClassRuntime {
 		var chk = new hscript.Checker(LiveClass.getTypes());
 		chk.allowNew = true;
 		chk.allowPrivateAccess = true;
+		chk.allowGlobalTypes = true;
 		chk.setGlobal("this", type);
 		for( v in newVars )
 			chk.setGlobal(v.name, v.type);
@@ -256,6 +257,7 @@ class LiveClassRuntime {
 		var interp : LiveClassInterp = obj.__interp_inst;
 		if( interp == null ) {
 			interp = new LiveClassInterp();
+			interp.allowTypeResolve();
 			interp.variables.set("this", obj);
 			obj.__interp_inst = interp;
 		}

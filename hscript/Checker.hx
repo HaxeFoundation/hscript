@@ -462,6 +462,7 @@ class Checker {
 	public var allowUntypedMeta : Bool;
 	public var allowPrivateAccess : Bool;
 	public var allowNew : Bool;
+	public var allowGlobalTypes : Bool;
 
 	public function new( ?types ) {
 		if( types == null ) types = new CheckerTypes();
@@ -1125,7 +1126,7 @@ class Checker {
 				return null;
 			}
 			var acc = mk(null,e);
-			var impl = resolveGlobal(a.impl.name,acc,Value,false);
+			var impl = resolveGlobal(a.impl.name,acc,null/* skip resolveGlobal */,false);
 			if( impl == null )
 				return null;
 			var t = checkField(cf,a,pl,forWrite,e);
@@ -1241,7 +1242,7 @@ class Checker {
 			var ft = getField(ot, p.f, p.e, p == path[path.length-1] ? forWrite : false);
 			if( ft == null ) {
 				switch( ot ) {
-				case TInst(c, _) if( c.name == "#Std" ):
+				case TInst(c, _) if( c.name == "#Std" && allowGlobalTypes ):
 					// these two methods are extern in HL and we must provide
 					// some stubs so they both type and execute
 					switch( p.f ) {
@@ -1378,7 +1379,7 @@ class Checker {
 			return TDynamic;
 		default:
 			#if hscriptPos
-			var wt = switch( withType ) { case WithType(t): follow(t); default: null; };
+			var wt = switch( withType ) { case null: null; case WithType(t): follow(t); default: null; };
 			switch( wt ) {
 			case null:
 			// enum constructor resolution
@@ -1400,7 +1401,7 @@ class Checker {
 					return wt;
 			default:
 			}
-			// this variable resolution
+			// this variable resolution : if we have a this, we can access it
 			var g = locals.get("this");
 			if( g == null ) g = globals.get("this");
 			if( g != null ) {
@@ -1440,7 +1441,7 @@ class Checker {
 						break;
 				}
 			}
-			if( !t.match(TUnresolved(_)) ) {
+			if( !t.match(TUnresolved(_)) && (allowGlobalTypes || withType == null) ) {
 				var acc = getTypeAccess(t, expr);
 				if( acc != null ) {
 					expr.e = acc;
@@ -1460,7 +1461,14 @@ class Checker {
 	}
 
 	function getTypeAccess( t : TType, expr : Expr, ?field : String ) : ExprDef {
-		return null;
+		var path = switch( t ) {
+		case TInst(c,_): c.name;
+		case TEnum(e,_): e.name;
+		default: return null;
+		}
+		var e : hscript.Expr.ExprDef = ECall(mk(EIdent("$resolve"),expr),[mk(EConst(CString(path)),expr)]);
+		if( field != null ) e = EField(mk(e,expr),field);
+		return e;
 	}
 
 	function unifyCallParams( args : Array<{ name : String, opt : Bool, t : TType }>, params : Array<Expr>, pos : Expr ) {
