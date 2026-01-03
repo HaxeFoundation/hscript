@@ -702,6 +702,7 @@ class Parser {
 		case "for":
 			ensure(TPOpen);
 			var eit = parseExpr();
+			if( eit == null && resumeErrors ) return null;
 			ensure(TPClose);
 			var e = parseExpr();
 			switch( expr(eit) ) {
