@@ -113,6 +113,9 @@ class CheckerTypes {
 		types.set("Bool",CTAlias(TBool));
 		types.set("Dynamic",CTAlias(TDynamic));
 		parser = new hscript.Parser();
+		parser.allowTypes = true;
+		parser.allowMetadata = true;
+		parser.allowJSON = true;
 	}
 
 	public function addXmlApi( api : Xml ) {
@@ -170,7 +173,7 @@ class CheckerTypes {
 		if( f.meta != null && f.meta.length > 0 ) {
 			fl.meta = [];
 			for( m in f.meta )
-				fl.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+				fl.meta.push({ name : m.name, params : [for( p in m.params ) parseMeta(p)] });
 		}
 		while( pkeys.length > 0 )
 			localParams.remove(pkeys.pop());
@@ -362,12 +365,17 @@ class CheckerTypes {
 		}
 	}
 
+	function parseMeta( p : String ) {
+		if( StringTools.startsWith(p,"<![CDATA[") ) p = p.substr(9,p.length-12);
+		return try parser.parseString(p) catch( e : hscript.Expr.Error ) null;
+	}
+
 	function addMeta( src : haxe.rtti.CType.TypeInfos, to : CNamedType ) {
 		if( src.meta == null || src.meta.length == 0 )
 			return;
 		to.meta = [];
 		for( m in src.meta )
-			to.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+			to.meta.push({ name : m.name, params : [for( p in m.params ) parseMeta(p)] });
 	}
 
 	function makeXmlType( t : haxe.rtti.CType.CType ) : TType {
