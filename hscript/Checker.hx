@@ -462,6 +462,7 @@ class Checker {
 	var allowDefine : Bool;
 	var hasReturn : Bool;
 	var callExpr : Expr;
+	var completionExpr : Expr;
 	public var imports : Array<String> = [];
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
@@ -529,6 +530,31 @@ class Checker {
 			types.t_string = types.getType("String");
 		allowDefine = allowGlobalsDefine;
 		this.isCompletion = isCompletion;
+
+		if( isCompletion ) {
+			if( expr == null )
+				return null;
+			// look for latest identifier to get toplevel completion
+			function getRec( e : Expr ) {
+				switch( edef(e) ) {
+				case EIdent(_):
+					completionExpr = e;
+				default:
+					// only check the latest that is not empty block
+					var subs = [];
+					Tools.iter(e, subs.push);
+					for( i in 0...subs.length ) {
+						var e = subs[subs.length - 1 - i];
+						if( e == null ) continue;
+						getRec(e);
+						return;
+					}
+				}
+			}
+			completionExpr = null;
+			getRec(expr);
+		}
+
 		if( edef(expr).match(EFunction(_)) )
 			expr = mk(EBlock([expr]), expr); // single function might be self recursive
 		switch( edef(expr) ) {
@@ -569,6 +595,20 @@ class Checker {
 		return typeExpr(expr,withType);
 	}
 
+	public function getCompletion( c : Completion ) {
+		var fields;
+		if( c.t != null )
+			fields = getFields(c.t);
+		else {
+			var toplevel = globals.copy();
+			for( v => t in locals )
+				toplevel.set(v, t);
+			fields = [for( v => t in toplevel ) { name : v, t : t }];
+		}
+		fields.sort((v1,v2) -> Reflect.compare(v1.name, v2.name));
+		return fields;
+	}
+
 	inline function edef( e : Expr ) {
 		#if hscriptPos
 		return e.e;
@@ -592,9 +632,10 @@ class Checker {
 	}
 
 	inline function error( msg : String, curExpr : Expr ) {
+		if( isCompletion ) return;
 		var e = ECustom(msg);
 		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
-		if( !isCompletion ) throw e;
+		throw e;
 	}
 
 	function saveLocals() {
@@ -1071,9 +1112,14 @@ class Checker {
 			if( isCompletion )
 				fields.push({ name : "bind", t : TFun(args,TVoid) });
 		case TAbstract(a,pl):
-			for( v in a.forwards.keys() ) {
-				var t = getField(apply(a.t, a.params, pl), v, null, false);
-				fields.push({ name : v, t : t});
+			if( a.forwards.exists("*") ) {
+				for( f in getFields(apply(a.t,a.params,pl)) )
+					fields.push(f);
+			} else {
+				for( v in a.forwards.keys() ) {
+					var t = getField(apply(a.t, a.params, pl), v, null, false);
+					fields.push({ name : v, t : t});
+				}
 			}
 		default:
 		}
@@ -1301,6 +1347,8 @@ class Checker {
 		}
 		if( !isCompletion )
 			error("Unknown identifier "+root.f, root.e);
+		else if( root.e == completionExpr )
+			onCompletion(root.e,null);
 		return TDynamic;
 	}
 
@@ -1698,7 +1746,7 @@ class Checker {
 				var ev = events.get(name);
 				if( ev != null ) withType = WithType(ev);
 			}
-			var isShortFun = switch( edef(body) ) {
+			var isShortFun = body != null && switch( edef(body) ) {
 			case EMeta(":lambda",_): true;
 			default: false;
 			}
