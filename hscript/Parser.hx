@@ -516,10 +516,12 @@ class Parser {
 				}
 				first = false;
 				push(tk);
-				a.push(parseExpr());
+				var e = parseExpr();
+				if( e != null )
+					a.push(e);
 				tk = token();
 			}
-			if( a.length == 1 && a[0] != null )
+			if( a.length == 1 )
 				switch( expr(a[0]) ) {
 				case EFor(_), EWhile(_), EDoWhile(_):
 					var tmp = "__a_" + (uid++);
