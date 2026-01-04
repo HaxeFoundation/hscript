@@ -1477,6 +1477,7 @@ class Parser {
 		while( true ) {
 			if( StringTools.isEof(char) ) {
 				this.char = char;
+				readPos--;
 				return TEof;
 			}
 			switch( char ) {
