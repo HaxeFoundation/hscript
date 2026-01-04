@@ -289,6 +289,7 @@ class Parser {
 
 	function parseFullExpr( exprs : Array<Expr> ) {
 		var e = parseExpr();
+		if( e == null && resumeErrors ) return;
 		exprs.push(e);
 
 		var tk = token();
@@ -666,6 +667,7 @@ class Parser {
 			mk(EIf(cond,e1,e2),p1,(e2 == null) ? tokenMax : pmax(e2));
 		case "var", "final":
 			var ident = getIdent();
+			if( ident == null && resumeErrors ) return null;
 			var tk = token();
 			var t = null;
 			if( tk == TDoubleDot && allowTypes ) {
