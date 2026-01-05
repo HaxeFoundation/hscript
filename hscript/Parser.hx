@@ -289,6 +289,7 @@ class Parser {
 
 	function parseFullExpr( exprs : Array<Expr> ) {
 		var e = parseExpr();
+		if( e == null && resumeErrors ) return;
 		exprs.push(e);
 
 		var tk = token();
@@ -352,7 +353,7 @@ class Parser {
 			var e = parseStructure(id);
 			if( e == null )
 				e = mk(EIdent(id));
-			return parseExprNext(e);
+			return isBlock(e) ? e : parseExprNext(e);
 		case TConst(c):
 			return parseExprNext(mk(EConst(c)));
 		case TPOpen:
@@ -515,10 +516,12 @@ class Parser {
 				}
 				first = false;
 				push(tk);
-				a.push(parseExpr());
+				var e = parseExpr();
+				if( e != null )
+					a.push(e);
 				tk = token();
 			}
-			if( a.length == 1 && a[0] != null )
+			if( a.length == 1 )
 				switch( expr(a[0]) ) {
 				case EFor(_), EWhile(_), EDoWhile(_):
 					var tmp = "__a_" + (uid++);
@@ -666,6 +669,7 @@ class Parser {
 			mk(EIf(cond,e1,e2),p1,(e2 == null) ? tokenMax : pmax(e2));
 		case "var", "final":
 			var ident = getIdent();
+			if( ident == null && resumeErrors ) return null;
 			var tk = token();
 			var t = null;
 			if( tk == TDoubleDot && allowTypes ) {
@@ -702,6 +706,7 @@ class Parser {
 		case "for":
 			ensure(TPOpen);
 			var eit = parseExpr();
+			if( eit == null && resumeErrors ) return null;
 			ensure(TPClose);
 			var e = parseExpr();
 			switch( expr(eit) ) {
@@ -1474,6 +1479,7 @@ class Parser {
 		while( true ) {
 			if( StringTools.isEof(char) ) {
 				this.char = char;
+				readPos--;
 				return TEof;
 			}
 			switch( char ) {

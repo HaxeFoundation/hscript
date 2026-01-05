@@ -10,7 +10,7 @@ import haxe.macro.Expr;
 class LiveClass {
 
 	@:persistent static var CONFIG : { api : String, srcPath : Array<String> } #if !macro = getMacroConfig() #end;
-	
+
 	public static function isEnable() {
 	   return CONFIG != null;
 	}
@@ -110,15 +110,15 @@ class LiveClass {
 		return filePath;
 	}
 
-	#elseif (sys || hxnodejs)
+	#else
 
 	// runtime
 
 	public static function registerFile( file : String, onChange : Void -> Void ) {
 		for( dir in CONFIG.srcPath ) {
 			var path = dir+"/"+file;
-			if( !sys.FileSystem.exists(path) ) continue;
 			#if hl
+			if( !sys.FileSystem.exists(path) ) continue;
 			new hl.uv.Fs(null, path, function(ev) onChange());
 			#else
 			throw "Not implemented for this platform";
@@ -133,10 +133,18 @@ class LiveClass {
 		if( types != null )
 			return types;
 		if( CONFIG == null ) throw "Checker types were not configured";
-		var xml = Xml.parse(sys.io.File.getContent(CONFIG.api));
+		var xml = Xml.parse(getContent(CONFIG.api));
 		types = new Checker.CheckerTypes();
 		types.addXmlApi(xml.firstElement());
 		return types;
+	}
+
+	public static dynamic function getContent( file : String ) : String {
+		#if (sys || hxnodejs)
+		return sys.io.File.getContent(file);
+		#else
+		throw "This platform cannot load "+file+" : redefine hscript.LiveClass.getContent";
+		#end
 	}
 
 	#end
@@ -178,7 +186,7 @@ class LiveClassRuntime {
 		if( type == null )
 			loadType();
 		try {
-			var content = sys.io.File.getContent(path);
+			var content = LiveClass.getContent(path);
 			var parser = new hscript.Parser();
 			parser.allowTypes = true;
 			parser.allowMetadata = true;
@@ -235,6 +243,7 @@ class LiveClassRuntime {
 		var chk = new hscript.Checker(LiveClass.getTypes());
 		chk.allowNew = true;
 		chk.allowPrivateAccess = true;
+		chk.allowGlobalTypes = true;
 		chk.setGlobal("this", type);
 		for( v in newVars )
 			chk.setGlobal(v.name, v.type);
@@ -256,6 +265,7 @@ class LiveClassRuntime {
 		var interp : LiveClassInterp = obj.__interp_inst;
 		if( interp == null ) {
 			interp = new LiveClassInterp();
+			interp.allowTypeResolve();
 			interp.variables.set("this", obj);
 			obj.__interp_inst = interp;
 		}
