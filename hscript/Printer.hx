@@ -252,8 +252,17 @@ class Printer {
 				expr(e);
 			}
 			add("]");
-		case ENew(cl, args):
-			add("new " + cl + "(");
+		case ENew(cl, args, targs):
+			add("new " + cl);
+			if( targs != null ) {
+				add('<');
+				var first = true;
+				for( t in targs ) {
+					if( first ) first = false else add(',');
+					addType(t);
+				}
+				add('>');
+			}
 			var first = true;
 			for( e in args ) {
 				if( first ) first = false else add(", ");

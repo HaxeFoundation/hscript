@@ -55,6 +55,7 @@ typedef CClass = {> CNamedType,
 	var ?isInterface : Bool;
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
+	var ?staticClass : TType;
 }
 
 typedef CField = {
@@ -70,6 +71,7 @@ typedef CField = {
 
 typedef CEnum = {> CNamedType,
 	var constructors : Array<{ name : String, ?args : Array<{ name : String, opt : Bool, t : TType }> }>;
+	var ?enumClass : TType;
 }
 
 typedef CTypedef = {> CNamedType,
@@ -82,6 +84,8 @@ typedef CAbstract = {> CNamedType,
 	var to : Array<TType>;
 	var forwards : Map<String,Bool>;
 	var impl : CClass;
+	var ops : Map<String,Array<CField>>;
+	var ?constructor : CField;
 }
 
 class Completion {
@@ -109,6 +113,9 @@ class CheckerTypes {
 		types.set("Bool",CTAlias(TBool));
 		types.set("Dynamic",CTAlias(TDynamic));
 		parser = new hscript.Parser();
+		parser.allowTypes = true;
+		parser.allowMetadata = true;
+		parser.allowJSON = true;
 	}
 
 	public function addXmlApi( api : Xml ) {
@@ -117,8 +124,9 @@ class CheckerTypes {
 		var todo = [];
 		for( v in types.root )
 			addXmlType(v,todo);
-		for( f in todo )
-			f();
+		var i = 0;
+		while( i < todo.length )
+			todo[i++]();
 		t_string = getType("String");
 	}
 
@@ -148,7 +156,7 @@ class CheckerTypes {
 		var fl : CField = {
 			isPublic : f.isPublic,
 			canWrite : f.set.match(RNormal | RCall(_) | RDynamic),
-			isMethod : f.set == RMethod || f.set == RDynamic,
+			isMethod : f.set == RMethod || f.set == RDynamic || f.get == RInline,
 			complete : complete,
 			params : [],
 			name : f.name,
@@ -165,7 +173,7 @@ class CheckerTypes {
 		if( f.meta != null && f.meta.length > 0 ) {
 			fl.meta = [];
 			for( m in f.meta )
-				fl.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+				fl.meta.push({ name : m.name, params : [for( p in m.params ) parseMeta(p)] });
 		}
 		while( pkeys.length > 0 )
 			localParams.remove(pkeys.pop());
@@ -218,9 +226,19 @@ class CheckerTypes {
 							cl.fields.set(f.name, f);
 					}
 				}
+				var stc : CClass = {
+					name : "#"+cl.name,
+					fields : [],
+					statics: [],
+					params: [],
+				};
+				cl.staticClass = TInst(stc,[]);
 				for( f in c.statics ) {
 					var f = addField(f);
-					if( f != null ) cl.statics.set(f.name, f);
+					if( f != null ) {
+						cl.statics.set(f.name, f);
+						stc.fields.set(f.name, f);
+					}
 				}
 				localParams = null;
 			});
@@ -231,6 +249,7 @@ class CheckerTypes {
 				name : e.path,
 				params : [],
 				constructors: [],
+				enumClass: null,
 			};
 			addMeta(e,en);
 			for( p in e.params )
@@ -240,6 +259,8 @@ class CheckerTypes {
 				for( c in e.constructors )
 					en.constructors.push({ name : c.name, args : c.args == null ? null : [for( a in c.args ) { name : a.name, opt : a.opt, t : makeXmlType(a.t) }] });
 				localParams = null;
+				var ent = TEnum(en,en.params);
+				en.enumClass = TType({ name : "#"+en.name, params : [], t : TAnon([for( f in en.constructors ) { name : f.name, t : f.args == null ? ent : TFun(f.args,ent), opt : false }]) },[]);
 			});
 			types.set(en.name, CTEnum(en));
 		case TTypedecl(t):
@@ -269,6 +290,7 @@ class CheckerTypes {
 				to : [],
 				forwards : new Map(),
 				impl : null,
+				ops : new Map(),
 			};
 			addMeta(a,ta);
 			for( p in a.params )
@@ -291,12 +313,50 @@ class CheckerTypes {
 					}
 				localParams = null;
 			});
+			function extractFields() {
+				for( f in ta.impl.statics ) {
+					if( f.name == "_hx_new" ) {
+						ta.constructor = {
+							name : f.name,
+							t : f.t,
+							params : f.params,
+							isPublic : false,
+							complete : false,
+							canWrite : false,
+						};
+					}
+					if( f.meta == null ) continue;
+					for( m in f.meta ) {
+						var op = null;
+						if( m.name == ":op" && m.params != null && m.params.length == 1 && m.params[0] != null ) {
+							op = switch( Tools.expr(m.params[0]) ) {
+							case EField(_): ".";
+							case EBinop(op,_,_): op;
+							case EArrayDecl([]): "[]";
+							default: null;
+							}
+						}
+						if( m.name == ":arrayAccess" )
+							op = "[]";
+						if( op != null ) {
+							var ops = ta.ops.get(op);
+							if( ops == null ) {
+								ops = [];
+								ta.ops.set(op, ops);
+							}
+							ops.push(f);
+						}
+					}
+				}
+			}
 			todo.unshift(function() {
 				if( a.impl != null ) {
 					var t = resolve(a.impl.path);
 					if( t != null )
 						switch( t ) {
-						case TInst(c,_): ta.impl = c;
+						case TInst(c,_):
+							ta.impl = c;
+							todo.push(extractFields);
 						default:
 						}
 				}
@@ -305,12 +365,17 @@ class CheckerTypes {
 		}
 	}
 
+	function parseMeta( p : String ) {
+		if( StringTools.startsWith(p,"<![CDATA[") ) p = p.substr(9,p.length-12);
+		return try parser.parseString(p) catch( e : hscript.Expr.Error ) null;
+	}
+
 	function addMeta( src : haxe.rtti.CType.TypeInfos, to : CNamedType ) {
 		if( src.meta == null || src.meta.length == 0 )
 			return;
 		to.meta = [];
 		for( m in src.meta )
-			to.meta.push({ name : m.name, params : [for( p in m.params ) try parser.parseString(p) catch( e : hscript.Expr.Error ) null] });
+			to.meta.push({ name : m.name, params : [for( p in m.params ) parseMeta(p)] });
 	}
 
 	function makeXmlType( t : haxe.rtti.CType.CType ) : TType {
@@ -365,12 +430,21 @@ class CheckerTypes {
 		}
 		var t = types.get(name);
 		if( t == null ) return null;
-		if( args == null ) args = [];
+		inline function makeArgs(targs) {
+			if( args == null )
+				return targs;
+			if( args.length != targs.length ) throw "Invalid type params for "+name;
+			return args;
+		}
 		return switch( t ) {
-		case CTClass(c): TInst(c,args);
-		case CTEnum(e): TEnum(e,args);
-		case CTTypedef(t): TType(t,args);
-		case CTAbstract(a): TAbstract(a, args);
+		case CTClass(c):
+			TInst(c,makeArgs(c.params));
+		case CTEnum(e):
+			TEnum(e,makeArgs(e.params));
+		case CTTypedef(t):
+			TType(t,makeArgs(t.params));
+		case CTAbstract(a):
+			TAbstract(a,makeArgs(a.params));
 		case CTAlias(t): t;
 		}
 	}
@@ -388,11 +462,16 @@ class Checker {
 	var allowDefine : Bool;
 	var hasReturn : Bool;
 	var callExpr : Expr;
+	var completionExpr : Expr;
+	public var imports : Array<String> = [];
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
 	public var allowUntypedMeta : Bool;
+	public var allowPrivateAccess : Bool;
+	public var allowNew : Bool;
+	public var allowGlobalTypes : Bool;
 
 	public function new( ?types ) {
 		if( types == null ) types = new CheckerTypes();
@@ -451,6 +530,31 @@ class Checker {
 			types.t_string = types.getType("String");
 		allowDefine = allowGlobalsDefine;
 		this.isCompletion = isCompletion;
+
+		if( isCompletion ) {
+			if( expr == null )
+				return null;
+			// look for latest identifier to get toplevel completion
+			function getRec( e : Expr ) {
+				switch( edef(e) ) {
+				case EIdent(_):
+					completionExpr = e;
+				default:
+					// only check the latest that is not empty block
+					var subs = [];
+					Tools.iter(e, subs.push);
+					for( i in 0...subs.length ) {
+						var e = subs[subs.length - 1 - i];
+						if( e == null ) continue;
+						getRec(e);
+						return;
+					}
+				}
+			}
+			completionExpr = null;
+			getRec(expr);
+		}
+
 		if( edef(expr).match(EFunction(_)) )
 			expr = mk(EBlock([expr]), expr); // single function might be self recursive
 		switch( edef(expr) ) {
@@ -491,6 +595,20 @@ class Checker {
 		return typeExpr(expr,withType);
 	}
 
+	public function getCompletion( c : Completion ) {
+		var fields;
+		if( c.t != null )
+			fields = getFields(c.t);
+		else {
+			var toplevel = globals.copy();
+			for( v => t in locals )
+				toplevel.set(v, t);
+			fields = [for( v => t in toplevel ) { name : v, t : t }];
+		}
+		fields.sort((v1,v2) -> Reflect.compare(v1.name, v2.name));
+		return fields;
+	}
+
 	inline function edef( e : Expr ) {
 		#if hscriptPos
 		return e.e;
@@ -514,9 +632,10 @@ class Checker {
 	}
 
 	inline function error( msg : String, curExpr : Expr ) {
+		if( isCompletion ) return;
 		var e = ECustom(msg);
 		#if hscriptPos var e = new Error(e, curExpr.pmin, curExpr.pmax, curExpr.origin, curExpr.line); #end
-		if( !isCompletion ) throw e;
+		throw e;
 	}
 
 	function saveLocals() {
@@ -527,7 +646,7 @@ class Checker {
 		return switch (t) {
 		case CTPath(path, params):
 			var params = params == null ? [] : [for( p in params ) makeType(p,e)];
-			var ct = types.resolve(path.join("."),params);
+			var ct = resolve(path.join("."),params,e);
 			if( ct == null ) {
 				// maybe a subtype that is public ?
 				var pack = path.copy();
@@ -535,7 +654,7 @@ class Checker {
 				if( pack.length > 0 && pack[pack.length-1].charCodeAt(0) >= 'A'.code && pack[pack.length-1].charCodeAt(0) <= 'Z'.code ) {
 					pack.pop();
 					pack.push(name);
-					ct = types.resolve(pack.join("."), params);
+					ct = resolve(pack.join("."), params,e);
 				}
 			}
 			if( ct == null ) {
@@ -763,7 +882,7 @@ class Checker {
 					if( f2.opt ) continue;
 					return false;
 				}
-				if( !typeEq(f1.t,f2.t) )
+				if( !typeEq(f1.t,f2.t) && follow(f1.t) != TDynamic && follow(f2.t) != TDynamic )
 					return false;
 			}
 			return true;
@@ -833,17 +952,31 @@ class Checker {
 		return typeEq(t1,t2);
 	}
 
+	function resolve(name,params,pos:Expr) {
+		try {
+			return types.resolve(name,params);
+		} catch( msg : String ) {
+			error(msg, pos);
+			return null;
+		}
+	}
+
 	public function unify( t1 : TType, t2 : TType, e : Expr ) {
 		if( !tryUnify(t1,t2) && !abstractCast(t1,t2,e) )
 			error(typeStr(t1)+" should be "+typeStr(t2),e);
 	}
 
 	public function abstractCast( t1 : TType, t2 : TType, e : Expr ) {
+		var tf1 = follow(t1);
+		var tf2 = follow(t2);
+		switch( [tf1,tf2] ) {
+		case [TInst(c,[]),TAbstract(a,[ct])] if( a.name == "Class" && c.name.charCodeAt(0) == '#'.code ):
+			return tryUnify(types.resolve(c.name.substr(1)), ct);
+		default:
+		}
 		#if !hscriptPos
 		return false;
 		#else
-		var tf1 = follow(t1);
-		var tf2 = follow(t2);
 		return getAbstractCast(tf1,tf2,e,false) || getAbstractCast(tf2,tf1,e,true);
 		#end
 	}
@@ -865,11 +998,8 @@ class Checker {
 				case TFun([arg], _):
 					var at = apply(arg.t, s.params, [for( _ in s.params ) makeMono()]);
 					at = apply(at,a.params,args);
-					var acc = mk(null,e);
-					if( tryUnify(to,at) && resolveGlobal(a.impl.name,acc,Value) != null ) {
-						e.e = ECall(mk(EField(acc,s.name),e),[mk(e.e,e)]);
+					if( tryUnify(to,at) && patchAbstractAccess(e,a,s.name,[mk(e.e,e)]) )
 						return true;
-					}
 				default:
 				}
 			}
@@ -982,9 +1112,14 @@ class Checker {
 			if( isCompletion )
 				fields.push({ name : "bind", t : TFun(args,TVoid) });
 		case TAbstract(a,pl):
-			for( v in a.forwards.keys() ) {
-				var t = getField(apply(a.t, a.params, pl), v, null, false);
-				fields.push({ name : v, t : t});
+			if( a.forwards.exists("*") ) {
+				for( f in getFields(apply(a.t,a.params,pl)) )
+					fields.push(f);
+			} else {
+				for( v in a.forwards.keys() ) {
+					var t = getField(apply(a.t, a.params, pl), v, null, false);
+					fields.push({ name : v, t : t});
+				}
 			}
 		default:
 		}
@@ -1045,7 +1180,7 @@ class Checker {
 				return null;
 			}
 			var acc = mk(null,e);
-			var impl = resolveGlobal(a.impl.name,acc,Value);
+			var impl = resolveGlobal(a.impl.name,acc,null/* skip resolveGlobal */,false);
 			if( impl == null )
 				return null;
 			var t = checkField(cf,a,pl,forWrite,e);
@@ -1139,10 +1274,44 @@ class Checker {
 		return readPath(typeExpr(o, Value), path, forWrite);
 	}
 
+	function patchStubAccess( ef : Expr ) {
+		#if hscriptPos
+		switch( ef.e ) {
+		case EField(e, f):
+			var g = types.resolve("hscript.Checker",[]);
+			if( g == null ) return false;
+			var acc = getTypeAccess(g, e);
+			if( acc == null ) return false;
+			e.e = acc;
+			ef.e = EField(e,"stub_"+f);
+			return true;
+		default:
+		}
+		#end
+		return false;
+	}
+
 	function readPath( ot : TType, path : Array<{ f : String, e : Expr }>, forWrite ) {
 		for( p in path ) {
 			var ft = getField(ot, p.f, p.e, p == path[path.length-1] ? forWrite : false);
 			if( ft == null ) {
+				switch( ot ) {
+				case TInst(c, _) if( c.name == "#Std" && allowGlobalTypes ):
+					// these two methods are extern in HL and we must provide
+					// some stubs so they both type and execute
+					switch( p.f ) {
+					case "int":
+						if( patchStubAccess(p.e) )
+							return TFun([{ name : "value", opt : false, t : TFloat }],TInt);
+					case "downcast":
+						var ct = makeMono();
+						var t = types.resolve("Class",[ct]);
+						if( t != null && patchStubAccess(p.e) )
+							return TFun([{ name : "value", opt : false, t : TDynamic }, { name : "cl", opt : false, t : t }],ct);
+					default:
+					}
+				default:
+				}
 				error(typeStr(ot)+" has no field "+p.f, p.e);
 				return TDynamic;
 			}
@@ -1158,7 +1327,7 @@ class Checker {
 			path.shift();
 			return readPath(l,path,forWrite);
 		}
-		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value);
+		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value, forWrite && path.length == 1);
 		if( t != null ) {
 			path.shift();
 			return readPath(t,path,forWrite);
@@ -1167,7 +1336,7 @@ class Checker {
 		while( path.length > 1 ) {
 			var name = [for( p in path ) p.f].join(".");
 			var union = punion(path[0].e,path[path.length-1].e);
-			var t = resolveGlobal(name, union, Value);
+			var t = resolveGlobal(name, union, Value, forWrite && fields.length == 0);
 			if( t != null ) {
 				#if hscriptPos
 				if( union.e != null ) path[path.length-1].e.e = union.e;
@@ -1178,17 +1347,73 @@ class Checker {
 		}
 		if( !isCompletion )
 			error("Unknown identifier "+root.f, root.e);
+		else if( root.e == completionExpr )
+			onCompletion(root.e,null);
 		return TDynamic;
 	}
 
 	function hasMeta( meta : Metadata, name : String ) {
+		if( meta == null )
+			return false;
 		for( m in meta )
 			if( m.name == name )
 				return true;
 		return false;
 	}
 
-	function resolveGlobal( name : String, expr : Expr, withType : WithType ) : TType {
+	function abstractOp( expr : Expr, a : CAbstract, args : Array<TType>, abs : Expr, op : String, opA : Expr, ?opB : Expr ) {
+		var fields = a.ops.get(op);
+		if( fields == null )
+			return null;
+		var t_a = null, t_b = null;
+		var last_a = null, last_b = null;
+		for( f in fields ) {
+			switch( apply(f.t,a.params,args) ) {
+			case TFun([_, { t : ft_a }],tret) if( opB == null ):
+				if( t_a == null )
+					t_a = typeExpr(opA,WithType(ft_a));
+				if( tryUnify(t_a, ft_a) ) {
+					if( !patchAbstractAccess(expr,a,f.name,[abs,opA]) ) continue;
+					return tret;
+				}
+				last_a = ft_a;
+			case TFun([_, { t : ft_a }, { t : ft_b }],tret) if( opB != null ):
+				if( t_a == null )
+					t_a = typeExpr(opA,WithType(ft_a));
+				if( t_b == null )
+					t_b = typeExpr(opB,WithType(ft_b));
+				if( tryUnify(t_a, ft_a) && tryUnify(t_b, ft_b) ) {
+					if( !patchAbstractAccess(expr,a,f.name,[abs,opA,opB]) ) continue;
+					return tret;
+				}
+				last_a = ft_a;
+				last_b = ft_b;
+			default:
+			}
+		}
+		if( last_a != null )
+			unify(t_a, last_a, opA);
+		if( last_b != null )
+			unify(t_b, last_b, opB);
+		return null;
+	}
+
+	function patchAbstractAccess( expr : Expr, a : CAbstract, field : String, ?args : Array<Expr> ) {
+		#if hscriptPos
+		var acc = getTypeAccess(TInst(a.impl,[]),expr,field);
+		if( acc == null )
+			return false;
+		if( args != null )
+			expr.e = ECall(mk(acc,expr), args);
+		else
+			expr.e = acc;
+		return true;
+		#else
+		return false;
+		#end
+	}
+
+	function resolveGlobal( name : String, expr : Expr, withType : WithType, forWrite : Bool ) : TType {
 		var g = globals.get(name);
 		if( g != null ) {
 			return switch( g ) {
@@ -1210,7 +1435,7 @@ class Checker {
 			return TDynamic;
 		default:
 			#if hscriptPos
-			var wt = switch( withType ) { case WithType(t): follow(t); default: null; };
+			var wt = switch( withType ) { case null: null; case WithType(t): follow(t); default: null; };
 			switch( wt ) {
 			case null:
 			// enum constructor resolution
@@ -1228,17 +1453,13 @@ class Checker {
 			// abstract enum resolution
 			case TAbstract(a, args) if( hasMeta(a.meta,":enum") ):
 				var f = a.impl.statics.get(name);
-				if( f != null && hasMeta(f.meta,":enum") ) {
-					var acc = getTypeAccess(TInst(a.impl,[]),expr,name);
-					if( acc != null ) {
-						expr.e = acc;
-						return wt;
-					}
-				}
+				if( f != null && hasMeta(f.meta,":enum") && patchAbstractAccess(expr,a,name) )
+					return wt;
 			default:
 			}
-			// this variable resolution
+			// this variable resolution : if we have a this, we can access it
 			var g = locals.get("this");
+			if( g == null ) g = globals.get("this");
 			if( g != null ) {
 				// local this resolution
 				var prev = checkPrivate;
@@ -1257,7 +1478,11 @@ class Checker {
 						var acc = getTypeAccess(g, expr, name);
 						if( acc != null ) {
 							expr.e = acc;
-							return apply(f.t, f.params, [for( a in f.params ) makeMono()]);
+							var prev = checkPrivate;
+							checkPrivate = false;
+							var t = checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
+							checkPrivate = prev;
+							return t;
 						}
 					}
 				default:
@@ -1265,15 +1490,22 @@ class Checker {
 			}
 			// type path resolution
 			var t = types.getType(name);
-			if( !t.match(TUnresolved(_)) ) {
+			if( t.match(TUnresolved(_)) && name.indexOf('.') < 0 ) {
+				for( i in imports ) {
+					t = types.getType(i+"."+name);
+					if( !t.match(TUnresolved(_)) )
+						break;
+				}
+			}
+			if( !t.match(TUnresolved(_)) && (allowGlobalTypes || withType == null) ) {
 				var acc = getTypeAccess(t, expr);
 				if( acc != null ) {
 					expr.e = acc;
 					switch( t ) {
-					case TInst(c,_):
-						return TType({ name : "#"+c.name, params : [], t : TAnon([for( f in c.statics ) { name : f.name, t : f.t, opt : false }]) },[]);
+					case TInst(c,_) if( c.staticClass != null ):
+						return c.staticClass;
 					case TEnum(e,_):
-						return TType({ name : "#"+e.name, params : [], t : TAnon([for( f in e.constructors ) { name : f.name, t : f.args == null ? t : TFun(f.args,t), opt : false }]) },[]);
+						return e.enumClass;
 					default:
 						throw "assert";
 					}
@@ -1285,7 +1517,41 @@ class Checker {
 	}
 
 	function getTypeAccess( t : TType, expr : Expr, ?field : String ) : ExprDef {
-		return null;
+		var path = switch( t ) {
+		case TInst(c,_): c.name;
+		case TEnum(e,_): e.name;
+		default: return null;
+		}
+		var e : hscript.Expr.ExprDef = ECall(mk(EIdent("$resolve"),expr),[mk(EConst(CString(path)),expr)]);
+		if( field != null ) e = EField(mk(e,expr),field);
+		return e;
+	}
+
+	function unifyCallParams( args : Array<{ name : String, opt : Bool, t : TType }>, params : Array<Expr>, pos : Expr ) {
+		for( i in 0...params.length ) {
+			var a = args[i];
+			if( a == null ) {
+				error("Too many arguments", params[i]);
+				break;
+			}
+			var t = typeExpr(params[i], a == null ? Value : WithType(a.t));
+			unify(t, a.t, params[i]);
+		}
+		for( i in params.length...args.length )
+			if( !args[i].opt )
+				error("Missing argument "+args[i].name+":"+typeStr(args[i].t), pos);
+	}
+
+	function typeMin( expr : Expr, t : Null<TType> ) {
+		if( t == null )
+			return typeExpr(expr, Value);
+		var et = typeExpr(expr, WithType(t));
+		if( tryUnify(et,t) )
+			return t;
+		if( tryUnify(t,et) )
+			return et;
+		unify(t,et,expr); // error
+		return TDynamic;
 	}
 
 	function typeExpr( expr : Expr, withType : WithType ) : TType {
@@ -1349,18 +1615,7 @@ class Checker {
 			callExpr = prev;
 			switch( follow(ft) ) {
 			case TFun(args, ret):
-				for( i in 0...params.length ) {
-					var a = args[i];
-					if( a == null ) {
-						error("Too many arguments", params[i]);
-						break;
-					}
-					var t = typeExpr(params[i], a == null ? Value : WithType(a.t));
-					unify(t, a.t, params[i]);
-				}
-				for( i in params.length...args.length )
-					if( !args[i].opt )
-						error("Missing argument "+args[i].name+":"+typeStr(args[i].t), expr);
+				unifyCallParams(args, params, expr);
 				return ret;
 			case TDynamic:
 				for( p in params ) typeExpr(p,Value);
@@ -1422,20 +1677,45 @@ class Checker {
 			return makeMono();
 		case EArrayDecl(el):
 			var et = null;
+			var kt = null;
 			for( v in el ) {
-				var t = typeExpr(v, et == null ? Value : WithType(et));
-				if( et == null ) et = t else if( !tryUnify(t,et) ) {
-					if( tryUnify(et,t) ) et = t else unify(t,et,v);
+				switch( edef(v) ) {
+				case EBinop(op, e1, e2):
+					if( et != null && kt == null ) error("Mixed array/map declaration", v);
+					kt = typeMin(e1, kt);
+					et = typeMin(e2, et);
+				default:
+					if( kt != null ) error("Mixed array/map declaration", v);
+					et = typeMin(v, et);
 				}
 			}
+			if( kt != null )
+				return types.getType("haxe.ds.Map",[kt,et]);
 			if( et == null ) et = makeMono();
 			return types.getType("Array",[et]);
-		case EArray(a, index):
-			typeExprWith(index, TInt);
-			var at = typeExpr(a, Value);
+		case EArray(arr, index):
+			var at = typeExpr(arr, Value);
 			switch( follow(at) ) {
-			case TInst({ name : "Array"},[et]): return et;
-			default: error(typeStr(at)+" is not an Array", a);
+			case TInst({ name : "Array"},[et]):
+				typeExprWith(index, TInt);
+				return et;
+			case TAbstract(a, args):
+				var t = abstractOp(expr,a,args,arr,"[]",index);
+				if( t != null )
+					return t;
+				// the operator can have been DCE'ed but hscript Interp supports maps
+				if( a.name == "haxe.ds.Map" )
+					return args[1];
+				// if we implicit cast to an Array, allow it
+				for( t in a.to )
+					switch( follow(t) ) {
+					case TInst({ name : "Array" },[et]):
+						return apply(et,a.params,args);
+					default:
+					}
+				error("Invalid array accessor", arr);
+			default:
+				error(typeStr(at)+" is not an Array", arr);
 			}
 		case EThrow(e):
 			typeExpr(e, Value);
@@ -1466,7 +1746,7 @@ class Checker {
 				var ev = events.get(name);
 				if( ev != null ) withType = WithType(ev);
 			}
-			var isShortFun = switch( edef(body) ) {
+			var isShortFun = body != null && switch( edef(body) ) {
 			case EMeta(":lambda",_): true;
 			default: false;
 			}
@@ -1628,8 +1908,8 @@ class Checker {
 				typeExpr(e1,Value);
 				var ct = typeExpr(e2,Value);
 				switch( ct ) {
-				case TType(t,_) if( t.name.charCodeAt(0) == "#".code ):
-					// type check
+				case TInst(c,_) if( c.name.charCodeAt(0) == "#".code ): // class
+				case TType(t,_) if( t.name.charCodeAt(0) == "#".code ): // enum
 				default:
 					error("Should be a type",e2);
 				}
@@ -1682,7 +1962,36 @@ class Checker {
 		case ECast(e,t):
 			var et = typeExpr(e, Value);
 			return t == null ? makeMono() : makeType(t,expr);
-		case ENew(cl, params):
+		case ENew(cl, params, targs):
+			if( !allowNew ) error("'new' is not allowed", expr);
+			var targs = targs == null ? null : [for( t in targs ) makeType(t,expr)];
+			var t = resolve(cl, targs, expr);
+			if( t == null ) error("Unknown class "+cl, expr);
+			var tparams = null, cst = null;
+			switch( t ) {
+			case TInst(c,args): tparams = c.params; cst = c.constructor;
+			#if hscriptPos
+			case TAbstract(a, args) if( a.constructor != null && patchAbstractAccess(expr,a,a.constructor.name,params) ):
+				tparams = a.params;
+				cst = a.constructor;
+			#end
+			default:
+			}
+			if( cst == null )
+				error(typeStr(t)+" cannot be constructed", expr);
+			if( targs == null ) {
+				targs = [for( i in 0...tparams.length ) makeMono()];
+				t = apply(t,tparams,targs);
+			}
+			switch( cst.t ) {
+			case TFun(args, _):
+				var mf = [for( c in cst.params ) makeMono()];
+				var args = [for( a in args ) { name : a.name, opt : a.opt, t : apply(apply(a.t,tparams,targs),cst.params,mf) }];
+				unifyCallParams(args, params, expr);
+				return t;
+			default:
+				throw "assert";
+			}
 		}
 		error("Don't know how to type "+edef(expr).getName(), expr);
 		return TDynamic;
@@ -1691,6 +2000,13 @@ class Checker {
 	function checkMeta( m : String, args : Array<Expr>, next : Expr, expr : Expr, withType ) {
 		if( m == ":untyped" && allowUntypedMeta )
 			return makeMono();
+		if( m == ":privateAccess" && allowPrivateAccess ) {
+			var prev = checkPrivate;
+			checkPrivate = false;
+			var t = typeExpr(next, withType);
+			checkPrivate = prev;
+			return t;
+		}
 		return typeExpr(next, withType);
 	}
 
@@ -1750,5 +2066,7 @@ class Checker {
 		return { key : key, value : value };
 	}
 
+	static function stub_int( v : Float ) return Std.int(v);
+	static function stub_downcast( v : Dynamic, cl : Dynamic ) return Std.downcast(v, cl);
 
 }

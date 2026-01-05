@@ -52,6 +52,18 @@ class Interp {
 		initOps();
 	}
 
+	public function allowTypeResolve() {
+		variables.set("$resolve", resolveType);
+	}
+
+	function resolveType( path : String ) : Dynamic {
+		var c = std.Type.resolveClass(path);
+		if( c != null ) return c;
+		var e = std.Type.resolveEnum(path);
+		if( e != null ) return e;
+		throw "Invalid type "+path;
+	}
+
 	private function resetVariables(){
 		variables = new Map<String,Dynamic>();
 		variables.set("null",null);
