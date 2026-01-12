@@ -117,7 +117,7 @@ class LiveClass {
 	public static function registerFile( file : String, onChange : Void -> Void ) {
 		for( dir in CONFIG.srcPath ) {
 			var path = dir+"/"+file;
-			#if hl
+			#if (hl && !hl_no_libuv)
 			if( !sys.FileSystem.exists(path) ) continue;
 			new hl.uv.Fs(null, path, function(ev) onChange());
 			#else
