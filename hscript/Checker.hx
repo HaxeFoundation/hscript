@@ -56,6 +56,7 @@ typedef CClass = {> CNamedType,
 	var fields : Map<String,CField>;
 	var statics : Map<String,CField>;
 	var ?staticClass : TType;
+	var ?runtimePath : String;
 }
 
 typedef CField = {
@@ -348,6 +349,21 @@ class CheckerTypes {
 						}
 					}
 				}
+
+				var c = ta.impl;
+				// api.xml name is private + _Impl_ , translate to actual real name (for errors)
+				var path = c.name.split(".");
+				var p = path.length - 1;
+				if( StringTools.endsWith(path[p],"_Impl_") ) path[p] = path[p].substr(0,-6);
+				if( p >= 2 && path[p-1].charCodeAt(0) == "_".code ) path.splice(p-1,1);
+				types.remove(c.name);
+				#if js
+				c.runtimePath = "#"+path.join("_");
+				#else
+				c.runtimePath = c.name;
+				#end
+				c.name = path.join(".");
+				types.set(c.name, CTClass(c));
 			}
 			todo.unshift(function() {
 				if( a.impl != null ) {
@@ -1518,7 +1534,7 @@ class Checker {
 
 	function getTypeAccess( t : TType, expr : Expr, ?field : String ) : ExprDef {
 		var path = switch( t ) {
-		case TInst(c,_): c.name;
+		case TInst(c,_): c.runtimePath ?? c.name;
 		case TEnum(e,_): e.name;
 		default: return null;
 		}
@@ -1785,8 +1801,12 @@ class Checker {
 		case EUnop(op, _, e):
 			var et = typeExpr(e, Value);
 			switch( op ) {
-			case "++", "--", "-":
+			case "++", "--":
 				unify(et,TInt,e);
+				return et;
+			case "-":
+				if( !tryUnify(et,TInt) )
+					unify(et,TFloat,e);
 				return et;
 			case "!":
 				unify(et,TBool,e);

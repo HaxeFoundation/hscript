@@ -457,7 +457,7 @@ class Parser {
 				var ident = getIdent();
 				if( #if hscriptPos tokens.length != 0 #else !tokens.isEmpty() #end )
 					throw "assert";
-				if( readPos == start + ident.length + 1 ) {
+				if( ident != null && readPos == start + ident.length + 1 ) {
 					var startTag = "<"+ident;
 					var endTag = "</"+ident+">";
 					var endTag2 = "/>";
@@ -476,8 +476,10 @@ class Parser {
 							if( nextTag < 0 || end2 < nextTag )
 								end = end2 + endTag2.length;
 						}
-						if( end < 0 )
+						if( end < 0 ) {
 							error(ECustom("Unclosed "+startTag+">"), curPos, curPos + startTag.length + 1);
+							return null;
+						}
 						var prev = input.indexOf(startTag, curPos + 1);
 						if( prev < 0 || prev > end ) {
 							count--;

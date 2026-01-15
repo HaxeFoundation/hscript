@@ -172,7 +172,7 @@ class Macro {
 			case EDoWhile(c, e):
 				EWhile(convert(c), convert(e), false);
 			case EFor(v, it, efor):
-				var p = #if (!macro && hscriptPos) { file : p.file, min : e.pmin, max : e.pmax } #else p #end;
+				var p = #if (!macro && hscriptPos) { file : e.origin, min : e.pmin, max : e.pmax } #else p #end;
 				EFor({ expr : EBinop(OpIn,{ expr : EConst(CIdent(v)), pos : p },convert(it)), pos : p }, convert(efor));
 			case EForGen(it, efor):
 				EFor(convert(it), convert(efor));
