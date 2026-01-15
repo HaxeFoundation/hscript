@@ -25,7 +25,7 @@ class LiveClass {
 		if( api == null )
 			CONFIG = null;
 		else
-			CONFIG = { api : api, srcPath : srcPath ?? [".","src"] }
+			CONFIG = { api : api, srcPath : srcPath != null ? srcPath : [".","src"] }
 	}
 
 	static function hasRet( e : Expr ) : Bool {

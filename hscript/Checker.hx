@@ -1534,7 +1534,7 @@ class Checker {
 
 	function getTypeAccess( t : TType, expr : Expr, ?field : String ) : ExprDef {
 		var path = switch( t ) {
-		case TInst(c,_): c.runtimePath ?? c.name;
+		case TInst(c,_): c.runtimePath != null ? c.runtimePath : c.name;
 		case TEnum(e,_): e.name;
 		default: return null;
 		}
