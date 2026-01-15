@@ -56,11 +56,13 @@ class Interp {
 		variables.set("$resolve", resolveType);
 	}
 
+	#if js
+	static var ABS_CACHE = new Map();
+	#end
 	function resolveType( path : String ) : Dynamic {
 		#if js
 		// abstract type is not part of the class map
 		if( path.charCodeAt(0) == '#'.code ) {
-			static var ABS_CACHE = new Map();
 			var c = ABS_CACHE.get(path);
 			if( c != null ) return c;
 			c = js.Lib.eval(path.substr(1));
