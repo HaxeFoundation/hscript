@@ -264,6 +264,7 @@ class JsInterp extends Interp {
 			default:
 				error(EInvalidOp(op));
 			}
+			return null;
 		case EUnop(op, prefix, e):
 			switch( op ) {
 			case "!":
@@ -300,6 +301,7 @@ class JsInterp extends Interp {
 			default:
 				error(EInvalidOp(op));
 			}
+			return null;
 		case ECall(e, params):
 			var args = [for( p in params ) exprValue(p)];
 			switch( Tools.expr(e) ) {
