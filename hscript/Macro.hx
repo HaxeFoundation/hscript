@@ -67,6 +67,9 @@ class Macro {
 			#if (haxe_ver >= 4)
 			case OpIn: "in";
 			#end
+			#if (haxe_ver >= 4.3)
+			case OpNullCoal: "??";
+			#end
 			default:
 				continue;
 			};
