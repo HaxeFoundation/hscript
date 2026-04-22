@@ -119,7 +119,11 @@ class LiveClass {
 			var path = dir+"/"+file;
 			#if (hl && !hl_no_libuv)
 			if( !sys.FileSystem.exists(path) ) continue;
+			#if (hl_ver >= version("1.16.0"))
+			new hl.uv.Fs(null, path, function(path, event) onChange());
+			#else
 			new hl.uv.Fs(null, path, function(ev) onChange());
+			#end
 			#else
 			throw "Not implemented for this platform";
 			#end
