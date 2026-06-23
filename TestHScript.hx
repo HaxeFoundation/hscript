@@ -252,6 +252,14 @@ class TestHScript extends TestCase {
 		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
 	}
 
+	function testStringInterpolation():Void {
+		assertScript("var a = 5; 'a is ${a}'", 'a is 5');
+		assertScript("var a = 5; 'a is ${a + 1}'", 'a is 6');
+		assertScript("var a = 5; 'a is ${if (a > 3) \"big\" else \"small\"}'", 'a is big');
+		assertScript("var a = 5; 'a is ${switch (a) { case 0: \"zero\"; case 5: \"five\"; default: \"other\"; }}'", 'a is five');
+		assertScript("'Hello, ${{var val = false; if (val) \"world\" else {var num = 5 + 3; 'userid_${num}';}}}!'", 'Hello, userid_8!');
+	}
+
 	static function main() {
 		#if ((haxe_ver < 4) && php)
 		// uncaught exception: The each() function is deprecated. This message will be suppressed on further calls (errno: 8192)

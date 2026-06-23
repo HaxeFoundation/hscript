@@ -354,7 +354,21 @@ class Parser {
 				e = mk(EIdent(id));
 			return isBlock(e) ? e : parseExprNext(e);
 		case TConst(c):
-			return parseExprNext(mk(EConst(c)));
+			switch( c ) {
+			case CString(s, SingleQuotes):
+				var ex = makeInterpolatedStr(s);
+				if (ex.length == 1)
+					return parseExprNext(ex[0]);
+				else
+				{
+					var result = ex[0];
+					for (i in 1...ex.length)
+						result = makeBinop("+", result, ex[i]);
+					return parseExprNext(mk(EParent(result), p1));
+				}
+			default:
+				return parseExprNext(mk(EConst(c)));
+			}
 		case TPOpen:
 			tk = token();
 			if( tk == TPClose ) {
@@ -642,6 +656,155 @@ class Parser {
 		default:
 			mk(EBinop(op,e1,e),pmin(e1),pmax(e));
 		}
+	}
+
+	function makeInterpolatedStr(s:String):Array<Expr> {
+		var ex = new Array();
+
+		inline function newBuf()
+			return new StringBuf();
+
+		var nextStr = newBuf();
+		function pushNextStr() {
+			if (nextStr.length > 0) {
+				ex.push(mk(EConst(CString(nextStr.toString())), tokenMin, tokenMax));
+				nextStr = newBuf();
+			}
+		}
+
+		var i = 0;
+		var c = StringTools.fastCodeAt(s, i);
+		while (true)
+		{
+			if (StringTools.isEof(c))
+			{
+				pushNextStr();
+				break;
+			}
+
+			if (c != "$".code)
+			{
+				nextStr.addChar(c);
+				c = StringTools.fastCodeAt(s, ++i);
+				continue;
+			}
+
+			c = StringTools.fastCodeAt(s, ++i);
+			if ((c >= "0".code && c <= "9".code) || c == "$".code)
+			{
+				nextStr.add("$");
+				nextStr.addChar(c);
+				c = StringTools.fastCodeAt(s, ++i);
+				continue;
+			}
+
+			if( idents[c] ) {
+				var id = String.fromCharCode(c);
+				while( true ) {
+					c = StringTools.fastCodeAt(s, ++i);
+					if( StringTools.isEof(c) ) c = 0;
+					if( !idents[c] ) {
+						break;
+					}
+					id += String.fromCharCode(c);
+				}
+				pushNextStr();
+				ex.push(mk(EIdent(id), tokenMin, tokenMax));
+				nextStr = newBuf();
+			}
+			else if (c == "{".code)
+			{
+				pushNextStr();
+				nextStr = newBuf();
+				var lastInput = input;
+				var lastReadPos = readPos;
+				var lastChar = char;
+				var lastTokens = tokens;
+				var lastOffset = offset;
+				var lastLine = line;
+				#if hscriptPos
+				var lastTokenMin = tokenMin;
+				var lastTokenMax = tokenMax;
+				var lastOldTokenMin = oldTokenMin;
+				var lastOldTokenMax = oldTokenMax;
+				#end
+
+				function reset()
+				{
+					input = s;
+					readPos = i;
+					char = -1;
+					offset = lastOffset;
+					#if hscriptPos
+					tokens = new List();
+					tokenMin = oldTokenMin = currentPos;
+					tokenMax = oldTokenMax = currentPos;
+					#else
+					tokens = new haxe.ds.GenericStack<Token>();
+					#end
+				}
+				reset();
+				var brOpens = -1;
+				while( true ) {
+					var tk = token();
+					if ( tk == TBrOpen )
+					{
+						if (brOpens == -1)
+							brOpens = 0;
+						brOpens++;
+					}
+					else if ( tk == TBrClose )
+					{
+						if (brOpens == -1)
+							unexpected(tk);
+						brOpens--;
+						if (brOpens <= 0)
+							break;
+					}
+					if( tk == TEof )
+						error(EUnterminatedString, currentPos, currentPos);
+				}
+				var endPos = readPos - 1;
+				reset();
+				var startPos = ++i;
+				input = s.substring(startPos, endPos);
+				readPos = 0;
+				offset = lastOffset + startPos;
+				#if hscriptPos
+				tokenMin = oldTokenMin = currentPos;
+				tokenMax = oldTokenMax = currentPos;
+				#end
+				var a = new Array();
+				while( true ) {
+					var tk = token();
+					if( tk == TEof ) break;
+					push(tk);
+					parseFullExpr(a);
+				}
+				pushNextStr();
+				ex.push(mk(EBlock(a),0));
+				nextStr = newBuf();
+				input = lastInput;
+				i = endPos + 1;
+				c = StringTools.fastCodeAt(s, i);
+				readPos = lastReadPos;
+				char = lastChar;
+				tokens = lastTokens;
+				offset = lastOffset;
+				line = lastLine;
+				#if hscriptPos
+				tokenMin = lastTokenMin;
+				tokenMax = lastTokenMax;
+				oldTokenMin = lastOldTokenMin;
+				oldTokenMax = lastOldTokenMax;
+				#end
+			}
+			else
+			{
+				nextStr.add("$");
+			}
+		}
+		return ex;
 	}
 
 	function parseStructure(id) {
@@ -1385,8 +1548,12 @@ class Parser {
 	inline function readChar() {
 		return StringTools.fastCodeAt(input, readPos++);
 	}
+	
+	inline function peekChar() {
+		return StringTools.fastCodeAt(input, readPos);
+	}
 
-	function readString( until ) {
+	function readString( until , allowInterpolation = false ) {
 		var c = 0;
 		var b = new StringBuf();
 		var esc = false;
@@ -1438,7 +1605,36 @@ class Parser {
 				esc = true;
 			else if( c == until )
 				break;
-			else {
+			else if (allowInterpolation && c == '$'.code && peekChar() == '{'.code)
+			{
+				b.addChar('$'.code);
+				var brOpens = -1;
+				while (true)
+				{
+					c = readChar();
+					if (StringTools.isEof(c))
+					{
+						line = old;
+						error(EUnterminatedString, p1, p1);
+						break;
+					}
+					b.addChar(c);
+					if ( c == '{'.code )
+					{
+						if (brOpens == -1)
+							brOpens = 0;
+						brOpens++;
+					}
+					else if ( c == '}'.code )
+					{
+						if (brOpens == -1)
+							invalidChar(c);
+						brOpens--;
+						if (brOpens <= 0)
+							break;
+					}
+				}
+			} else {
 				if( c == 10 ) line++;
 				b.addChar(c);
 			}
@@ -1589,7 +1785,8 @@ class Parser {
 			case "}".code: return TBrClose;
 			case "[".code: return TBkOpen;
 			case "]".code: return TBkClose;
-			case "'".code, '"'.code: return TConst( CString(readString(char)) );
+			case "'".code: return TConst( CString(readString(char, true), SingleQuotes) );
+			case '"'.code: return TConst( CString(readString(char, false), DoubleQuotes) );
 			case "?".code:
 				char = readChar();
 				if( char == ".".code )
