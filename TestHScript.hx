@@ -252,6 +252,37 @@ class TestHScript extends TestCase {
 		assertScript('var newMap = [{a:"a"}=>"foo", objKey=>"bar"]; newMap[objKey];', 'bar', vars);
 	}
 
+	static macro function liveSources() {
+		var config = @:privateAccess hscript.LiveClass.CONFIG;
+		var api = sys.FileSystem.exists(config.api) ? sys.io.File.getContent(config.api) : "";
+		var entries = [macro $v{config.api} => $v{api}];
+		for( f in sys.FileSystem.readDirectory("tests") ) {
+			if( !StringTools.endsWith(f,".hx") ) continue;
+			var file = "tests/"+f;
+			entries.push(macro $v{file} => $v{sys.io.File.getContent(file)});
+		}
+		return macro [$a{entries}];
+	}
+
+	#if !macro
+	function testLive():Void {
+		if( !hscript.LiveClass.isEnable() )
+			return;
+		#if !(sys || hxnodejs)
+		var sources : Map<String,String> = liveSources();
+		hscript.LiveClass.getContent = function(file) return sources.get(file);
+		#end
+		var runtimes = @:privateAccess hscript.LiveClass.LiveClassRuntime.runtimes;
+		assertTrue(runtimes != null && runtimes.length > 0);
+		for( r in runtimes ) {
+			var cl = @:privateAccess r.cl;
+			Type.createInstance(cl,[]);
+			assertTrue(r.setSource(hscript.LiveClass.getContent(r.file), true));
+			Type.createInstance(cl,[]);
+		}
+	}
+	#end
+
 	static function main() {
 		#if ((haxe_ver < 4) && php)
 		// uncaught exception: The each() function is deprecated. This message will be suppressed on further calls (errno: 8192)
