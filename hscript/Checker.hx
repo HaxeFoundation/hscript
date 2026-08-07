@@ -1811,6 +1811,9 @@ class Checker {
 			case "!":
 				unify(et,TBool,e);
 				return et;
+			case "~":
+				unify(et,TInt,e);
+				return et;
 			default:
 			}
 		case EFor(v, it, e):
