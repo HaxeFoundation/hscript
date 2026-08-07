@@ -481,6 +481,8 @@ class Checker {
 	var completionExpr : Expr;
 	public var imports : Array<String> = [];
 	public var checkPrivate : Bool = true;
+
+	public var localClass : CClass;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
 	public var allowGlobalsDefine : Bool;
@@ -1095,9 +1097,10 @@ class Checker {
 		case TInst(c, args):
 			var map = (t) -> apply(t,c.params,args);
 			while( c != null ) {
+				var allowPrivate = isLocalClass(c);
 				for( fname in c.fields.keys() ) {
 					var f = c.fields.get(fname);
-					if( !f.isPublic || !f.complete ) continue;
+					if( (!f.isPublic && !allowPrivate) || !f.complete ) continue;
 					var name = f.name, t = map(f.t);
 					if( allowAsync && StringTools.startsWith(name,"a_") ) {
 						t = unasync(t);
@@ -1142,8 +1145,21 @@ class Checker {
 		return fields;
 	}
 
+	function isLocalClass( ct : CNamedType ) {
+		var c = localClass;
+		while( c != null ) {
+			if( c == ct )
+				return true;
+			c = c.superClass == null ? null : switch( follow(c.superClass) ) {
+			case TInst(c,_): c;
+			default: null;
+			}
+		}
+		return false;
+	}
+
 	function checkField( cf : CField, ct : CNamedType, args, forWrite, e ) {
-		if( !cf.isPublic && checkPrivate )
+		if( !cf.isPublic && checkPrivate && !isLocalClass(ct) )
 			error("Can't access private field "+cf.name+" on "+ct.name, e);
 		if( forWrite && !cf.canWrite )
 			error("Can't write readonly field "+cf.name+" on "+ct.name, e);
