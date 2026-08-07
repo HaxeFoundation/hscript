@@ -1,3 +1,7 @@
 -main TestHScript
 -dce no
 -lib hx3compat
+-D hscriptPos
+--macro include("tests")
+-xml bin/live-api.xml
+--macro hscript.LiveClass.enable("bin/live-api.xml",["."])

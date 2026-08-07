@@ -153,6 +153,9 @@ class LiveClass {
 
 #if !macro
 class LiveClassRuntime {
+
+	static var runtimes : Array<LiveClassRuntime>;
+
 	var cl : Class<Dynamic>;
 	var type : hscript.Checker.TType;
 	var className : String;
@@ -162,13 +165,19 @@ class LiveClassRuntime {
 	var compiledFields : Map<String,Bool>;
 	var chk : Checker;
 	var version = 0;
+	public var file : String;
 	public var path : String;
 	public function new(cl, file, idents) {
 		this.cl = cl;
 		className = Type.getClassName(cl);
 		this.idents = idents;
+		this.file = file;
+		if( runtimes == null ) runtimes = [];
+		runtimes.push(this);
+		#if (hl && !hl_no_libuv)
 		this.path = LiveClass.registerFile(file, onChange);
 		if( this.path != null ) haxe.Timer.delay(onChange,0);
+		#end
 	}
 
 	function loadType() {
@@ -183,60 +192,73 @@ class LiveClassRuntime {
 	}
 
 	function onChange() {
-		if( type == null )
-			loadType();
 		try {
-			var content = LiveClass.getContent(path);
-			var parser = new hscript.Parser();
-			parser.allowTypes = true;
-			parser.allowMetadata = true;
-			parser.allowJSON = true;
-			var defs = parser.parseModule(content,path);
-			for( d in defs )
-				switch( d ) {
-				case DClass(c) if( c.name == className.split(".").pop() ):
-					var todo : Array<hscript.Expr> = [];
-					var done = [];
-					for( cf in c.fields ) {
-						if( cf.access.indexOf(AStatic) >= 0 )
-							continue;
-						switch( cf.kind ) {
-						case KVar(v) if( !compiledFields.exists(cf.name) ):
-							if( v.get != null || v.set != null )
-								continue; // New properties not supported
-							todo.push({ e : EVar(cf.name,v.type,v.expr), pmin : 0, pmax : 0, line : 0, origin : null });
-							done.push(function(chk:Checker) {
-								newVars.push({ name : cf.name, expr : v.expr, type : @:privateAccess chk.locals.get(cf.name) });
-								compiledFields.set(cf.name, true);
-							});
-						case KFunction(f):
-							var v = functions.get(cf.name);
-							var code = hscript.Printer.toString(f.expr);
-							if( v == null ) {
-								v = { prev : code, value : null, index : idents.indexOf(cf.name) };
-								functions.set(cf.name, v);
-							} else if( v.prev != code ) {
-								var e : hscript.Expr = { e : EFunction(f.args,f.expr,cf.name), line : f.expr.line, pmin : f.expr.pmin, pmax : f.expr.pmax, origin : f.expr.origin };
-								todo.push(e);
-								done.push(function(chk) {
-									if( v.value == null && v.index >= 0 )
-										(cl:Dynamic).__INTERP_BITS |= 1 << v.index;
-									v.value = e;
-									v.prev = code;
-								});
-							}
-						default:
-						}
-					}
-					if( todo.length > 0 ) {
-						checkCode({ e : EBlock(todo), pmin : 0, pmax : 0, line : 0, origin : null }, done);
-						version++;
-					}
-				default:
-				}
+			reload();
 		} catch( e : hscript.Expr.Error ) {
 			log(Std.string(e));
 		}
+	}
+
+	public function reload( forceReload = false ) {
+		if( path == null )
+			throw "Could not find the source file of "+className;
+		return setSource(LiveClass.getContent(path), forceReload);
+	}
+
+	public function setSource( content : String, forceReload = false ) {
+		if( type == null )
+			loadType();
+		var parser = new hscript.Parser();
+		parser.allowTypes = true;
+		parser.allowMetadata = true;
+		parser.allowJSON = true;
+		var defs = parser.parseModule(content,path == null ? className : path);
+		var changed = false;
+		for( d in defs )
+			switch( d ) {
+			case DClass(c) if( c.name == className.split(".").pop() ):
+				var todo : Array<hscript.Expr> = [];
+				var done = [];
+				for( cf in c.fields ) {
+					if( cf.access.indexOf(AStatic) >= 0 )
+						continue;
+					switch( cf.kind ) {
+					case KVar(v) if( !compiledFields.exists(cf.name) ):
+						if( v.get != null || v.set != null )
+							continue; // New properties not supported
+						todo.push({ e : EVar(cf.name,v.type,v.expr), pmin : 0, pmax : 0, line : 0, origin : null });
+						done.push(function(chk:Checker) {
+							newVars.push({ name : cf.name, expr : v.expr, type : @:privateAccess chk.locals.get(cf.name) });
+							compiledFields.set(cf.name, true);
+						});
+					case KFunction(f):
+						var v = functions.get(cf.name);
+						var code = hscript.Printer.toString(f.expr);
+						if( v == null ) {
+							v = { prev : code, value : null, index : idents.indexOf(cf.name) };
+							functions.set(cf.name, v);
+							if( !forceReload ) continue;
+						} else if( v.prev == code && !forceReload )
+							continue;
+						var e : hscript.Expr = { e : EFunction(f.args,f.expr,cf.name), line : f.expr.line, pmin : f.expr.pmin, pmax : f.expr.pmax, origin : f.expr.origin };
+						todo.push(e);
+						done.push(function(chk) {
+							if( v.value == null && v.index >= 0 )
+								(cl:Dynamic).__INTERP_BITS |= 1 << v.index;
+							v.value = e;
+							v.prev = code;
+						});
+					default:
+					}
+				}
+				if( todo.length > 0 ) {
+					checkCode({ e : EBlock(todo), pmin : 0, pmax : 0, line : 0, origin : null }, done);
+					version++;
+					changed = true;
+				}
+			default:
+			}
+		return changed;
 	}
 
 	function checkCode( e : hscript.Expr, done : Array<Checker->Void> ) {
@@ -244,6 +266,10 @@ class LiveClassRuntime {
 		chk.allowNew = true;
 		chk.allowPrivateAccess = true;
 		chk.allowGlobalTypes = true;
+		switch( type ) {
+		case TInst(c,_): chk.localClass = c;
+		default:
+		}
 		chk.setGlobal("this", type);
 		for( v in newVars )
 			chk.setGlobal(v.name, v.type);
