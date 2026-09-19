@@ -43,7 +43,9 @@ enum CTypedecl {
 enum ImportDef {
 	/** `import pack.*`, or an implicit package : resolve `Name` as `pack.Name` **/
 	IPackage( pack : String );
-	/** `import pack.Type`, `import pack.Type as Name` **/
+	/** `import pack.Module` : the module main type and all its sub-types **/
+	IModule( path : String );
+	/** `import pack.Module.Type`, `import pack.Module as Name` **/
 	IType( name : String, path : String );
 	/** `import pack.Type.field`, `import pack.Type.field as Name` **/
 	IStatic( name : String, path : String, field : String );
@@ -116,6 +118,8 @@ class CheckerTypes {
 	var t_string : TType;
 	var localParams : Map<String,TType>;
 	var parser : hscript.Parser;
+	var modules : Map<String,Array<String>> = new Map();
+	var subTypes : Map<String,String> = new Map();
 
 	public function new() {
 		types = new Map();
@@ -192,12 +196,24 @@ class CheckerTypes {
 		return fl;
 	}
 
+	function addModuleType( t : haxe.rtti.CType.TypeInfos ) {
+		if( t.module == null || t.module == t.path || t.isPrivate ) return;
+		var ml = modules.get(t.module);
+		if( ml == null ) {
+			ml = [];
+			modules.set(t.module, ml);
+		}
+		ml.push(t.path);
+		subTypes.set(t.path, t.module);
+	}
+
 	function addXmlType(x:haxe.rtti.CType.TypeTree,todo:Array<Void->Void>) {
 		switch (x) {
 		case TPackage(name, full, subs):
 			for( s in subs ) addXmlType(s,todo);
 		case TClassdecl(c):
 			if( types.exists(c.path) ) return;
+			addModuleType(c);
 			var cl : CClass = {
 				name : c.path,
 				params : [],
@@ -257,6 +273,7 @@ class CheckerTypes {
 			types.set(cl.name, CTClass(cl));
 		case TEnumdecl(e):
 			if( types.exists(e.path) ) return;
+			addModuleType(e);
 			var en : CEnum = {
 				name : e.path,
 				params : [],
@@ -277,6 +294,7 @@ class CheckerTypes {
 			types.set(en.name, CTEnum(en));
 		case TTypedecl(t):
 			if( types.exists(t.path) ) return;
+			addModuleType(t);
 			var td : CTypedef = {
 				name : t.path,
 				params : [],
@@ -294,6 +312,7 @@ class CheckerTypes {
 			types.set(t.path, CTTypedef(td));
 		case TAbstractdecl(a):
 			if( types.exists(a.path) ) return;
+			addModuleType(a);
 			var ta : CAbstract = {
 				name : a.path,
 				params : [],
@@ -527,11 +546,49 @@ class Checker {
 		}
 	}
 
-	public function addImport( i : ImportDef ) {
+	public function addImportDef( i : ImportDef ) {
 		switch( i ) {
+		case IModule(path):
+			inline function add(p:String) {
+				var name = p.split(".").pop();
+				importedNames.set(name, IType(name, p));
+			}
+			if( !types.getType(path).match(TUnresolved(_)) ) add(path);
+			var subs = types.modules.get(path);
+			if( subs != null ) for( s in subs ) add(s);
 		case IType(name,_), IStatic(name,_,_): importedNames.set(name, i);
 		case IPackage(_), IStaticAll(_): importedAll.push(i);
 		}
+	}
+
+	public function addImport( path : Array<String>, star = false, ?alias : String ) {
+		var full = path.join(".");
+		var t = resolvePath(full);
+		if( t == full && types.subTypes.exists(full) ) return;
+		if( star ) {
+			// `import pack.*` or `import pack.Type.*`
+			addImportDef(t == null ? IPackage(full) : IStaticAll(t));
+			return;
+		}
+		if( alias == null && (t == full || types.modules.exists(full)) ) {
+			addImportDef(IModule(full));
+			return;
+		}
+		var name = alias != null ? alias : path[path.length-1];
+		if( t != null ) {
+			addImportDef(IType(name, t));
+			return;
+		}
+		// `import pack.Type.staticField`
+		if( path.length < 2 ) return;
+		t = resolvePath(path.slice(0,-1).join("."));
+		if( t != null )
+			addImportDef(IStatic(name, t, path[path.length-1]));
+	}
+
+	public function moduleOf( path : String ) {
+		var m = types.subTypes.get(path);
+		return m == null ? path : m;
 	}
 
 	public function clearImports() {
@@ -1453,7 +1510,7 @@ class Checker {
 		#end
 	}
 
-	public function resolvePath( path : String ) : Null<String> {
+	function resolvePath( path : String ) : Null<String> {
 		if( !types.getType(path).match(TUnresolved(_)) )
 			return path;
 		var pack = path.split(".");
@@ -1473,12 +1530,13 @@ class Checker {
 		case IType(_, path): return path;
 		default:
 		}
-		if( !types.getType(name).match(TUnresolved(_)) ) return name;
+		// a package import shadows the global name, like in Haxe
 		for( i in importedAll )
 			switch( i ) {
 			case IPackage(pack):
+				// a module sub-type is not reachable from its package, only from its module
 				var p = pack+"."+name;
-				if( !types.getType(p).match(TUnresolved(_)) ) return p;
+				if( !types.subTypes.exists(p) && !types.getType(p).match(TUnresolved(_)) ) return p;
 			default:
 			}
 		return name;
