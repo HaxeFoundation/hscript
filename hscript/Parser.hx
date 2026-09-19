@@ -1184,6 +1184,26 @@ class Parser {
 		return decls;
 	}
 
+	public function parseImports( content : String, ?origin : String = "hscript", ?position = 0 ) {
+		initParser(origin, position);
+		input = content;
+		readPos = 0;
+		allowTypes = true;
+		allowMetadata = true;
+		var decls = [];
+		while( true ) {
+			var tk = token();
+			switch( tk ) {
+			case TId("package"|"import"|"using"):
+				push(tk);
+				decls.push(parseModuleDecl());
+			default:
+				return decls;
+			}
+		}
+		return decls;
+	}
+
 	function parseMetadata() : Metadata {
 		var meta = [];
 		while( true ) {
