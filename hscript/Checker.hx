@@ -1453,6 +1453,20 @@ class Checker {
 		#end
 	}
 
+	public function resolvePath( path : String ) : Null<String> {
+		if( !types.getType(path).match(TUnresolved(_)) )
+			return path;
+		var pack = path.split(".");
+		var name = pack.pop();
+		var last = pack[pack.length-1];
+		if( last == null || last.charCodeAt(0) < 'A'.code || last.charCodeAt(0) > 'Z'.code )
+			return null;
+		pack.pop();
+		pack.push(name);
+		var sub = pack.join(".");
+		return types.getType(sub).match(TUnresolved(_)) ? null : sub;
+	}
+
 	function importedPath( name : String ) : String {
 		if( name.indexOf('.') >= 0 ) return name;
 		switch( importedNames.get(name) ) {
