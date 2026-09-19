@@ -40,6 +40,17 @@ enum CTypedecl {
 	CTAbstract( a : CAbstract );
 }
 
+enum ImportDef {
+	/** `import pack.*`, or an implicit package : resolve `Name` as `pack.Name` **/
+	IPackage( pack : String );
+	/** `import pack.Type`, `import pack.Type as Name` **/
+	IType( name : String, path : String );
+	/** `import pack.Type.field`, `import pack.Type.field as Name` **/
+	IStatic( name : String, path : String, field : String );
+	/** `import pack.Type.*` : any static field of `Type` **/
+	IStaticAll( path : String );
+}
+
 typedef CMetadata = Array<{ name : String, params : Null<Array<Expr>> }>;
 
 typedef CNamedType = {
@@ -479,7 +490,8 @@ class Checker {
 	var hasReturn : Bool;
 	var callExpr : Expr;
 	var completionExpr : Expr;
-	public var imports : Array<String> = [];
+	var importedNames : Map<String,ImportDef> = new Map();
+	var importedAll : Array<ImportDef> = [];
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
@@ -513,6 +525,18 @@ class Checker {
 			default: throw "assert";
 			}
 		}
+	}
+
+	public function addImport( i : ImportDef ) {
+		switch( i ) {
+		case IType(name,_), IStatic(name,_,_): importedNames.set(name, i);
+		case IPackage(_), IStaticAll(_): importedAll.push(i);
+		}
+	}
+
+	public function clearImports() {
+		importedNames = new Map();
+		importedAll = [];
 	}
 
 	public function removeGlobal( name : String ) {
@@ -662,7 +686,7 @@ class Checker {
 		return switch (t) {
 		case CTPath(path, params):
 			var params = params == null ? [] : [for( p in params ) makeType(p,e)];
-			var ct = resolve(path.join("."),params,e);
+			var ct = resolve(importedPath(path.join(".")),params,e);
 			if( ct == null ) {
 				// maybe a subtype that is public ?
 				var pack = path.copy();
@@ -1429,6 +1453,45 @@ class Checker {
 		#end
 	}
 
+	function importedPath( name : String ) : String {
+		if( name.indexOf('.') >= 0 ) return name;
+		switch( importedNames.get(name) ) {
+		case IType(_, path): return path;
+		default:
+		}
+		if( !types.getType(name).match(TUnresolved(_)) ) return name;
+		for( i in importedAll )
+			switch( i ) {
+			case IPackage(pack):
+				var p = pack+"."+name;
+				if( !types.getType(p).match(TUnresolved(_)) ) return p;
+			default:
+			}
+		return name;
+	}
+
+	function resolveStatic( path : String, field : String, expr : Expr, forWrite : Bool ) : TType {
+		#if hscriptPos
+		var t = types.getType(path);
+		switch( t ) {
+		case TInst(c,_):
+			var f = c.statics.get(field);
+			var acc = f == null ? null : getTypeAccess(t, expr, field);
+			if( acc == null ) return null;
+			expr.e = acc;
+			var prev = checkPrivate;
+			checkPrivate = false;
+			var ft = checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
+			checkPrivate = prev;
+			return ft;
+		default:
+			return null;
+		}
+		#else
+		return null;
+		#end
+	}
+
 	function resolveGlobal( name : String, expr : Expr, withType : WithType, forWrite : Bool ) : TType {
 		var g = globals.get(name);
 		if( g != null ) {
@@ -1504,15 +1567,25 @@ class Checker {
 				default:
 				}
 			}
-			// type path resolution
-			var t = types.getType(name);
-			if( t.match(TUnresolved(_)) && name.indexOf('.') < 0 ) {
-				for( i in imports ) {
-					t = types.getType(i+"."+name);
-					if( !t.match(TUnresolved(_)) )
-						break;
+			var isSingle = name.indexOf('.') < 0;
+			// `import pack.Type.field`
+			if( isSingle )
+				switch( importedNames.get(name) ) {
+				case IStatic(_, path, field):
+					var ft = resolveStatic(path, field, expr, forWrite);
+					if( ft != null ) return ft;
+				default:
 				}
-			}
+			// type path resolution, imports included
+			var t = types.getType(importedPath(name));
+			if( t.match(TUnresolved(_)) && isSingle )
+				for( i in importedAll )
+					switch( i ) {
+					case IStaticAll(path):
+						var ft = resolveStatic(path, name, expr, forWrite);
+						if( ft != null ) return ft;
+					default:
+					}
 			if( !t.match(TUnresolved(_)) && (allowGlobalTypes || withType == null) ) {
 				var acc = getTypeAccess(t, expr);
 				if( acc != null ) {
@@ -1985,7 +2058,7 @@ class Checker {
 		case ENew(cl, params, targs):
 			if( !allowNew ) error("'new' is not allowed", expr);
 			var targs = targs == null ? null : [for( t in targs ) makeType(t,expr)];
-			var t = resolve(cl, targs, expr);
+			var t = resolve(importedPath(cl), targs, expr);
 			if( t == null ) error("Unknown class "+cl, expr);
 			var tparams = null, cst = null;
 			switch( t ) {
