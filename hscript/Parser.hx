@@ -1245,7 +1245,7 @@ class Parser {
 				}
 			}
 			var name = null;
-			if ( maybe(TId("as")) && !star) {
+			if ( !star && (maybe(TId("as")) || maybe(TId("in"))) ) {
 				var t = token();
 				switch( t ) {
 				case TId(id):
@@ -1256,6 +1256,10 @@ class Parser {
 			}
 			ensure(TSemicolon);
 			return DImport(path, star, name);
+		case "using":
+			var path = parsePath();
+			ensure(TSemicolon);
+			return DUsing(path);
 		case "class":
 			var name = getIdent();
 			var params = parseParams();
