@@ -108,6 +108,7 @@ class Parser {
 		opChars = "+*/-=!><&|^%~";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 		var priorities = [
+			["is"],
 			["%"],
 			["*", "/"],
 			["+", "-"],
@@ -120,7 +121,7 @@ class Parser {
 			["||"],
 			["=","+=","-=","*=","/=","%=","<<=",">>=",">>>=","|=","&=","^=","=>"],
 			["->"],
-			["in","is"]
+			["in"]
 		];
 		opPriority = new Map();
 		opRightAssoc = new Map();
@@ -456,6 +457,15 @@ class Parser {
 				var ident = getIdent();
 				if( #if hscriptPos tokens.length != 0 #else !tokens.isEmpty() #end )
 					throw "assert";
+				// a markup tag name can hold '-', which is not an identifier char
+				while( ident != null && char == "-".code ) {
+					var p = readPos;
+					while( p < input.length && idents[StringTools.fastCodeAt(input,p)] ) p++;
+					if( p == readPos ) break;
+					ident += "-" + input.substr(readPos, p - readPos);
+					readPos = p + 1;
+					char = p < input.length ? StringTools.fastCodeAt(input,p) : 0;
+				}
 				if( ident != null && readPos == start + ident.length + 1 ) {
 					var startTag = "<"+ident;
 					var endTag = "</"+ident+">";
@@ -476,7 +486,7 @@ class Parser {
 								end = end2 + endTag2.length;
 						}
 						if( end < 0 ) {
-							error(ECustom("Unclosed "+startTag+">"), curPos, curPos + startTag.length + 1);
+							error(ECustom("Unclosed "+startTag+">"), curPos + offset, curPos + offset + startTag.length + 1);
 							return null;
 						}
 						var prev = input.indexOf(startTag, curPos + 1);
@@ -848,9 +858,15 @@ class Parser {
 			var tk = token();
 			if( tk == TPOpen ) {
 				var e = parseExpr();
-				ensure(TComma);
-				var t = parseType();
-				mk(ECast(e,t), p1, tokenMax);
+				tk = token();
+				if( tk == TComma ) {
+					var t = parseType();
+					ensure(TPClose);
+					mk(ECast(e,t), p1, tokenMax);
+				} else {
+					if( tk != TPClose ) unexpected(tk);
+					mk(ECast(parseExprNext(mk(EParent(e),p1,tokenMax)),null), p1, tokenMax);
+				}
 			} else {
 				push(tk);
 				var e = parseExpr();
