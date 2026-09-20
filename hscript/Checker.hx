@@ -764,16 +764,6 @@ class Checker {
 			var params = params == null ? [] : [for( p in params ) makeType(p,e)];
 			var ct = resolve(importedPath(path.join(".")),params,e);
 			if( ct == null ) {
-				// maybe a subtype that is public ?
-				var pack = path.copy();
-				var name = pack.pop();
-				if( pack.length > 0 && pack[pack.length-1].charCodeAt(0) >= 'A'.code && pack[pack.length-1].charCodeAt(0) <= 'Z'.code ) {
-					pack.pop();
-					pack.push(name);
-					ct = resolve(pack.join("."), params,e);
-				}
-			}
-			if( ct == null ) {
 				error("Unknown type "+path, e);
 				ct = TDynamic;
 			}
@@ -1439,6 +1429,32 @@ class Checker {
 		return ot;
 	}
 
+	function typeLongestPath( path : Array<{ f : String, e : Expr }>, forWrite : Bool, subTypesOnly : Bool ) : Null<TType> {
+		var path = path.copy();
+		var fields = [];
+		while( path.length > 1 ) {
+			var name = [for( p in path ) p.f].join(".");
+			var skip = false;
+			if( subTypesOnly ) {
+				// only a path that the api flattened, ie `pack.Module.SubType` -> `pack.SubType`
+				var rp = resolvePath(name);
+				skip = rp == null || rp == name;
+			}
+			if( !skip ) {
+				var union = punion(path[0].e,path[path.length-1].e);
+				var t = resolveGlobal(name, union, Value, forWrite && fields.length == 0);
+				if( t != null ) {
+					#if hscriptPos
+					if( union.e != null ) path[path.length-1].e.e = union.e;
+					#end
+					return readPath(t,fields,forWrite);
+				}
+			}
+			fields.unshift(path.pop());
+		}
+		return null;
+	}
+
 	function typePath( path : Array<{ f : String, e : Expr }>, withType, forWrite : Bool ) {
 		var root = path[0];
 		var l = locals.get(root.f);
@@ -1446,24 +1462,15 @@ class Checker {
 			path.shift();
 			return readPath(l,path,forWrite);
 		}
+		var t = typeLongestPath(path, forWrite, true);
+		if( t != null ) return t;
 		var t = resolveGlobal(root.f,root.e,path.length == 1 ? withType : Value, forWrite && path.length == 1);
 		if( t != null ) {
 			path.shift();
 			return readPath(t,path,forWrite);
 		}
-		var fields = [];
-		while( path.length > 1 ) {
-			var name = [for( p in path ) p.f].join(".");
-			var union = punion(path[0].e,path[path.length-1].e);
-			var t = resolveGlobal(name, union, Value, forWrite && fields.length == 0);
-			if( t != null ) {
-				#if hscriptPos
-				if( union.e != null ) path[path.length-1].e.e = union.e;
-				#end
-				return readPath(t,fields,forWrite);
-			}
-			fields.unshift(path.pop());
-		}
+		var t = typeLongestPath(path, forWrite, false);
+		if( t != null ) return t;
 		if( !isCompletion )
 			error("Unknown identifier "+root.f, root.e);
 		else if( root.e == completionExpr )
@@ -1547,7 +1554,10 @@ class Checker {
 	}
 
 	function importedPath( name : String ) : String {
-		if( name.indexOf('.') >= 0 ) return name;
+		if( name.indexOf('.') >= 0 ) {
+			var p = resolvePath(name);
+			return p == null ? name : p;
+		}
 		switch( importedNames.get(name) ) {
 		case IType(_, path): return path;
 		default:
@@ -1726,6 +1736,8 @@ class Checker {
 						return c.staticClass;
 					case TEnum(e,_):
 						return e.enumClass;
+					case TAbstract(a,_) if( a.impl != null && a.impl.staticClass != null ):
+						return a.impl.staticClass;
 					default:
 						throw "assert";
 					}
@@ -1740,6 +1752,7 @@ class Checker {
 		var path = switch( t ) {
 		case TInst(c,_): c.runtimePath != null ? c.runtimePath : c.name;
 		case TEnum(e,_): e.name;
+		case TAbstract(a,_) if( a.impl != null ): a.impl.runtimePath != null ? a.impl.runtimePath : a.impl.name;
 		default: return null;
 		}
 		var e : hscript.Expr.ExprDef = ECall(mk(EIdent("$resolve"),expr),[mk(EConst(CString(path)),expr)]);
@@ -2130,7 +2143,8 @@ class Checker {
 					return t1;
 				if( tryUnify(t1,t2) )
 					return t2;
-				unify(t2,t1,e2); // error
+				unify(t2,t1,e2); // error, unless a previous tryUnify left a mono bound
+				return t1;
 			case "is":
 				typeExpr(e1,Value);
 				var ct = typeExpr(e2,Value);
@@ -2191,12 +2205,19 @@ class Checker {
 			return t == null ? makeMono() : makeType(t,expr);
 		case ENew(cl, params, targs):
 			if( !allowNew ) error("'new' is not allowed", expr);
+			var ctargs = targs;
 			var targs = targs == null ? null : [for( t in targs ) makeType(t,expr)];
 			var t = resolve(importedPath(cl), targs, expr);
 			if( t == null ) error("Unknown class "+cl, expr);
 			var tparams = null, cst = null;
 			switch( t ) {
-			case TInst(c,args): tparams = c.params; cst = c.constructor;
+			case TInst(c,args):
+				tparams = c.params; cst = c.constructor;
+				#if hscriptPos
+				// `pack.Module.SubType` is not a runtime path : give the interpreter the real one
+				var rt = c.runtimePath != null ? c.runtimePath : c.name;
+				if( rt != cl ) expr.e = ENew(rt, params, ctargs);
+				#end
 			#if hscriptPos
 			case TAbstract(a, args) if( a.constructor != null && patchAbstractAccess(expr,a,a.constructor.name,params) ):
 				tparams = a.params;
