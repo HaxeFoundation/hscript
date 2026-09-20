@@ -511,6 +511,8 @@ class Checker {
 	var completionExpr : Expr;
 	var importedNames : Map<String,ImportDef> = new Map();
 	var importedAll : Array<ImportDef> = [];
+	var usings : Array<String> = [];
+	var skipArgs : Int = 0;
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
@@ -549,16 +551,21 @@ class Checker {
 	public function addImportDef( i : ImportDef ) {
 		switch( i ) {
 		case IModule(path):
-			inline function add(p:String) {
+			for( p in moduleTypes(path) ) {
 				var name = p.split(".").pop();
 				importedNames.set(name, IType(name, p));
 			}
-			if( !types.getType(path).match(TUnresolved(_)) ) add(path);
-			var subs = types.modules.get(path);
-			if( subs != null ) for( s in subs ) add(s);
 		case IType(name,_), IStatic(name,_,_): importedNames.set(name, i);
 		case IPackage(_), IStaticAll(_): importedAll.push(i);
 		}
+	}
+
+	function moduleTypes( path : String ) {
+		var out = [];
+		if( !types.getType(path).match(TUnresolved(_)) ) out.push(path);
+		var subs = types.modules.get(path);
+		if( subs != null ) for( s in subs ) out.push(s);
+		return out;
 	}
 
 	public function addImport( path : Array<String>, star = false, ?alias : String ) {
@@ -586,6 +593,17 @@ class Checker {
 			addImportDef(IStatic(name, t, path[path.length-1]));
 	}
 
+	public function addUsing( path : Array<String> ) {
+		addImport(path);
+		var full = path.join(".");
+		var t = resolvePath(full);
+		if( t == full && types.subTypes.exists(full) ) return;
+		if( t == full || types.modules.exists(full) )
+			for( p in moduleTypes(full) ) usings.push(p);
+		else if( t != null )
+			usings.push(t);
+	}
+
 	public function moduleOf( path : String ) {
 		var m = types.subTypes.get(path);
 		return m == null ? path : m;
@@ -594,6 +612,7 @@ class Checker {
 	public function clearImports() {
 		importedNames = new Map();
 		importedAll = [];
+		usings = [];
 	}
 
 	public function removeGlobal( name : String ) {
@@ -1409,8 +1428,11 @@ class Checker {
 					}
 				default:
 				}
-				error(typeStr(ot)+" has no field "+p.f, p.e);
-				return TDynamic;
+				ft = resolveUsing(ot, p.f, p.e);
+				if( ft == null ) {
+					error(typeStr(ot)+" has no field "+p.f, p.e);
+					return TDynamic;
+				}
 			}
 			ot = ft;
 		}
@@ -1564,6 +1586,43 @@ class Checker {
 		#end
 	}
 
+	function resolveUsing( ot : TType, field : String, e : Expr ) : Null<TType> {
+		#if hscriptPos
+		var obj = switch( e.e ) {
+		case EField(obj, _): obj;
+		default: return null;
+		}
+		var params = switch( callExpr == null ? null : callExpr.e ) {
+		case ECall(ec, params) if( ec == e ): params;
+		default: return null;
+		}
+		var i = usings.length;
+		while( i-- > 0 ) {
+			var c = switch( types.getType(usings[i]) ) {
+			case TInst(c,_): c;
+			case TAbstract(a,_): a.impl;
+			default: null;
+			}
+			if( c == null ) continue;
+			var f = c.statics.get(field);
+			if( f == null || !f.isPublic ) continue;
+			var ft = follow(f.params.length == 0 ? f.t : apply(f.t, f.params, [for( p in f.params ) makeMono()]));
+			switch( ft ) {
+			// an abstract method is compiled to a static taking `this`, but is not an extension
+			case TFun(args,_) if( args.length > 0 && args[0].name != "this" && tryUnify(ot, args[0].t) ):
+				var acc = getTypeAccess(TInst(c,[]), e, field);
+				if( acc == null ) continue;
+				e.e = acc;
+				params.unshift(obj);
+				skipArgs = 1; // the receiver is already typed, don't type it again
+				return ft;
+			default:
+			}
+		}
+		#end
+		return null;
+	}
+
 	function resolveGlobal( name : String, expr : Expr, withType : WithType, forWrite : Bool ) : TType {
 		var g = globals.get(name);
 		if( g != null ) {
@@ -1688,8 +1747,8 @@ class Checker {
 		return e;
 	}
 
-	function unifyCallParams( args : Array<{ name : String, opt : Bool, t : TType }>, params : Array<Expr>, pos : Expr ) {
-		for( i in 0...params.length ) {
+	function unifyCallParams( args : Array<{ name : String, opt : Bool, t : TType }>, params : Array<Expr>, pos : Expr, skip = 0 ) {
+		for( i in skip...params.length ) {
 			var a = args[i];
 			if( a == null ) {
 				error("Too many arguments", params[i]);
@@ -1767,16 +1826,19 @@ class Checker {
 				}
 			default:
 			}
-			var prev = callExpr;
+			var prev = callExpr, prevSkip = skipArgs;
 			callExpr = expr;
+			skipArgs = 0;
 			var ft = typeExpr(e, switch( [edef(e),withType] ) {
 				case [EIdent(_),WithType(TEnum(_))]: withType;
 				default: Value;
 			});
+			var skip = skipArgs;
 			callExpr = prev;
+			skipArgs = prevSkip;
 			switch( follow(ft) ) {
 			case TFun(args, ret):
-				unifyCallParams(args, params, expr);
+				unifyCallParams(args, params, expr, skip);
 				return ret;
 			case TDynamic:
 				for( p in params ) typeExpr(p,Value);
