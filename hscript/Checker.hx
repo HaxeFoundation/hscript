@@ -513,6 +513,7 @@ class Checker {
 	var importedAll : Array<ImportDef> = [];
 	var usings : Array<String> = [];
 	var skipArgs : Int = 0;
+	var skipPrivate : Bool;
 	public var checkPrivate : Bool = true;
 	public var allowAsync : Bool;
 	public var allowReturn : Null<TType>;
@@ -642,6 +643,7 @@ class Checker {
 	public function check( expr : Expr, ?withType : WithType, ?isCompletion = false ) {
 		if( withType == null ) withType = NoValue;
 		locals = new Map();
+		skipPrivate = false;
 		if( types.t_string == null )
 			types.t_string = types.getType("String");
 		allowDefine = allowGlobalsDefine;
@@ -1233,7 +1235,7 @@ class Checker {
 	}
 
 	function checkField( cf : CField, ct : CNamedType, args, forWrite, e ) {
-		if( !cf.isPublic && checkPrivate )
+		if( !cf.isPublic && checkPrivate && !skipPrivate )
 			error("Can't access private field "+cf.name+" on "+ct.name, e);
 		if( forWrite && !cf.canWrite )
 			error("Can't write readonly field "+cf.name+" on "+ct.name, e);
@@ -1583,10 +1585,10 @@ class Checker {
 			var acc = f == null ? null : getTypeAccess(t, expr, field);
 			if( acc == null ) return null;
 			expr.e = acc;
-			var prev = checkPrivate;
-			checkPrivate = false;
+			var prev = skipPrivate;
+			skipPrivate = true;
 			var ft = checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
-			checkPrivate = prev;
+			skipPrivate = prev;
 			return ft;
 		default:
 			return null;
@@ -1682,10 +1684,10 @@ class Checker {
 			if( g == null ) g = globals.get("this");
 			if( g != null ) {
 				// local this resolution
-				var prev = checkPrivate;
-				checkPrivate = false;
+				var prev = skipPrivate;
+				skipPrivate = true;
 				var t = getField(g, name, expr);
-				checkPrivate = prev;
+				skipPrivate = prev;
 				if( t != null ) {
 					expr.e = EField(mk(EIdent("this"),expr),name);
 					return t;
@@ -1698,10 +1700,10 @@ class Checker {
 						var acc = getTypeAccess(g, expr, name);
 						if( acc != null ) {
 							expr.e = acc;
-							var prev = checkPrivate;
-							checkPrivate = false;
+							var prev = skipPrivate;
+							skipPrivate = true;
 							var t = checkField(f,c,[for( a in f.params ) makeMono()], forWrite, expr);
-							checkPrivate = prev;
+							skipPrivate = prev;
 							return t;
 						}
 					}
@@ -2249,10 +2251,10 @@ class Checker {
 		if( m == ":untyped" && allowUntypedMeta )
 			return makeMono();
 		if( m == ":privateAccess" && allowPrivateAccess ) {
-			var prev = checkPrivate;
-			checkPrivate = false;
+			var prev = skipPrivate;
+			skipPrivate = true;
 			var t = typeExpr(next, withType);
-			checkPrivate = prev;
+			skipPrivate = prev;
 			return t;
 		}
 		return typeExpr(next, withType);
