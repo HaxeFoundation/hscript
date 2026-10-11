@@ -21,10 +21,15 @@
  */
 package hscript;
 
+enum StringKind {
+	DoubleQuotes;
+	SingleQuotes;
+}
+
 enum Const {
 	CInt( v : Int );
 	CFloat( f : Float );
-	CString( s : String );
+	CString( s : String , ?kind : StringKind);
 }
 
 #if hscriptPos
