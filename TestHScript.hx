@@ -35,6 +35,13 @@ class TestHScript extends TestCase {
 
 	function test():Void {
 		assertScript("0",0);
+		assertScript("var o = { x : 1 }; o.x = 5; o.x", 5);
+		assertScript("var o = { x : 1 }; o.x += 2; o.x *= 3; o.x", 9);
+		assertScript("var a = 0; var b = 0; if( a == 0 ) a = 1 else b = 2; a + b", 1);
+		assertScript("var a = 3; if( a > 2 ) return 5; 3", 5);
+		assertScript("for( i in 0...10 ) if( i == 4 ) return i; -1", 4);
+		assertScript("var o = { a : 2, b : 3 }; o.a + o.b", 5);
+		assertScript("var o = { n : 1 }; var a = o.n++; o.n-- + a + o.n", 4);
 		assertScript("0xFF", 255);
 		#if !(php || python)
 			#if haxe3

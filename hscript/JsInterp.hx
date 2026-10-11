@@ -18,11 +18,18 @@ class JsInterp extends Interp {
 	var hasReturn : Bool;
 
 	override function execute( expr : Expr ) : Dynamic {
+		return compile(expr)(this);
+	}
+
+	public function compile( expr : Expr ) : Dynamic -> Dynamic {
 		depth = 0;
 		localNames = new Map();
-		var str = '(($$i) => ${exprValue(expr)})';
-		var f : Dynamic -> Dynamic = js.Lib.eval(str);
-		return f(this);
+		var prevReturn = hasReturn;
+		hasReturn = false;
+		var body = exprValue(expr);
+		var str = hasReturn ? '(($$i) => { try { return $body; } catch( $$e ) { if( $$e != null && $$e.$$ == 1 ) return $$e.$$val; throw $$e; } })' : '(($$i) => $body)';
+		hasReturn = prevReturn;
+		return js.Lib.eval(str);
 	}
 
 	public static function defineArrayExtensions() {
@@ -235,7 +242,7 @@ class JsInterp extends Interp {
 				case EIdent(id):
 					return '$$i.setVar("$id",${exprValue(e2)})';
 				case EField(e,f):
-					return addPos('$$i.set(${exprValue(e)},"$f")');
+					return addPos('$$i.set(${exprValue(e)},"$f",${exprValue(e2)})');
 				case EArray(e, index):
 					return '$$i.setArray(${exprValue(e)},${exprValue(index)},${exprValue(e2)})';
 				default:
@@ -251,7 +258,7 @@ class JsInterp extends Interp {
 				case EIdent(id):
 					return '$$i.setVar("$id",$$i.resolve("$id") $aop (${exprValue(e2)}))';
 				case EField(e, f):
-					return '(($$o,$$v) => $$i.set($$o,"$f",$$i.get($$o,"$f") $aop $$v)(${exprValue(e)},${exprValue(e2)})';
+					return '(($$o,$$v) => $$i.set($$o,"$f",$$i.get($$o,"$f") $aop $$v))(${exprValue(e)},${exprValue(e2)})';
 				case EArray(e, index):
 					return '(($$a,$$idx,$$v) => $$i.setArray($$a,$$idx,$$i.getArray($$a,$$idx) $aop $$v))(${exprValue(e)},${exprValue(index)},${exprValue(e2)})';
 				default:
@@ -291,6 +298,7 @@ class JsInterp extends Interp {
 					localNames.remove(v);
 					return str;
 				case EField(e, f):
+					var op = op.charAt(0);
 					var v = declLocal("$v");
 					var str = '(($$o) => { let $v = $$i.get($$o,"$f"); $$i.set($$o,"$f",$$v $op 1); return $v; })(${exprValue(e)})';
 					localNames.remove(v);
@@ -327,7 +335,7 @@ class JsInterp extends Interp {
 				return '$$i.call(null,${exprValue(e)},[${args.join(',')}])';
 			}
 		case EIf(cond,e1,e2):
-			return 'if( ${exprCond(cond)} ) ${exprJS(e1)}'+(e2 == null ? "" : 'else ${exprJS(e2)}');
+			return 'if( ${exprCond(cond)} ) ${exprBlock(e1)}'+(e2 == null ? "" : ' else ${exprBlock(e2)}');
 		case ETernary(cond, e1, e2):
 			return '(${exprCond(cond)} ? ${exprValue(e1)} : ${e2 == null ? 'undefined' : exprValue(e2)})';
 		case EWhile(cond, e):
@@ -382,7 +390,7 @@ class JsInterp extends Interp {
 			localNames.remove(v);
 			return 'try ${exprBlock(e)} catch( $v ) $ec';
 		case EObject(fl):
-			var fields = [for( f in fl ) f.name+":"+exprValue(f.e)];
+			var fields = [for( f in fl ) (~/^[A-Za-z_$][A-Za-z0-9_$]*$/.match(f.name) && f.name != "__proto__" ? f.name : '["'+escapeString(f.name)+'"]')+":"+exprValue(f.e)];
 			return '{${fields.join(',')}}'; // do not use 'set' here
 		case EMeta(_, _, e), ECheckType(e,_):
 			return exprJS(e);
@@ -421,11 +429,11 @@ class JsInterp extends Interp {
 		return fcall(o,f,args);
 	}
 
-	function getArray( arr : Dynamic, index : Dynamic ) {
+	function getArray( arr : Dynamic, index : Dynamic ) : Dynamic {
 		return isMap(arr) ? getMapValue(arr,index) : arr[index];
 	}
 
-	function setArray( arr : Dynamic, index : Dynamic, v : Dynamic ) {
+	function setArray( arr : Dynamic, index : Dynamic, v : Dynamic ) : Dynamic {
 		if(isMap(arr) )
 			setMapValue(arr, index, v);
 		else
