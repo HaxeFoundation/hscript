@@ -57,7 +57,7 @@ class Interp {
 	}
 
 	#if js
-	static var ABS_CACHE = new Map();
+	static var ABS_CACHE : Map<String,Dynamic> = new Map();
 	#end
 	function resolveType( path : String ) : Dynamic {
 		#if js
@@ -179,7 +179,7 @@ class Interp {
 		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
 	}
 
-	function evalAssignOp(op,fop,e1,e2) : Dynamic {
+	function evalAssignOp(op:String,fop:Dynamic->Dynamic->Dynamic,e1:Expr,e2:Expr) : Dynamic {
 		var v;
 		switch( Tools.expr(e1) ) {
 		case EIdent(id):
@@ -577,7 +577,7 @@ class Interp {
 		return null;
 	}
 
-	function exprMeta(meta,args,e) : Dynamic {
+	function exprMeta(meta:String,args:Array<Expr>,e:Expr) : Dynamic {
 		return expr(e);
 	}
 
