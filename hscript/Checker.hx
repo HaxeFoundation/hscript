@@ -1244,7 +1244,7 @@ class Checker {
 		return apply(t, ct.params, args);
 	}
 
-	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
+	function getField( t : TType, f : String, e : Expr, forWrite = false ) : TType {
 		switch( follow(t) ) {
 		case TInst(c, args):
 			var cf = c.fields.get(f);
@@ -2317,6 +2317,6 @@ class Checker {
 	}
 
 	static function stub_int( v : Float ) return Std.int(v);
-	static function stub_downcast( v : Dynamic, cl : Dynamic ) return Std.downcast(v, cl);
+	static function stub_downcast( v : Dynamic, cl : Dynamic ) : Dynamic return Std.downcast(v, cl);
 
 }

@@ -343,7 +343,7 @@ class Parser {
 		return parseExprNext(mk(EObject(fl),p1));
 	}
 
-	function parseExpr() {
+	function parseExpr() : Expr {
 		var tk = token();
 		#if hscriptPos
 		var p1 = tokenMin;
@@ -654,7 +654,7 @@ class Parser {
 		}
 	}
 
-	function parseStructure(id) {
+	function parseStructure(id:String) : Expr {
 		#if hscriptPos
 		var p1 = tokenMin;
 		#end
@@ -1486,7 +1486,7 @@ class Parser {
 		return b.toString();
 	}
 
-	function token() {
+	function token() : Token {
 		#if hscriptPos
 		var t = tokens.pop();
 		if( t != null ) {
@@ -1502,7 +1502,7 @@ class Parser {
 		return t;
 	}
 
-	function _token() {
+	function _token() : Token {
 		#else
 		if( !tokens.isEmpty() )
 			return tokens.pop();
