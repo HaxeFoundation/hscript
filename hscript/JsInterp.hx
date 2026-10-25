@@ -73,7 +73,7 @@ class JsInterp extends Interp {
 		}
 	}
 
-	function exprValue( expr : Expr ) : String {
+	function exprValue( expr : Expr ) {
 		switch( Tools.expr(expr) ) {
 		case EBlock([]):
 			return "null";

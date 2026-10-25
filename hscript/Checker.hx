@@ -1244,7 +1244,7 @@ class Checker {
 		return apply(t, ct.params, args);
 	}
 
-	function getField( t : TType, f : String, e : Expr, forWrite = false ) : TType {
+	function getField( t : TType, f : String, e : Expr, forWrite = false ) {
 		switch( follow(t) ) {
 		case TInst(c, args):
 			var cf = c.fields.get(f);

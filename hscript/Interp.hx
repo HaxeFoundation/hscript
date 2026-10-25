@@ -179,7 +179,7 @@ class Interp {
 		binops.set(op,function(e1,e2) return me.evalAssignOp(op,fop,e1,e2));
 	}
 
-	function evalAssignOp(op:String,fop:Dynamic->Dynamic->Dynamic,e1:Expr,e2:Expr) : Dynamic {
+	function evalAssignOp(op,fop:Dynamic->Dynamic->Dynamic,e1,e2) : Dynamic {
 		var v;
 		switch( Tools.expr(e1) ) {
 		case EIdent(id):

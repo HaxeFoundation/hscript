@@ -654,7 +654,7 @@ class Parser {
 		}
 	}
 
-	function parseStructure(id:String) : Expr {
+	function parseStructure(id) : Expr {
 		#if hscriptPos
 		var p1 = tokenMin;
 		#end
@@ -1486,7 +1486,7 @@ class Parser {
 		return b.toString();
 	}
 
-	function token() : Token {
+	function token() {
 		#if hscriptPos
 		var t = tokens.pop();
 		if( t != null ) {
@@ -1502,7 +1502,7 @@ class Parser {
 		return t;
 	}
 
-	function _token() : Token {
+	function _token() {
 		#else
 		if( !tokens.isEmpty() )
 			return tokens.pop();
