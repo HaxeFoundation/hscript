@@ -343,7 +343,7 @@ class Parser {
 		return parseExprNext(mk(EObject(fl),p1));
 	}
 
-	function parseExpr() {
+	function parseExpr() : Expr {
 		var tk = token();
 		#if hscriptPos
 		var p1 = tokenMin;
